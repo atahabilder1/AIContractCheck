@@ -1,0 +1,12 @@
+%======================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+%======================================================================
+
+We presented the first large-scale empirical study of security vulnerabilities in LLM-generated smart contracts. Our analysis of 1,500 contracts across five state-of-the-art LLMs---GPT-4o, Claude 3.5 Sonnet, Gemini 1.5 Pro, GitHub Copilot, and CodeLlama-34B---reveals that \demo{78.4\%} contain at least one vulnerability, with \demo{40.8\%} containing high-severity flaws that could lead to direct financial loss. Significant variation exists across models: Claude produces the fewest vulnerabilities while CodeLlama produces the most (Cohen's $d = \demo{0.98}$).
+
+Our adversarial prompt framework demonstrates that natural-sounding prompts emphasizing gas optimization, simplicity, or independence from external libraries increase vulnerability rates by up to \demo{87\%}, with a mean increase of \demo{37.2\%}. We identified three LLM-specific vulnerability patterns---phantom guards, inherited vulnerabilities, and context window degradation---absent from human-written code, suggesting the need for LLM-aware security tooling.
+
+These findings have immediate practical implications: developers must not deploy LLM-generated smart contracts without rigorous multi-tool security auditing, LLM providers should prioritize security-aware code generation for high-stakes domains, and the security community should develop detection capabilities targeting LLM-specific vulnerability patterns.
+
+We release our full dataset, analysis pipeline, and vulnerability taxonomy to support reproducibility and future research. Future work includes extending the study to additional LLMs (DeepSeek Coder, StarCoder), smart contract languages (Rust/Solana, Move/Aptos), runtime analysis through fuzzing, multi-turn interactive generation sessions, and the development of LLM-aware security tools that can detect the novel vulnerability patterns we have identified.

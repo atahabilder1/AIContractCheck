@@ -1,0 +1,28 @@
+%======================================================================
+\section{Threat Model}
+\label{sec:threat}
+%======================================================================
+
+We consider three attacker types with increasing sophistication, illustrated in the context of the smart contract development lifecycle:
+
+\textbf{Naive Developer (Unintentional).} A developer uses an LLM to generate a smart contract and deploys the output without comprehensive security review. The LLM introduces vulnerabilities from patterns encoded during training---including reentrancy-prone code patterns, missing access control checks, and unsafe arithmetic operations. This is the most common and realistic threat scenario, consistent with findings that developers over-trust AI-generated code~\cite{perry2023users, sandoval2023lost}. Our RQ1 results quantify this risk: \demo{78.4\%} of LLM-generated contracts contain at least one vulnerability, and \demo{40.8\%} contain high-severity flaws that could lead to direct financial loss.
+
+\textbf{Malicious Prompt Crafter (Intentional).} An attacker crafts prompts---often disguised as tutorials, blog posts, Stack Overflow answers, or ``best practices'' guides---that, when used with an LLM, produce contracts with specific exploitable vulnerabilities. The attacker then monitors the blockchain for deployment of vulnerable contracts and exploits them. This attack is scalable: a single malicious tutorial can influence thousands of developers. This attack vector builds on established prompt injection research~\cite{perez2022ignore, greshake2023not, kang2024exploiting} and is validated by our RQ4 results showing that adversarial prompts increase vulnerability rates by \demo{37.2\%}.
+
+\textbf{Supply Chain Attacker.} An adversary poisons LLM training data with subtly vulnerable code patterns~\cite{schuster2021you, wan2023poisoning}, causing the model to systematically reproduce these vulnerabilities across multiple users and deployments. Unlike the prompt crafter, this attacker influences the model itself rather than individual prompts, achieving broader and more persistent impact. This represents the most sophisticated and scalable attack on the smart contract ecosystem.
+
+\subsection{Attack Surface}
+
+The attack surface encompasses three components:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Training data}: May contain vulnerable patterns from unaudited contracts, deprecated coding practices, and intentionally poisoned code repositories.
+    \item \textbf{Prompt interface}: Susceptible to adversarial manipulation through natural-sounding requests that prioritize non-security objectives (gas optimization, simplicity, speed).
+    \item \textbf{Developer trust}: Developers may assume LLM output is correct, particularly when the generated code appears syntactically complete and includes security-relevant constructs (e.g., modifier names like \texttt{nonReentrant}) that create a false sense of security.
+\end{itemize}
+
+The \textbf{impact} ranges from individual contract exploitation (thousands to millions of dollars) to systemic DeFi protocol failures. Cross-chain bridge contracts present the highest-impact target, with potential losses exceeding hundreds of millions of dollars from a single vulnerability, as demonstrated by the Ronin (\$625M), Wormhole (\$326M), and Nomad (\$190M) incidents~\cite{bridge_hacks}.
+
+\subsection{Assumptions}
+
+We make the following assumptions: (1)~developers have access to commercial and open-source LLMs via APIs or IDE integrations; (2)~some developers deploy LLM output without thorough audit, as evidenced by survey data showing that 37\% of developers using AI assistants review generated code only ``briefly''~\cite{perry2023users}; (3)~attackers can observe deployed contracts on-chain, as Ethereum contract bytecode and (often) source code are publicly accessible; and (4)~attackers understand common vulnerability patterns and have access to the same automated exploitation tools as security researchers. These assumptions are consistent with the current state of smart contract development and blockchain transparency.

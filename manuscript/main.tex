@@ -1,0 +1,92 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage{balance}
+\usepackage{subcaption}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepgfplotslibrary{statistics}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, patterns}
+
+\lstdefinelanguage{Solidity}{
+  keywords={pragma, solidity, contract, function, modifier, require, returns, return, mapping, address, uint, uint256, bool, string, bytes, public, private, internal, external, view, pure, payable, memory, storage, calldata, if, else, for, while, emit, event, struct, enum, import, is, new, delete, true, false, msg, block, tx, this},
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]",
+  morestring=[b]',
+  sensitive=true,
+}
+
+\lstset{
+  basicstyle=\footnotesize\ttfamily,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny,
+  tabsize=2,
+  captionpos=b,
+  keywordstyle=\bfseries,
+  commentstyle=\itshape\color{gray},
+}
+
+% =====================================================================
+% DEMO DATA MARKER: All placeholder numbers are wrapped in \demo{}.
+% They render in RED. Replace with real experimental data and remove
+% the \demo command before final submission.
+% =====================================================================
+\newcommand{\demo}[1]{{\color{red}#1}}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{From Prompt to Exploit: An Empirical Study of Security Vulnerabilities in LLM-Generated Smart Contracts}
+
+\author{\IEEEauthorblockN{Anik Tahabilder}
+\IEEEauthorblockA{\textit{Department of Computer Science} \\
+\textit{Wayne State University}\\
+Detroit, MI, USA \\
+tahabilderanik@gmail.com}
+}
+
+\maketitle
+
+\input{sections/abstract}
+
+\input{sections/introduction}
+
+\input{sections/background}
+
+\input{sections/threat_model}
+
+\input{sections/methodology}
+
+\input{sections/results}
+
+\input{sections/category_analysis}
+
+\input{sections/discussion}
+
+\input{sections/related_work}
+
+\input{sections/conclusion}
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\balance
+
+\end{document}

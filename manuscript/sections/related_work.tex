@@ -1,0 +1,36 @@
+%======================================================================
+\section{Related Work}
+\label{sec:related}
+%======================================================================
+
+\subsection{LLM-Assisted Vulnerability Detection}
+
+Recent work has explored using LLMs to \emph{detect} vulnerabilities in smart contracts, complementing traditional tools. GPTScan~\cite{gptscan} combines GPT-4 with static analysis to identify logic vulnerabilities, achieving higher precision than standalone tools on a benchmark of 168 contracts. SmartLLMSentry~\cite{smartllmsentry} employs LLMs as vulnerability detectors with chain-of-thought reasoning. PropertyGPT~\cite{propertygpt} uses LLMs to generate formal security properties for automated verification. David et al.~\cite{david2023you} evaluated ChatGPT's ability to detect and repair 52 smart contract vulnerabilities, finding moderate detection accuracy (68\%) but low repair success rates. ContractTinker~\cite{contracttinker} proposes LLM-based automated smart contract repair.
+
+These works are complementary to ours: they study LLMs as \emph{detectors}, while we study LLMs as vulnerability \emph{sources}. An important implication of combining both perspectives is the potential for circular vulnerabilities---LLMs that generate vulnerable code may also fail to detect the same vulnerability classes in their output.
+
+\subsection{Smart Contract Security Analysis}
+
+The smart contract security tooling ecosystem has matured significantly. Slither~\cite{slither} provides fast static analysis with over 90 built-in detectors, making it the most widely used tool for Solidity auditing. Mythril~\cite{mythril} performs symbolic execution for deep bug detection, including those requiring specific state conditions. Securify~\cite{securify} applies formal verification to check compliance with predefined security patterns. Oyente~\cite{luu2016making} was among the first symbolic execution tools for Ethereum smart contracts. Manticore~\cite{mossberg2019manticore} provides advanced symbolic analysis with support for multiple architectures. SmartCheck~\cite{smartcheck} uses structural pattern-based detection.
+
+Durieux et al.~\cite{durieux2020empirical} conducted the most comprehensive empirical evaluation of smart contract analysis tools, testing 9 tools on 47,587 contracts. Their key finding---that no single tool achieves complete coverage and that tools have low inter-agreement---directly motivated our multi-tool approach. Ren et al.~\cite{ren2021empirical} conducted an empirical study of vulnerabilities in 21,212 real-world contracts, establishing prevalence baselines. SmartBugs~\cite{smartbugs} provides a curated, labeled benchmark dataset for tool evaluation. We build on these tools as our analysis infrastructure and contribute a new dimension by applying them to LLM-generated rather than human-written code.
+
+\subsection{Security of LLM-Generated Code}
+
+The security implications of LLM code generation have been studied primarily in general-purpose languages. Pearce et al.~\cite{copilot_eval} conducted the foundational study evaluating GitHub Copilot's security across 89 scenarios derived from CWE types, finding that approximately 40\% of generated suggestions contained vulnerabilities. Perry et al.~\cite{perry2023users} demonstrated through a controlled study with 47 participants that developers using AI assistants produce less secure code while believing it to be more secure. Sandoval et al.~\cite{sandoval2023lost} confirmed these findings in a larger study with professional developers.
+
+Tony et al.~\cite{tony2023llmSecEval} created LLMSecEval, a benchmark of 150 test cases for evaluating code LLM security across 18 CWE types. Tihanyi et al.~\cite{tihanyi2023formai} proposed FormAI, a dataset of 112,000 AI-generated C programs with vulnerability labels obtained through dynamic analysis. Jesse et al.~\cite{jesse2023large} studied LLM-generated code bugs more broadly, finding systematic patterns in error generation.
+
+Our work extends this line of research to the smart contract domain, which introduces unique challenges: immutability prevents post-deployment patching, financial exposure creates immediate exploitation incentives, and the adversarial blockchain environment means any vulnerability is publicly discoverable. Furthermore, our adversarial prompt framework and cross-LLM comparison methodology are novel contributions not present in prior work.
+
+\subsection{Adversarial Attacks on LLMs}
+
+Prompt injection~\cite{perez2022ignore, greshake2023not} and jailbreaking~\cite{kang2024exploiting} attacks demonstrate that LLMs can be manipulated to produce harmful or unintended outputs. In the code domain, Schuster et al.~\cite{schuster2021you} showed that training data poisoning can introduce targeted vulnerabilities into code completion models. Wan et al.~\cite{wan2023poisoning} extended this to instruction-tuned code generation models, demonstrating that subtle training data manipulation can cause models to systematically produce specific vulnerability types.
+
+Our adversarial prompt framework differs from these prior approaches in two ways: (1)~we focus on \emph{prompt-level} manipulation rather than training data poisoning, reflecting a more realistic threat model; and (2)~our adversarial prompts are designed to appear natural and plausible---resembling requests a non-security-aware developer might genuinely write---rather than explicit jailbreaking attempts. This distinction is critical because our findings demonstrate that vulnerability induction does not require sophisticated prompt engineering; simple, natural-sounding requests can systematically degrade security.
+
+\subsection{Smart Contract Datasets and Benchmarks}
+
+Several datasets exist for smart contract security research. SmartBugs~\cite{smartbugs} provides a curated dataset of vulnerable contracts for tool benchmarking, categorized by vulnerability type. The SWC Registry~\cite{swc_registry} maintains a taxonomy of known smart contract weaknesses with test cases. Ren et al.~\cite{ren2021empirical} compiled a dataset of 21,212 real-world contracts with vulnerability annotations from multiple tools.
+
+Our dataset differs fundamentally from these prior datasets: it captures vulnerabilities \emph{introduced by LLM generation} rather than curated from known bugs, mined from deployed contracts, or synthetically constructed. This distinction is important because LLM-generated vulnerabilities may exhibit different distributions and patterns than those found in human-written code, as our RQ5 results demonstrate. Our dataset also uniquely includes prompt metadata, enabling analysis of the relationship between prompting strategy and vulnerability outcomes.

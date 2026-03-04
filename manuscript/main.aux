@@ -1,0 +1,269 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{copilot_eval,fan2023large,hou2024large}
+\citation{github_copilot}
+\citation{werner2022sok,zhou2023sok}
+\citation{chainalysis2023}
+\citation{chen2020defining}
+\citation{gptscan,smartllmsentry,david2023you}
+\citation{perry2023users}
+\citation{schuster2021you}
+\citation{kang2024exploiting}
+\citation{bridge_hacks}
+\@writefile{toc}{\contentsline {section}{\numberline {I}Introduction}{1}{section.1}\protected@file@percent }
+\newlabel{sec:intro}{{I}{1}{Introduction}{section.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {I-A}}Research Questions}{1}{subsection.1.1}\protected@file@percent }
+\citation{wood2014ethereum,buterin2014next}
+\citation{atzei2017survey}
+\citation{dao_hack}
+\citation{torres2018integer}
+\citation{chen2020defining}
+\citation{qin2023attacks}
+\citation{atzei2017survey,perez2021smart}
+\citation{zhou2023sok}
+\citation{perez2021smart}
+\citation{qin2021attacking}
+\citation{zhou2023sok}
+\citation{swc_registry}
+\citation{chen2021evaluating,nijkamp2023codegen,li2023starcoder}
+\citation{openai_gpt4}
+\citation{anthropic_claude}
+\citation{codellama}
+\citation{copilot_eval,tony2023llmSecEval}
+\citation{li2023starcoder}
+\citation{guo2024deepseek}
+\citation{github_copilot}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {I-B}}Contributions}{2}{subsection.1.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {II}Background}{2}{section.2}\protected@file@percent }
+\newlabel{sec:background}{{II}{2}{Background}{section.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-A}}Smart Contract Vulnerabilities}{2}{subsection.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-B}}LLM Code Generation}{2}{subsection.2.2}\protected@file@percent }
+\citation{copilot_eval,perry2023users,sandoval2023lost}
+\citation{copilot_eval}
+\citation{perry2023users}
+\citation{sandoval2023lost}
+\citation{belchior2021survey}
+\citation{bridge_hacks,zhang2023bridge}
+\citation{slither}
+\citation{mythril}
+\citation{securify}
+\citation{semgrep}
+\citation{durieux2020empirical}
+\citation{durieux2020empirical}
+\citation{smartbugs,ren2021empirical}
+\citation{perry2023users,sandoval2023lost}
+\citation{perez2022ignore,greshake2023not,kang2024exploiting}
+\citation{schuster2021you,wan2023poisoning}
+\citation{bridge_hacks}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-C}}Cross-Chain Bridge Security}{3}{subsection.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-D}}Security Analysis Tools}{3}{subsection.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {III}Threat Model}{3}{section.3}\protected@file@percent }
+\newlabel{sec:threat}{{III}{3}{Threat Model}{section.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-A}}Attack Surface}{3}{subsection.3.1}\protected@file@percent }
+\citation{perry2023users}
+\citation{openai_gpt4}
+\citation{anthropic_claude}
+\citation{gemini}
+\citation{github_copilot}
+\citation{codellama}
+\citation{eip20}
+\citation{eip721}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Overview of our four-phase research pipeline for analyzing security vulnerabilities in LLM-generated smart contracts.}}{4}{figure.caption.1}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig:pipeline}{{1}{4}{Overview of our four-phase research pipeline for analyzing security vulnerabilities in LLM-generated smart contracts}{figure.caption.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-B}}Assumptions}{4}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {IV}Methodology}{4}{section.4}\protected@file@percent }
+\newlabel{sec:methodology}{{IV}{4}{Methodology}{section.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-A}}Dataset Generation}{4}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {\mbox  {IV-A}1}LLM Selection}{4}{subsubsection.4.1.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {I}{\ignorespaces LLM Configuration Details}}{4}{table.caption.2}\protected@file@percent }
+\newlabel{tab:llm_config}{{I}{4}{LLM Configuration Details}{table.caption.2}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {\mbox  {IV-A}2}Contract Categories}{4}{subsubsection.4.1.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {\mbox  {IV-A}3}Prompt Design}{4}{subsubsection.4.1.3}\protected@file@percent }
+\citation{slither}
+\citation{mythril}
+\citation{securify}
+\citation{semgrep}
+\citation{swc_registry}
+\citation{kang2024exploiting,perez2022ignore}
+\citation{openzeppelin}
+\newlabel{fig:prompt_example}{{1}{5}{Representative prompts for the ERC20 token category. Standard prompts (top) request straightforward implementations. Adversarial prompts (bottom) introduce biases that may reduce security}{lstlisting.1}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {1}{\ignorespaces Representative prompts for the ERC20 token category. Standard prompts (top) request straightforward implementations. Adversarial prompts (bottom) introduce biases that may reduce security.}}{5}{lstlisting.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {II}{\ignorespaces Security Analysis Tool Configuration}}{5}{table.caption.4}\protected@file@percent }
+\newlabel{tab:tools}{{II}{5}{Security Analysis Tool Configuration}{table.caption.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-B}}Vulnerability Analysis Pipeline}{5}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {\mbox  {IV-B}1}Deduplication Strategy}{5}{subsubsection.4.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {\mbox  {IV-B}2}Manual Validation}{5}{subsubsection.4.2.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {III}{\ignorespaces Mapping of Detected Vulnerabilities to CWE Identifiers}}{5}{table.caption.5}\protected@file@percent }
+\newlabel{tab:cwe_mapping}{{III}{5}{Mapping of Detected Vulnerabilities to CWE Identifiers}{table.caption.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}CWE Vulnerability Mapping}{5}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-D}}Adversarial Prompt Design}{5}{subsection.4.4}\protected@file@percent }
+\newlabel{sec:adversarial}{{\mbox  {IV-D}}{5}{Adversarial Prompt Design}{subsection.4.4}{}}
+\citation{openzeppelin}
+\citation{adams2021uniswap}
+\citation{aave}
+\citation{leshner2019compound}
+\citation{cohen1988statistical}
+\citation{arcuri2011practical}
+\citation{perry2023users}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-E}}Human Baseline Collection}{6}{subsection.4.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-F}}Statistical Methods}{6}{subsection.4.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {V}Results}{6}{section.5}\protected@file@percent }
+\newlabel{sec:results}{{V}{6}{Results}{section.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-A}}RQ1: Vulnerability Prevalence}{6}{subsection.5.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {IV}{\ignorespaces Overall Vulnerability Prevalence Across All LLMs}}{6}{table.caption.6}\protected@file@percent }
+\newlabel{tab:overall}{{IV}{6}{Overall Vulnerability Prevalence Across All LLMs}{table.caption.6}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {V}{\ignorespaces Vulnerability Statistics by LLM}}{6}{table.caption.7}\protected@file@percent }
+\newlabel{tab:llm_comparison}{{V}{6}{Vulnerability Statistics by LLM}{table.caption.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-B}}RQ2: Cross-LLM Comparison}{6}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-C}}RQ3: Vulnerability Taxonomy}{6}{subsection.5.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Distribution of vulnerability counts per contract by LLM. Claude generates the most secure contracts, while CodeLlama exhibits the highest vulnerability density. {\color  {red}(Demo data)}}}{7}{figure.caption.8}\protected@file@percent }
+\newlabel{fig:boxplot}{{2}{7}{Distribution of vulnerability counts per contract by LLM. Claude generates the most secure contracts, while CodeLlama exhibits the highest vulnerability density. {\color {red}(Demo data)}}{figure.caption.8}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {VI}{\ignorespaces Pairwise Effect Sizes (Cohen's $d$) Between LLMs}}{7}{table.caption.9}\protected@file@percent }
+\newlabel{tab:pairwise}{{VI}{7}{Pairwise Effect Sizes (Cohen's $d$) Between LLMs}{table.caption.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-D}}RQ4: Adversarial Prompt Effectiveness}{7}{subsection.5.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {VII}{\ignorespaces Top 10 Vulnerability Types in LLM-Generated Contracts}}{7}{table.caption.10}\protected@file@percent }
+\newlabel{tab:taxonomy}{{VII}{7}{Top 10 Vulnerability Types in LLM-Generated Contracts}{table.caption.10}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Heatmap of vulnerability type distribution across LLMs. Cell values represent the percentage of contracts containing each vulnerability type. Darker cells indicate higher prevalence. {\color  {red}(Demo data)}}}{7}{figure.caption.11}\protected@file@percent }
+\newlabel{fig:heatmap}{{3}{7}{Heatmap of vulnerability type distribution across LLMs. Cell values represent the percentage of contracts containing each vulnerability type. Darker cells indicate higher prevalence. {\color {red}(Demo data)}}{figure.caption.11}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-E}}RQ5: LLM-Specific Vulnerability Patterns}{7}{subsection.5.5}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {VIII}{\ignorespaces Impact of Adversarial vs.\ Standard Prompts}}{8}{table.caption.12}\protected@file@percent }
+\newlabel{tab:adversarial}{{VIII}{8}{Impact of Adversarial vs.\ Standard Prompts}{table.caption.12}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Mean vulnerability count by adversarial prompt category compared to standard prompts. ``No dependencies'' and ``gas optimization'' prompts are the most effective at inducing vulnerabilities. {\color  {red}(Demo data)}}}{8}{figure.caption.13}\protected@file@percent }
+\newlabel{fig:adversarial_bar}{{4}{8}{Mean vulnerability count by adversarial prompt category compared to standard prompts. ``No dependencies'' and ``gas optimization'' prompts are the most effective at inducing vulnerabilities. {\color {red}(Demo data)}}{figure.caption.13}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {\mbox  {V-E}1}Phantom Guard Pattern}{8}{subsubsection.5.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {\mbox  {V-E}2}Inherited Vulnerability Pattern}{8}{subsubsection.5.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {\mbox  {V-E}3}Context Window Degradation}{8}{subsubsection.5.5.3}\protected@file@percent }
+\newlabel{fig:phantom}{{2}{8}{Phantom Guard Pattern: The \texttt {nonReentrant} modifier is declared but contains no locking logic (left). A correct implementation requires a state variable and checks (right). {\color {red}(Demo)}}{lstlisting.2}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {2}{\ignorespaces Phantom Guard Pattern: The \texttt  {nonReentrant} modifier is declared but contains no locking logic (left). A correct implementation requires a state variable and checks (right). {\color  {red}(Demo)}}}{8}{lstlisting.2}\protected@file@percent }
+\newlabel{fig:inherited}{{3}{8}{Inherited Vulnerability: LLM-generated SafeMath reimplementation with an incorrect overflow check (line 3). The check \texttt {c >= a} is insufficient when both operands are large. {\color {red}(Demo)}}{lstlisting.3}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {3}{\ignorespaces Inherited Vulnerability: LLM-generated SafeMath reimplementation with an incorrect overflow check (line 3). The check \texttt  {c >= a} is insufficient when both operands are large. {\color  {red}(Demo)}}}{8}{lstlisting.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-F}}RQ6: Comparison with Human-Written Code}{8}{subsection.5.6}\protected@file@percent }
+\citation{bridge_hacks,zhang2023bridge}
+\citation{qin2021attacking}
+\@writefile{lot}{\contentsline {table}{\numberline {IX}{\ignorespaces LLM-Generated vs.\ Human-Written Contract Comparison}}{9}{table.caption.16}\protected@file@percent }
+\newlabel{tab:human_comparison}{{IX}{9}{LLM-Generated vs.\ Human-Written Contract Comparison}{table.caption.16}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {X}{\ignorespaces Vulnerability Rates by Contract Category (Top 10)}}{9}{table.caption.17}\protected@file@percent }
+\newlabel{tab:categories}{{X}{9}{Vulnerability Rates by Contract Category (Top 10)}{table.caption.17}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {VI}Contract Category Analysis}{9}{section.6}\protected@file@percent }
+\newlabel{sec:category}{{VI}{9}{Contract Category Analysis}{section.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-A}}Cross-Chain Contracts: Highest Risk}{9}{subsection.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-B}}DeFi Protocols: Reentrancy Dominant}{9}{subsection.6.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Vulnerability severity distribution by contract category. High-complexity categories (bridges, flash loans) have both more total vulnerabilities and a higher proportion of high-severity issues. {\color  {red}(Demo data)}}}{9}{figure.caption.18}\protected@file@percent }
+\newlabel{fig:category_radar}{{5}{9}{Vulnerability severity distribution by contract category. High-complexity categories (bridges, flash loans) have both more total vulnerabilities and a higher proportion of high-severity issues. {\color {red}(Demo data)}}{figure.caption.18}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-C}}Standard Contracts: Lower but Non-Zero Risk}{9}{subsection.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {VII}Discussion}{9}{section.7}\protected@file@percent }
+\newlabel{sec:discussion}{{VII}{9}{Discussion}{section.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VII-A}}Implications for Developers}{9}{subsection.7.1}\protected@file@percent }
+\citation{bai2022training}
+\citation{guo2024deepseek}
+\citation{li2023starcoder}
+\citation{kang2024exploiting,perez2022ignore}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VII-B}}Implications for LLM Providers}{10}{subsection.7.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VII-C}}Implications for the Security Community}{10}{subsection.7.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VII-D}}Limitations}{10}{subsection.7.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VII-E}}Threats to Validity}{10}{subsection.7.5}\protected@file@percent }
+\citation{gptscan}
+\citation{smartllmsentry}
+\citation{propertygpt}
+\citation{david2023you}
+\citation{contracttinker}
+\citation{slither}
+\citation{mythril}
+\citation{securify}
+\citation{luu2016making}
+\citation{mossberg2019manticore}
+\citation{smartcheck}
+\citation{durieux2020empirical}
+\citation{ren2021empirical}
+\citation{smartbugs}
+\citation{copilot_eval}
+\citation{perry2023users}
+\citation{sandoval2023lost}
+\citation{tony2023llmSecEval}
+\citation{tihanyi2023formai}
+\citation{jesse2023large}
+\citation{perez2022ignore,greshake2023not}
+\citation{kang2024exploiting}
+\citation{schuster2021you}
+\citation{wan2023poisoning}
+\citation{smartbugs}
+\citation{swc_registry}
+\citation{ren2021empirical}
+\@writefile{toc}{\contentsline {section}{\numberline {VIII}Related Work}{11}{section.8}\protected@file@percent }
+\newlabel{sec:related}{{VIII}{11}{Related Work}{section.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VIII-A}}LLM-Assisted Vulnerability Detection}{11}{subsection.8.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VIII-B}}Smart Contract Security Analysis}{11}{subsection.8.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VIII-C}}Security of LLM-Generated Code}{11}{subsection.8.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VIII-D}}Adversarial Attacks on LLMs}{11}{subsection.8.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VIII-E}}Smart Contract Datasets and Benchmarks}{11}{subsection.8.5}\protected@file@percent }
+\bibstyle{IEEEtran}
+\bibdata{references}
+\bibcite{copilot_eval}{1}
+\bibcite{fan2023large}{2}
+\bibcite{hou2024large}{3}
+\bibcite{github_copilot}{4}
+\bibcite{werner2022sok}{5}
+\bibcite{zhou2023sok}{6}
+\bibcite{chainalysis2023}{7}
+\bibcite{chen2020defining}{8}
+\bibcite{gptscan}{9}
+\bibcite{smartllmsentry}{10}
+\bibcite{david2023you}{11}
+\bibcite{perry2023users}{12}
+\bibcite{schuster2021you}{13}
+\bibcite{kang2024exploiting}{14}
+\bibcite{bridge_hacks}{15}
+\bibcite{wood2014ethereum}{16}
+\bibcite{buterin2014next}{17}
+\bibcite{atzei2017survey}{18}
+\bibcite{dao_hack}{19}
+\bibcite{torres2018integer}{20}
+\bibcite{qin2023attacks}{21}
+\bibcite{perez2021smart}{22}
+\bibcite{qin2021attacking}{23}
+\bibcite{swc_registry}{24}
+\bibcite{chen2021evaluating}{25}
+\bibcite{nijkamp2023codegen}{26}
+\bibcite{li2023starcoder}{27}
+\bibcite{openai_gpt4}{28}
+\bibcite{anthropic_claude}{29}
+\bibcite{codellama}{30}
+\bibcite{tony2023llmSecEval}{31}
+\bibcite{guo2024deepseek}{32}
+\@writefile{toc}{\contentsline {section}{\numberline {IX}Conclusion}{12}{section.9}\protected@file@percent }
+\newlabel{sec:conclusion}{{IX}{12}{Conclusion}{section.9}{}}
+\@writefile{toc}{\contentsline {section}{References}{12}{section*.22}\protected@file@percent }
+\bibcite{sandoval2023lost}{33}
+\bibcite{belchior2021survey}{34}
+\bibcite{zhang2023bridge}{35}
+\bibcite{slither}{36}
+\bibcite{mythril}{37}
+\bibcite{securify}{38}
+\bibcite{semgrep}{39}
+\bibcite{durieux2020empirical}{40}
+\bibcite{smartbugs}{41}
+\bibcite{ren2021empirical}{42}
+\bibcite{perez2022ignore}{43}
+\bibcite{greshake2023not}{44}
+\bibcite{wan2023poisoning}{45}
+\bibcite{gemini}{46}
+\bibcite{eip20}{47}
+\bibcite{eip721}{48}
+\bibcite{openzeppelin}{49}
+\bibcite{adams2021uniswap}{50}
+\bibcite{aave}{51}
+\bibcite{leshner2019compound}{52}
+\bibcite{cohen1988statistical}{53}
+\bibcite{arcuri2011practical}{54}
+\bibcite{bai2022training}{55}
+\bibcite{propertygpt}{56}
+\bibcite{contracttinker}{57}
+\bibcite{luu2016making}{58}
+\bibcite{mossberg2019manticore}{59}
+\bibcite{smartcheck}{60}
+\bibcite{tihanyi2023formai}{61}
+\bibcite{jesse2023large}{62}
+\gdef \@abspage@last{13}

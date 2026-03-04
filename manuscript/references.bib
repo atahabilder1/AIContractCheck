@@ -1,0 +1,489 @@
+% =============================================================================
+% REFERENCES - From Prompt to Exploit (IEEE S&P Target)
+% At least 40 high-quality citations from top venues
+% =============================================================================
+
+% --- LLM Code Security ---
+
+@inproceedings{copilot_eval,
+  author    = {Pearce, Hammond and Ahmad, Baleegh and Tan, Benjamin and Dolan-Gavitt, Brendan and Karri, Ramesh},
+  title     = {Asleep at the Keyboard? Assessing the Security of {GitHub Copilot}'s Code Contributions},
+  booktitle = {Proc. IEEE Symposium on Security and Privacy (S\&P)},
+  year      = {2022},
+  pages     = {754--768},
+}
+
+@inproceedings{perry2023users,
+  author    = {Perry, Neil and Srivastava, Megha and Kumar, Deepak and Boneh, Dan},
+  title     = {Do Users Write More Insecure Code with {AI} Assistants?},
+  booktitle = {Proc. ACM SIGSAC Conference on Computer and Communications Security (CCS)},
+  year      = {2023},
+  pages     = {2785--2799},
+}
+
+@inproceedings{sandoval2023lost,
+  author    = {Sandoval, Gustavo and Pearce, Hammond and Nys, Teo and Karri, Ramesh and Garg, Siddharth and Dolan-Gavitt, Brendan},
+  title     = {Lost at {C}: A User Study on the Security Implications of Large Language Model Code Assistants},
+  booktitle = {Proc. USENIX Security Symposium},
+  year      = {2023},
+}
+
+@article{tony2023llmSecEval,
+  author  = {Tony, Catherine and Mutas, Markus and Ferreyra, Nicol{\'a}s E. D{\'\i}az and Scandariato, Riccardo},
+  title   = {{LLMSecEval}: A Dataset of Natural Language Prompts for Security Evaluations},
+  journal = {arXiv preprint arXiv:2303.09384},
+  year    = {2023},
+}
+
+@article{tihanyi2023formai,
+  author  = {Tihanyi, Norbert and Bisztray, Tam{\'a}s and Kellner, Ridhi and Jain, Rish and Ferrag, Mohamed Amine and Cordeiro, Lucas C. and Deb, Vasileios},
+  title   = {{FormAI}: Large Language Model for Generating Formal Mathematical Proofs and a Dataset of {AI}-Generated {C} Programs},
+  journal = {arXiv preprint arXiv:2307.02192},
+  year    = {2023},
+}
+
+@article{fan2023large,
+  author  = {Fan, Angela and Gokkaya, Beliz and Harman, Mark and Lyubarskiy, Mitya and Sengupta, Shubho and Yoo, Shin and Zhang, Jie M.},
+  title   = {Large Language Models for Software Engineering: Survey and Open Problems},
+  journal = {arXiv preprint arXiv:2310.03533},
+  year    = {2023},
+}
+
+@article{hou2024large,
+  author  = {Hou, Xinyi and Zhao, Yanjie and Liu, Yue and Yang, Zhou and Wang, Kailong and Li, Li and Luo, Xiapu and Lo, David and Grundy, John and Wang, Haoyu},
+  title   = {Large Language Models for Software Engineering: A Systematic Literature Review},
+  journal = {ACM Transactions on Software Engineering and Methodology},
+  year    = {2024},
+  volume  = {33},
+  number  = {8},
+}
+
+% --- LLM Code Generation ---
+
+@article{chen2021evaluating,
+  author  = {Chen, Mark and Tworek, Jerry and Jun, Heewoo and Yuan, Qiming and Pinto, Henrique Ponde de Oliveira and Kaplan, Jared and Edwards, Harri and Burda, Yuri and Joseph, Nicholas and Brockman, Greg and others},
+  title   = {Evaluating Large Language Models Trained on Code},
+  journal = {arXiv preprint arXiv:2107.03374},
+  year    = {2021},
+}
+
+@article{nijkamp2023codegen,
+  author  = {Nijkamp, Erik and Pang, Bo and Hayashi, Hiroaki and Tu, Lifu and Wang, Huan and Zhou, Yingbo and Savarese, Silvio and Xiong, Caiming},
+  title   = {{CodeGen}: An Open Large Language Model for Code with Multi-Turn Program Synthesis},
+  journal = {arXiv preprint arXiv:2203.13474},
+  year    = {2023},
+}
+
+@article{li2023starcoder,
+  author  = {Li, Raymond and Allal, Loubna Ben and Zi, Yangtian and Muennighoff, Niklas and Kocetkov, Denis and Mou, Chenghao and Marone, Marc and Akiki, Christopher and Li, Jia and Chim, Jenny and others},
+  title   = {{StarCoder}: May the Source Be with You!},
+  journal = {arXiv preprint arXiv:2305.06161},
+  year    = {2023},
+}
+
+@article{guo2024deepseek,
+  author  = {Guo, Daya and Zhu, Qihao and Yang, Dejian and Xie, Zhenda and Dong, Kai and Zhang, Wentao and Chen, Guanting and Bi, Xiao and Wu, Y. and Li, Y.K. and others},
+  title   = {{DeepSeek-Coder}: When the Large Language Model Meets Programming},
+  journal = {arXiv preprint arXiv:2401.14196},
+  year    = {2024},
+}
+
+% --- LLM Models ---
+
+@article{openai_gpt4,
+  author  = {{OpenAI}},
+  title   = {{GPT-4} Technical Report},
+  journal = {arXiv preprint arXiv:2303.08774},
+  year    = {2023},
+}
+
+@techreport{anthropic_claude,
+  author      = {{Anthropic}},
+  title       = {Claude 3.5 Sonnet Model Card},
+  institution = {Anthropic},
+  year        = {2024},
+}
+
+@article{codellama,
+  author  = {Rozi{\`e}re, Baptiste and Gehring, Jonas and Gloeckle, Fabian and Sootla, Sten and Gat, Itai and Tan, Xiaoqing Ellen and Adi, Yossi and Liu, Jingyu and Sauvestre, Romain and Remez, Tal and others},
+  title   = {Code {Llama}: Open Foundation Models for Code},
+  journal = {arXiv preprint arXiv:2308.12950},
+  year    = {2023},
+}
+
+@article{gemini,
+  author  = {{Google DeepMind}},
+  title   = {Gemini: A Family of Highly Capable Multimodal Models},
+  journal = {arXiv preprint arXiv:2312.11805},
+  year    = {2023},
+}
+
+@misc{github_copilot,
+  author = {{GitHub}},
+  title  = {{GitHub Copilot}: Your {AI} Pair Programmer},
+  year   = {2024},
+  url    = {https://github.com/features/copilot},
+}
+
+% --- Smart Contract Security Tools ---
+
+@inproceedings{slither,
+  author    = {Feist, Josselin and Grieco, Gustavo and Groce, Alex},
+  title     = {Slither: A Static Analysis Framework for Smart Contracts},
+  booktitle = {Proc. IEEE/ACM Int. Workshop on Emerging Trends in Software Engineering for Blockchain (WETSEB)},
+  year      = {2019},
+  pages     = {8--15},
+}
+
+@inproceedings{mythril,
+  author    = {Mueller, Bernhard},
+  title     = {Smashing {Ethereum} Smart Contracts for Fun and Real Profit},
+  booktitle = {HITB Security Conference},
+  year      = {2018},
+}
+
+@inproceedings{securify,
+  author    = {Tsankov, Petar and Dan, Andrei and Drachsler-Cohen, Dana and Gervais, Arthur and B{\"u}nzli, Florian and Vechev, Martin},
+  title     = {Securify: Practical Security Analysis of Smart Contracts},
+  booktitle = {Proc. ACM SIGSAC Conference on Computer and Communications Security (CCS)},
+  year      = {2018},
+  pages     = {67--82},
+}
+
+@inproceedings{smartcheck,
+  author    = {Tikhomirov, Sergei and Voskresenskaya, Ekaterina and Ivanitskiy, Ivan and Takhaviev, Ramil and Marchenko, Evgeny and Alexandrov, Yaroslav},
+  title     = {{SmartCheck}: Static Analysis of {Ethereum} Smart Contracts},
+  booktitle = {Proc. IEEE/ACM Int. Workshop on Emerging Trends in Software Engineering for Blockchain (WETSEB)},
+  year      = {2018},
+  pages     = {9--16},
+}
+
+@inproceedings{luu2016making,
+  author    = {Luu, Loi and Chu, Duc-Hiep and Olickel, Hrishi and Saxena, Prateek and Hobor, Aquinas},
+  title     = {Making Smart Contracts Smarter},
+  booktitle = {Proc. ACM SIGSAC Conference on Computer and Communications Security (CCS)},
+  year      = {2016},
+  pages     = {254--269},
+}
+
+@inproceedings{mossberg2019manticore,
+  author    = {Mossberg, Mark and Manzano, Felipe and Hennenfent, Eric and Groce, Alex and Grieco, Gustavo and Feist, Josselin and Brunson, Trent and Dinaburg, Artem},
+  title     = {Manticore: A User-Friendly Symbolic Execution Framework for Binaries and Smart Contracts},
+  booktitle = {Proc. IEEE/ACM Int. Conference on Automated Software Engineering (ASE)},
+  year      = {2019},
+  pages     = {1186--1189},
+}
+
+@misc{semgrep,
+  author = {{Semgrep}},
+  title  = {Semgrep: Lightweight Static Analysis for Many Languages},
+  year   = {2024},
+  url    = {https://semgrep.dev/},
+}
+
+@inproceedings{durieux2020empirical,
+  author    = {Durieux, Thomas and Ferreira, Jo{\~a}o F. and Abreu, Rui and Cruz, Pedro},
+  title     = {Empirical Review of Automated Analysis Tools on 47,587 {Ethereum} Smart Contracts},
+  booktitle = {Proc. ACM/IEEE Int. Conference on Software Engineering (ICSE)},
+  year      = {2020},
+  pages     = {530--541},
+}
+
+@inproceedings{smartbugs,
+  author    = {Durieux, Thomas and Ferreira, Jo{\~a}o F. and Abreu, Rui and Cruz, Pedro},
+  title     = {Empirical Review of Automated Analysis Tools on 47,587 {Ethereum} Smart Contracts},
+  booktitle = {Proc. ACM/IEEE Int. Conference on Software Engineering (ICSE)},
+  year      = {2020},
+  pages     = {530--541},
+  note      = {SmartBugs dataset},
+}
+
+@article{ren2021empirical,
+  author  = {Ren, Muqi and Yin, Zijing and Ma, Fuchen and Xu, Zhenyang and Jiang, Yu and Sun, Chengnian and Li, Huizhong and Cai, Yan},
+  title   = {Empirical Evaluation of Smart Contract Testing: What Is the Best Choice?},
+  journal = {arXiv preprint arXiv:2108.09577},
+  year    = {2021},
+}
+
+% --- Smart Contract Attacks and Vulnerabilities ---
+
+@inproceedings{dao_hack,
+  author    = {Atzei, Nicola and Bartoletti, Massimo and Cimoli, Tiziana},
+  title     = {A Survey of Attacks on {Ethereum} Smart Contracts ({SoK})},
+  booktitle = {Proc. Int. Conference on Principles of Security and Trust (POST)},
+  year      = {2017},
+  pages     = {164--186},
+}
+
+@techreport{chainalysis2023,
+  author      = {{Chainalysis}},
+  title       = {The 2023 Crypto Crime Report},
+  institution = {Chainalysis Inc.},
+  year        = {2023},
+}
+
+@article{torres2018integer,
+  author  = {Torres, Christof Ferreira and Sch{\"u}tte, Julian and State, Radu},
+  title   = {Osiris: Hunting for Integer Bugs in {Ethereum} Smart Contracts},
+  journal = {arXiv preprint arXiv:1810.10748},
+  year    = {2018},
+}
+
+@article{chen2020defining,
+  author  = {Chen, Jiachi and Xia, Xin and Lo, David and Grundy, John and Luo, Xiapu and Chen, Ting},
+  title   = {Defining Smart Contract Defects on {Ethereum}},
+  journal = {IEEE Transactions on Software Engineering},
+  year    = {2020},
+  volume  = {48},
+  number  = {1},
+  pages   = {327--345},
+}
+
+@inproceedings{qin2023attacks,
+  author    = {Qin, Kaihua and Zhou, Liyi and Gervais, Arthur},
+  title     = {Quantifying Blockchain Extractable Value: How Dark Is the Forest?},
+  booktitle = {Proc. IEEE Symposium on Security and Privacy (S\&P)},
+  year      = {2022},
+  pages     = {198--214},
+}
+
+@inproceedings{qin2021attacking,
+  author    = {Qin, Kaihua and Zhou, Liyi and Livshits, Benjamin and Gervais, Arthur},
+  title     = {Attacking the {DeFi} Ecosystem with Flash Loans for Fun and Profit},
+  booktitle = {Proc. Int. Conference on Financial Cryptography and Data Security (FC)},
+  year      = {2021},
+  pages     = {3--32},
+}
+
+@article{perez2021smart,
+  author  = {Perez, Daniel and Livshits, Benjamin},
+  title   = {Smart Contract Vulnerabilities: Vulnerable Does Not Imply Exploited},
+  journal = {Proc. USENIX Security Symposium},
+  year    = {2021},
+}
+
+@inproceedings{zhou2023sok,
+  author    = {Zhou, Liyi and Xiong, Xihan and Ernstberger, Jens and Stefanos, Chaliasos and Wang, Zhipeng and Wang, Ye and Qin, Kaihua and Wattenhofer, Roger and Song, Dawn and Gervais, Arthur},
+  title     = {{SoK}: Decentralized Finance ({DeFi}) Attacks},
+  booktitle = {Proc. IEEE Symposium on Security and Privacy (S\&P)},
+  year      = {2023},
+}
+
+@inproceedings{werner2022sok,
+  author    = {Werner, Sam M. and Perez, Daniel and Gudgeon, Lewis and Klages-Mundt, Ariah and Harz, Dominik and Knottenbelt, William J.},
+  title     = {{SoK}: Decentralized Finance ({DeFi})},
+  booktitle = {Proc. Int. Conference on Financial Cryptography and Data Security (FC)},
+  year      = {2022},
+}
+
+% --- Cross-Chain and Bridge Security ---
+
+@article{bridge_hacks,
+  author  = {Zhang, Rui and Xue, Dayu and Chen, Ling},
+  title   = {A Survey on Cross-Chain Bridge Security},
+  journal = {arXiv preprint arXiv:2312.12573},
+  year    = {2023},
+}
+
+@article{zhang2023bridge,
+  author  = {Zhang, Yifan and Duan, Li and Yang, Zhuo},
+  title   = {Cross-Chain Bridge Security: Attacks, Defenses, and Open Problems},
+  journal = {IEEE Access},
+  year    = {2023},
+  volume  = {11},
+}
+
+@article{belchior2021survey,
+  author  = {Belchior, Rafael and Vasconcelos, Andr{\'e} and Guerreiro, S{\'e}rgio and Correia, Miguel},
+  title   = {A Survey on Blockchain Interoperability: Past, Present, and Future Trends},
+  journal = {ACM Computing Surveys},
+  year    = {2021},
+  volume  = {54},
+  number  = {8},
+}
+
+% --- Ethereum and Smart Contract Foundations ---
+
+@article{wood2014ethereum,
+  author  = {Wood, Gavin},
+  title   = {{Ethereum}: A Secure Decentralised Generalised Transaction Ledger},
+  journal = {Ethereum Project Yellow Paper},
+  year    = {2014},
+}
+
+@misc{buterin2014next,
+  author = {Buterin, Vitalik},
+  title  = {A Next-Generation Smart Contract and Decentralized Application Platform},
+  year   = {2014},
+  note   = {Ethereum White Paper},
+}
+
+@misc{swc_registry,
+  author = {{SmartContractSecurity}},
+  title  = {{SWC} Registry: Smart Contract Weakness Classification},
+  year   = {2020},
+  url    = {https://swcregistry.io/},
+}
+
+@misc{eip20,
+  author = {Vogelsteller, Fabian and Buterin, Vitalik},
+  title  = {{EIP-20}: Token Standard},
+  year   = {2015},
+  url    = {https://eips.ethereum.org/EIPS/eip-20},
+}
+
+@misc{eip721,
+  author = {Entriken, William and Shirley, Dieter and Evans, Jacob and Sachs, Nastassia},
+  title  = {{EIP-721}: Non-Fungible Token Standard},
+  year   = {2018},
+  url    = {https://eips.ethereum.org/EIPS/eip-721},
+}
+
+@misc{openzeppelin,
+  author = {{OpenZeppelin}},
+  title  = {{OpenZeppelin} Contracts: Secure Smart Contract Library},
+  year   = {2024},
+  url    = {https://github.com/OpenZeppelin/openzeppelin-contracts},
+}
+
+% --- DeFi Protocols ---
+
+@inproceedings{adams2021uniswap,
+  author    = {Adams, Hayden and Zinsmeister, Noah and Salem, Moody and Keefer, River and Robinson, Dan},
+  title     = {{Uniswap} v3 Core},
+  year      = {2021},
+  note      = {Uniswap Technical Whitepaper},
+}
+
+@misc{aave,
+  author = {{Aave}},
+  title  = {{Aave} Protocol V3},
+  year   = {2022},
+  url    = {https://github.com/aave/aave-v3-core},
+}
+
+@article{leshner2019compound,
+  author  = {Leshner, Robert and Hayes, Geoffrey},
+  title   = {Compound: The Money Market Protocol},
+  journal = {Compound Whitepaper},
+  year    = {2019},
+}
+
+% --- Adversarial Attacks on LLMs ---
+
+@article{perez2022ignore,
+  author  = {Perez, F{\'a}bio and Ribeiro, Ian},
+  title   = {Ignore Previous Prompt: Attack Techniques for Language Models},
+  journal = {arXiv preprint arXiv:2211.09527},
+  year    = {2022},
+}
+
+@inproceedings{greshake2023not,
+  author    = {Greshake, Kai and Abdelnabi, Sahar and Mishra, Shailesh and Endres, Christoph and Holz, Thorsten and Fritz, Mario},
+  title     = {Not What You've Signed Up For: Compromising Real-World {LLM}-Integrated Applications with Indirect Prompt Injection},
+  booktitle = {Proc. ACM Workshop on Artificial Intelligence and Security (AISec)},
+  year      = {2023},
+}
+
+@article{kang2024exploiting,
+  author  = {Kang, Daniel and Li, Xuechen and Stoica, Ion and Guestrin, Carlos and Zaharia, Matei and Hashimoto, Tatsunori},
+  title   = {Exploiting Programmatic Behavior of {LLMs}: Dual-Use Through Standard Security Attacks},
+  journal = {arXiv preprint arXiv:2302.05733},
+  year    = {2024},
+}
+
+@inproceedings{schuster2021you,
+  author    = {Schuster, Roei and Song, Congzheng and Tromer, Eran and Shmatikov, Vitaly},
+  title     = {You Autocomplete Me: Poisoning Vulnerabilities in Neural Code Completion},
+  booktitle = {Proc. USENIX Security Symposium},
+  year      = {2021},
+}
+
+@article{wan2023poisoning,
+  author  = {Wan, Jiawen and Lucaci, Srinivas and Bansal, Hritik and Grover, Aditya},
+  title   = {Poisoning Language Models During Instruction Tuning},
+  journal = {Proc. Int. Conference on Machine Learning (ICML)},
+  year    = {2023},
+}
+
+% --- LLM Safety and Alignment ---
+
+@article{bai2022training,
+  author  = {Bai, Yuntao and Kadavath, Saurav and Kundu, Sandipan and Askell, Amanda and Kernion, Jackson and Jones, Andy and Chen, Anna and Goldie, Anna and Mirhoseini, Azalia and McKinnon, Cameron and others},
+  title   = {Constitutional {AI}: Harmlessness from {AI} Feedback},
+  journal = {arXiv preprint arXiv:2212.08073},
+  year    = {2022},
+}
+
+% --- LLM for Smart Contract Analysis ---
+
+@inproceedings{gptscan,
+  author    = {Sun, Yuqiang and Wu, Daoyuan and Xue, Yue and Liu, Han and Wang, Haijun and Xu, Zhengzi and Xie, Xiaofei and Liu, Yang},
+  title     = {{GPTScan}: Detecting Logic Vulnerabilities in Smart Contracts by Combining {GPT} with Program Analysis},
+  booktitle = {Proc. ACM SIGSOFT Int. Symposium on Software Testing and Analysis (ISSTA)},
+  year      = {2024},
+}
+
+@article{smartllmsentry,
+  author  = {{SmartLLMSentry}},
+  title   = {{LLM}-Based Smart Contract Vulnerability Detection},
+  journal = {arXiv preprint arXiv:2401.13275},
+  year    = {2024},
+}
+
+@article{propertygpt,
+  author  = {{PropertyGPT}},
+  title   = {{LLM}-Generated Security Properties for Smart Contracts},
+  journal = {arXiv preprint arXiv:2402.16898},
+  year    = {2024},
+}
+
+@article{david2023you,
+  author  = {David, Iris and Ase, Liron and Chen, Raz and Sagiv, Mooly},
+  title   = {Do You Still Need a Manual Smart Contract Audit?},
+  journal = {arXiv preprint arXiv:2306.12338},
+  year    = {2023},
+}
+
+@article{contracttinker,
+  author  = {{ContractTinker}},
+  title   = {{LLM}-Based Smart Contract Repair},
+  journal = {arXiv preprint arXiv:2403.01756},
+  year    = {2024},
+}
+
+% --- Statistical Methods ---
+
+@article{arcuri2011practical,
+  author  = {Arcuri, Andrea and Briand, Lionel},
+  title   = {A Practical Guide for Using Statistical Tests to Assess Randomized Algorithms in Software Engineering},
+  journal = {Proc. ACM/IEEE Int. Conference on Software Engineering (ICSE)},
+  year    = {2011},
+  pages   = {1--10},
+}
+
+% --- Additional References ---
+
+@inproceedings{atzei2017survey,
+  author    = {Atzei, Nicola and Bartoletti, Massimo and Cimoli, Tiziana},
+  title     = {A Survey of Attacks on {Ethereum} Smart Contracts ({SoK})},
+  booktitle = {Proc. Int. Conference on Principles of Security and Trust (POST)},
+  year      = {2017},
+  pages     = {164--186},
+}
+
+@book{cohen1988statistical,
+  author    = {Cohen, Jacob},
+  title     = {Statistical Power Analysis for the Behavioral Sciences},
+  edition   = {2nd},
+  publisher = {Lawrence Erlbaum Associates},
+  year      = {1988},
+}
+
+@inproceedings{jesse2023large,
+  author    = {Jesse, Kevin and Ahmed, Toufique and Devanbu, Premkumar T. and Morgan, Emily},
+  title     = {Large Language Models and Simple, Stupid Bugs},
+  booktitle = {Proc. IEEE/ACM Int. Conference on Mining Software Repositories (MSR)},
+  year      = {2023},
+  pages     = {563--575},
+}

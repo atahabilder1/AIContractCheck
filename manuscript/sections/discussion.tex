@@ -1,0 +1,78 @@
+%======================================================================
+\section{Discussion}
+\label{sec:discussion}
+%======================================================================
+
+\subsection{Implications for Developers}
+
+Our results demonstrate that LLM-generated smart contracts should \emph{never} be deployed without comprehensive security auditing. The \demo{78.4\%} vulnerability rate, combined with the presence of high-severity flaws in \demo{40.8\%} of contracts, makes unaudited deployment reckless. We recommend the following guidelines based on our findings:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Always use multi-tool analysis.} Run generated contracts through multiple static analysis tools (at minimum, Slither and one symbolic execution tool) before deployment. No single tool catches all vulnerability types.
+    \item \textbf{Avoid adversarial-adjacent prompts.} Prompts emphasizing gas optimization, simplicity, or speed increase vulnerability rates by up to \demo{87\%} (no-dependency prompts). Prefer explicit security requirements in prompts.
+    \item \textbf{Prefer safety-focused models for critical code.} Claude demonstrates the strongest security posture ($d = 0.98$ advantage over CodeLlama). For safety-critical contracts, model selection matters.
+    \item \textbf{Exercise extreme caution with complex categories.} Cross-chain and DeFi contracts exhibit \demo{2-3}$\times$ higher vulnerability rates than standard tokens. These categories should receive proportionally more scrutiny.
+    \item \textbf{Verify security pattern completeness.} The phantom guard pattern (Section~\ref{sec:results}) demonstrates that syntactic presence of security constructs does not guarantee functional protection. Manually verify that modifiers and guards contain correct logic.
+    \item \textbf{Review the second half of long contracts more carefully.} Context window degradation causes \demo{2.3}$\times$ higher vulnerability density in the latter portions of complex contracts.
+\end{enumerate}
+
+\subsection{Implications for LLM Providers}
+
+Our findings suggest several actionable improvements for LLM providers:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Security-focused fine-tuning.} Incorporate verified, audited smart contract code (e.g., OpenZeppelin, audited DeFi protocols) as high-priority training data, similar to safety alignment efforts in other domains~\cite{bai2022training}. Downweight or filter unaudited Etherscan contract code.
+    \item \textbf{Output validation.} Implement post-generation security scanning that flags common vulnerability patterns (reentrancy, missing access control) before presenting code to users. This could be integrated as an automatic check, similar to how models currently flag unsafe content.
+    \item \textbf{Security warnings.} Include explicit warnings when generating financial contracts, analogous to medical disclaimers. For example: ``This generated contract has not been security audited. Do not deploy to mainnet without professional review.''
+    \item \textbf{Adversarial robustness.} Develop resistance to the adversarial prompt patterns identified in our study, particularly the no-dependency and gas optimization categories that most effectively degrade security.
+    \item \textbf{Context window management.} Address the context window degradation pattern by maintaining security-relevant context throughout long generations, potentially through architectural changes or explicit security checkpointing.
+\end{itemize}
+
+\subsection{Implications for the Security Community}
+
+Our findings motivate several research directions:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{LLM-aware security tools.} Traditional security tools are designed for human-written code patterns. The phantom guard, inherited vulnerability, and context degradation patterns we identified suggest the need for detectors specifically targeting LLM-generated code artifacts.
+    \item \textbf{Benchmark datasets.} Our dataset of 1,500 labeled contracts can serve as a benchmark for evaluating both LLM security and the effectiveness of detection tools on generated code.
+    \item \textbf{Prompt hardening research.} Developing ``security-hardened'' prompt templates that maintain security properties regardless of user modifications could significantly reduce vulnerability rates.
+\end{itemize}
+
+\subsection{Limitations}
+
+We acknowledge several limitations:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Model evolution.} LLM behavior evolves with model updates; our results reflect specific model versions documented in our dataset. Results may differ for future model versions, though we expect the structural patterns (phantom guards, context degradation) to persist.
+    \item \textbf{Prompt representativeness.} Our prompt set, while diverse (300 prompts across 20 categories and 8 adversarial types), may not fully capture the distribution of real-world developer prompting patterns. We mitigate this by including multiple complexity levels and prompt variations.
+    \item \textbf{Tool limitations.} Static analysis tools produce both false positives and false negatives. We mitigate this through multi-tool analysis, cross-tool deduplication, and manual validation of a stratified sample (\demo{200} contracts, achieving \demo{94.2}\% precision and inter-rater $\kappa = \demo{0.87}$).
+    \item \textbf{Model coverage.} Our study covers five LLMs; extending to additional models (e.g., DeepSeek Coder~\cite{guo2024deepseek}, StarCoder~\cite{li2023starcoder}, Mistral) is future work.
+    \item \textbf{Language scope.} Our analysis focuses on Solidity; generalization to other smart contract languages (e.g., Rust for Solana, Move for Aptos, Vyper for Ethereum) requires further investigation.
+    \item \textbf{Human baseline quality.} Our human baseline consists of audited, production-quality contracts, which represents the upper end of human code quality. The gap between LLM-generated and \emph{average} human-written code may be smaller.
+\end{enumerate}
+
+\subsection{Threats to Validity}
+
+\textbf{Internal validity}: Prompt design may bias results. We mitigate this by using diverse prompts across complexity levels and categories, with multiple variations per category. The consistent system prompt across all models ensures fair comparison. Temperature and token limits are standardized.
+
+\textbf{External validity}: Results may not generalize to all developer workflows, particularly interactive multi-turn sessions where developers iteratively refine generated code. We focus on single-shot generation as the most common use case and the one most likely to result in unreviewed deployment. We also focus on the highest-impact domain (Solidity/DeFi) and the most widely used LLMs.
+
+\textbf{Construct validity}: Vulnerability counts may not reflect exploitability. A contract with 10 low-severity informational findings may be safer than one with a single high-severity reentrancy vulnerability. We address this by reporting severity-stratified results and weighted vulnerability scores throughout our analysis.
+
+%======================================================================
+\section*{Data Availability}
+%======================================================================
+
+Our dataset of 1,500 contracts, analysis results, and all tooling are publicly available at: \url{https://github.com/[anonymized-for-review]}.
+
+%======================================================================
+\section*{Ethical Considerations}
+%======================================================================
+
+Our adversarial prompts are designed to study LLM behavior, not to enable attacks. We follow responsible disclosure practices: findings regarding specific LLM vulnerabilities were reported to respective providers prior to publication. Our dataset contains only synthetically generated contracts; no deployed contracts were tested or exploited. The adversarial prompt categories we document are constructed from patterns already discussed in the security literature~\cite{kang2024exploiting, perez2022ignore}, and we do not introduce novel attack techniques.
+
+%======================================================================
+\section*{Acknowledgment}
+%======================================================================
+
+[To be added upon acceptance.]
