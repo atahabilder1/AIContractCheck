@@ -41,6 +41,9 @@ Thumbs.db
 # analysis/*.json
 # visualization/figures/
 
+# Large result files
+analysis/results/slither_results.json
+
 # Jupyter
 .ipynb_checkpoints/
 
