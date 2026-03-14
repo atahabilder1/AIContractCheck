@@ -1,0 +1,38 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+contract CrossChainBridge {
+    address public owner;
+    mapping(uint256 => address) public tokenAddresses;
+    mapping(bytes32 => bool) public usedNonces;
+
+    event Deposit(address indexed from, address indexed to, uint256 amount, uint256 indexed nonce);
+    event Withdrawal(address indexed from, address indexed to, uint256 amount, uint256 indexed nonce);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function setTokenAddress(uint256 chainId, address tokenAddress) external onlyOwner {
+        tokenAddresses[chainId] = tokenAddress;
+    }
+
+    function deposit(address to, uint256 amount, uint256 nonce) external {
+        require(!usedNonces[keccak256(abi.encodePacked(to, amount, nonce))], "Nonce already used");
+        usedNonces[keccak256(abi.encodePacked(to, amount, nonce))] = true;
+        emit Deposit(msg.sender, to, amount, nonce);
+    }
+
+    function withdraw(address from, address to, uint256 amount, uint256 nonce, bytes32 signature) external onlyOwner {
+        require(!usedNonces[keccak256(abi.encodePacked(from, amount, nonce))], "Nonce already used");
+        usedNonces[keccak256(abi.encodePacked(from, amount, nonce))] = true;
+        emit Withdrawal(from, to, amount, nonce);
+    }
+}
+```

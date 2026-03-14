@@ -1,0 +1,91 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "@openzeppelin/contracts/token/common/ERC2981.sol";
+
+contract WhitelistNFT is ERC721, ERC721Enumerable, ERC721Burnable, Ownable, ERC2981 {
+    using Strings for uint256;
+
+    bytes32 public merkleRoot;
+    uint256 public constant MAX_SUPPLY = 10000;
+    uint256 public constant MINT_PRICE = 0.05 ether;
+    uint256 public constant MAX_MINT_PER_ADDRESS = 5;
+    string private baseURI;
+    string private notRevealedURI;
+    bool public revealed = false;
+
+    mapping(address => uint256) public addressMintedBalance;
+
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        bytes32 _merkleRoot,
+        string memory _initNotRevealedURI,
+        address _royaltyReceiver,
+        uint96 _royaltyFeeNumerator
+    ) ERC721(_name, _symbol) {
+        merkleRoot = _merkleRoot;
+        notRevealedURI = _initNotRevealedURI;
+        _setDefaultRoyalty(_royaltyReceiver, _royaltyFeeNumerator);
+    }
+
+    function mint(uint256 _mintAmount, bytes32[] calldata _merkleProof) external payable {
+        require(totalSupply() + _mintAmount <= MAX_SUPPLY, "Exceeds maximum supply");
+        require(msg.value >= MINT_PRICE * _mintAmount, "Insufficient funds");
+        require(addressMintedBalance[msg.sender] + _mintAmount <= MAX_MINT_PER_ADDRESS, "Exceeds max mint per address");
+
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+        require(MerkleProof.verify(_merkleProof, merkleRoot, leaf), "Invalid Merkle Proof");
+
+        for (uint256 i = 0; i < _mintAmount; i++) {
+            uint256 tokenId = totalSupply() + 1;
+            addressMintedBalance[msg.sender]++;
+            _safeMint(msg.sender, tokenId);
+        }
+    }
+
+    function reveal(string memory _baseURI) external onlyOwner {
+        revealed = true;
+        baseURI = _baseURI;
+    }
+
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        require(_exists(tokenId), "ERC721Metadata: URI query for nonexistent token");
+
+        if (revealed == false) {
+            return notRevealedURI;
+        }
+
+        return string(abi.encodePacked(baseURI, tokenId.toString(), ".json"));
+    }
+
+    function setMerkleRoot(bytes32 _merkleRoot) external onlyOwner {
+        merkleRoot = _merkleRoot;
+    }
+
+    function withdraw() external onlyOwner {
+        payable(owner()).transfer(address(this).balance);
+    }
+
+    // The following functions are overrides required by Solidity.
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize)
+        internal
+        override(ERC721, ERC721Enumerable)
+    {
+        super._beforeTokenTransfer(from, to, tokenId, batchSize);
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC721, ERC721Enumerable, ERC2981)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
+    }
+}

@@ -1,0 +1,171 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+contract UUPSProxy {
+    bytes32 private constant _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+    bytes32 private constant _ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+
+    constructor(address implementation, bytes memory data) {
+        _setAdmin(msg.sender);
+        _setImplementation(implementation);
+        if (data.length > 0) {
+            (bool success,) = implementation.delegatecall(data);
+            require(success, "Init failed");
+        }
+    }
+
+    fallback() external payable {
+        address impl = _getImplementation();
+        assembly {
+            calldatacopy(0, 0, calldatasize())
+            let result := delegatecall(gas(), impl, 0, calldatasize(), 0, 0)
+            returndatacopy(0, 0, returndatasize())
+            switch result
+            case 0 { revert(0, returndatasize()) }
+            default { return(0, returndatasize()) }
+        }
+    }
+
+    receive() external payable {}
+
+    function _getImplementation() internal view returns (address impl) {
+        bytes32 slot = _IMPLEMENTATION_SLOT;
+        assembly { impl := sload(slot) }
+    }
+
+    function _setImplementation(address newImpl) internal {
+        bytes32 slot = _IMPLEMENTATION_SLOT;
+        assembly { sstore(slot, newImpl) }
+    }
+
+    function _setAdmin(address newAdmin) internal {
+        bytes32 slot = _ADMIN_SLOT;
+        assembly { sstore(slot, newAdmin) }
+    }
+}
+
+abstract contract UUPSUpgradeable {
+    bytes32 private constant _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+    bytes32 private constant _ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+
+    modifier onlyAdmin() {
+        require(msg.sender == _getAdmin(), "Not admin");
+        _;
+    }
+
+    modifier onlyProxy() {
+        require(address(this) != __self(), "Must be called through proxy");
+        _;
+    }
+
+    function __self() internal view virtual returns (address) {
+        return address(this);
+    }
+
+    function upgradeTo(address newImplementation) external onlyAdmin onlyProxy {
+        _setImplementation(newImplementation);
+    }
+
+    function upgradeToAndCall(address newImplementation, bytes memory data) external onlyAdmin onlyProxy {
+        _setImplementation(newImplementation);
+        if (data.length > 0) {
+            (bool success,) = newImplementation.delegatecall(data);
+            require(success, "Upgrade call failed");
+        }
+    }
+
+    function getAdmin() external view returns (address) {
+        return _getAdmin();
+    }
+
+    function getImplementation() external view returns (address) {
+        return _getImplementation();
+    }
+
+    function _getAdmin() internal view returns (address admin) {
+        bytes32 slot = _ADMIN_SLOT;
+        assembly { admin := sload(slot) }
+    }
+
+    function _getImplementation() internal view returns (address impl) {
+        bytes32 slot = _IMPLEMENTATION_SLOT;
+        assembly { impl := sload(slot) }
+    }
+
+    function _setImplementation(address newImpl) internal {
+        require(newImpl.code.length > 0, "Not a contract");
+        bytes32 slot = _IMPLEMENTATION_SLOT;
+        assembly { sstore(slot, newImpl) }
+    }
+}
+
+contract CounterV1 is UUPSUpgradeable {
+    uint256 public count;
+    bool private _initialized;
+    address private _selfAddr;
+
+    function initialize(uint256 startCount) external {
+        require(!_initialized, "Already initialized");
+        _initialized = true;
+        _selfAddr = address(this);
+        count = startCount;
+    }
+
+    function __self() internal view override returns (address) {
+        return _selfAddr;
+    }
+
+    function increment() external {
+        count += 1;
+    }
+
+    function getCount() external view returns (uint256) {
+        return count;
+    }
+
+    function version() external pure returns (string memory) {
+        return "v1";
+    }
+}
+
+contract CounterV2 is UUPSUpgradeable {
+    uint256 public count;
+    bool private _initialized;
+    address private _selfAddr;
+
+    function initialize(uint256 startCount) external {
+        require(!_initialized, "Already initialized");
+        _initialized = true;
+        _selfAddr = address(this);
+        count = startCount;
+    }
+
+    function __self() internal view override returns (address) {
+        return _selfAddr;
+    }
+
+    function increment() external {
+        count += 1;
+    }
+
+    function decrement() external {
+        require(count > 0, "Cannot go below zero");
+        count -= 1;
+    }
+
+    function incrementBy(uint256 amount) external {
+        count += amount;
+    }
+
+    function reset() external onlyAdmin {
+        count = 0;
+    }
+
+    function getCount() external view returns (uint256) {
+        return count;
+    }
+
+    function version() external pure returns (string memory) {
+        return "v2";
+    }
+}

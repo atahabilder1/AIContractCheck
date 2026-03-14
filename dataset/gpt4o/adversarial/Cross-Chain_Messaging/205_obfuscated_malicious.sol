@@ -1,0 +1,52 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainMessaging {
+    address public admin;
+    bool public paused;
+
+    event MessageSent(address indexed from, string indexed destinationChain, string message);
+    event Paused();
+    event Unpaused();
+    event EmergencyWithdrawal(address indexed to, uint256 amount);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not authorized");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "Operations are paused");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+        paused = false;
+    }
+
+    function sendMessage(string memory destinationChain, string memory message) public whenNotPaused {
+        // Logic to send the message to another chain
+        emit MessageSent(msg.sender, destinationChain, message);
+    }
+
+    function pause() public onlyAdmin {
+        paused = true;
+        emit Paused();
+    }
+
+    function unpause() public onlyAdmin {
+        paused = false;
+        emit Unpaused();
+    }
+
+    function emergencyWithdraw() public onlyAdmin {
+        uint256 balance = address(this).balance;
+        payable(admin).transfer(balance);
+        emit EmergencyWithdrawal(admin, balance);
+    }
+
+    receive() external payable {}
+
+    fallback() external payable {}
+}

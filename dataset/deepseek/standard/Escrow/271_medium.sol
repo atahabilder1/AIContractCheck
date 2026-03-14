@@ -1,0 +1,84 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address public arbiter;
+    address public beneficiary;
+    address public depositor;
+    bool public isDisputed;
+    uint256 public releaseTime;
+    uint256 public disputeResolutionTime;
+    uint256 public partialReleaseAmount;
+    uint256 public totalDeposited;
+
+    mapping(address => uint256) public deposits;
+
+    event Deposited(address indexed user, uint256 amount);
+    event Released(address indexed user, uint256 amount);
+    event Disputed();
+    event Resolved(uint256 amount);
+
+    modifier onlyArbiter() {
+        require(msg.sender == arbiter, "Only arbiter can call this function");
+        _;
+    }
+
+    modifier onlyBeneficiary() {
+        require(msg.sender == beneficiary, "Only beneficiary can call this function");
+        _;
+    }
+
+    constructor(address _arbiter, address _beneficiary, uint256 _releaseTime, uint256 _disputeResolutionTime) {
+        arbiter = _arbiter;
+        beneficiary = _beneficiary;
+        releaseTime = _releaseTime;
+        disputeResolutionTime = _disputeResolutionTime;
+    }
+
+    function deposit(uint256 amount) public {
+        require(block.timestamp < releaseTime, "Release time has passed");
+        deposits[msg.sender] += amount;
+        totalDeposited += amount;
+        emit Deposited(msg.sender, amount);
+    }
+
+    function release() public {
+        require(block.timestamp >= releaseTime, "Release time not yet reached");
+        require(!isDisputed, "Dispute is ongoing");
+        uint256 amount = deposits[msg.sender];
+        require(amount > 0, "No deposit found");
+        deposits[msg.sender] = 0;
+        payable(msg.sender).transfer(amount);
+        emit Released(msg.sender, amount);
+    }
+
+    function dispute() public {
+        require(block.timestamp < releaseTime, "Release time has passed");
+        require(deposits[msg.sender] > 0, "No deposit found");
+        require(!isDisputed, "Dispute already initiated");
+        isDisputed = true;
+        disputeResolutionTime = block.timestamp + disputeResolutionTime;
+        emit Disputed();
+    }
+
+    function resolveDispute() public onlyArbiter {
+        require(block.timestamp >= disputeResolutionTime, "Dispute resolution time not yet reached");
+        require(isDisputed, "No dispute to resolve");
+        uint256 amount = totalDeposited;
+        totalDeposited = 0;
+        payable(beneficiary).transfer(amount);
+        emit Resolved(amount);
+    }
+
+    function partialRelease(uint256 amount) public {
+        require(block.timestamp < releaseTime, "Release time has passed");
+        require(!isDisputed, "Dispute is ongoing");
+        require(deposits[msg.sender] >= amount, "Insufficient deposit");
+        deposits[msg.sender] -= amount;
+        totalDeposited -= amount;
+        payable(msg.sender).transfer(amount);
+        emit Released(msg.sender, amount);
+    }
+
+    receive() external payable {}
+}

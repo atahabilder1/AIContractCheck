@@ -1,0 +1,43 @@
+pragma solidity ^0.8.0;
+
+// SPDX-License-Identifier: MIT
+
+contract GovernanceDAO {
+    address public owner;
+    mapping (address => uint) public memberBalances;
+    mapping (address => bool) public members;
+    uint public totalSupply;
+
+    constructor() public {
+        owner = msg.sender;
+        totalSupply = 10000;
+    }
+
+    function join() public {
+        require(msg.sender != owner, "Owner cannot join");
+        require(!members[msg.sender], "Member already exists");
+        members[msg.sender] = true;
+        memberBalances[msg.sender] = 0;
+    }
+
+    function leave() public {
+        require(members[msg.sender], "Member does not exist");
+        delete members[msg.sender];
+        delete memberBalances[msg.sender];
+    }
+
+    function vote(address _proposal) public {
+        require(members[msg.sender], "Member does not exist");
+        require(_proposal != address(0), "Invalid proposal address");
+        memberBalances[msg.sender] += 1;
+    }
+
+    function getMemberCount() public view returns (uint) {
+        return members.length;
+    }
+
+    function getTotalSupply() public view returns (uint) {
+        return totalSupply;
+    }
+}
+```

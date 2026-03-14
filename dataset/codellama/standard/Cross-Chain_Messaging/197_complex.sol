@@ -1,0 +1,60 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract LayerZero {
+    // Configurable security parameters
+    uint256 public securityDeposit;
+    uint256 public securityTimeout;
+
+    // Message retries
+    mapping(uint256 => uint256) public messageRetries;
+
+    // Nonce management
+    uint256 public nonce;
+
+    // Oracle and relayer separation
+    address public oracle;
+    address public relayer;
+
+    constructor(address _oracle, address _relayer, uint256 _securityDeposit, uint256 _securityTimeout) public {
+        oracle = _oracle;
+        relayer = _relayer;
+        securityDeposit = _securityDeposit;
+        securityTimeout = _securityTimeout;
+        nonce = 0;
+    }
+
+    function sendMessage(address _to, uint256 _amount, bytes memory _data) public {
+        // Check if the message is a retry
+        if (messageRetries[_to] > 0) {
+            // Decrease the retry count
+            messageRetries[_to]--;
+        } else {
+            // Increment the nonce
+            nonce++;
+        }
+
+        // Send the message to the oracle
+        oracle.sendMessage(_to, _amount, _data);
+    }
+
+    function receiveMessage(address _from, uint256 _amount, bytes memory _data) public {
+        // Check if the message is a retry
+        if (messageRetries[_from] > 0) {
+            // Decrease the retry count
+            messageRetries[_from]--;
+        } else {
+            // Increment the nonce
+            nonce++;
+        }
+
+        // Send the message to the relayer
+        relayer.sendMessage(_from, _amount, _data);
+    }
+
+    function withdraw() public {
+        require(msg.sender == oracle || msg.sender == relayer, "Only the oracle and relayer can withdraw");
+        uint256 amount = address(this).balance;
+        msg.sender.transfer(amount);
+    }
+}

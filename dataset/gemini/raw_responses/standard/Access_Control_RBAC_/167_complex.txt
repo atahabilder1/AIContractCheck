@@ -1,0 +1,361 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract ComprehensiveAccessControl is Ownable, ReentrancyGuard {
+    using EnumerableSet for EnumerableSet.AddressSet;
+    using SafeMath for uint256;
+
+    // --- Events ---
+    event RoleGranted(address indexed account, uint256 indexed roleId, uint256 expiryTimestamp);
+    event RoleRevoked(address indexed account, uint256 indexed roleId);
+    event RoleAssignmentProposed(address indexed granter, address indexed grantee, uint256 indexed roleId, uint256 expiryTimestamp, uint256 proposalId);
+    event RoleAssignmentApproved(uint256 indexed proposalId, address indexed approver);
+    event RoleAssignmentRejected(uint256 indexed proposalId, address indexed rejector);
+    event RoleAssignmentExecuted(uint256 indexed proposalId, address indexed granter, address indexed grantee, uint256 indexed roleId, uint256 expiryTimestamp);
+    event RoleAssignmentCancelled(uint256 indexed proposalId);
+    event RoleHierarchyChanged(uint256 indexed parentRoleId, uint256 indexed childRoleId);
+
+    // --- Structs ---
+    struct Role {
+        uint256 id;
+        string name;
+        uint256 parentRoleId; // 0 if no parent
+    }
+
+    struct RoleAssignmentProposal {
+        address granter;
+        address grantee;
+        uint256 roleId;
+        uint256 expiryTimestamp;
+        uint256 requiredApprovals;
+        uint256 approvedCount;
+        mapping(address => bool) hasApproved;
+        bool executed;
+        bool cancelled;
+    }
+
+    // --- State Variables ---
+    uint256 public nextRoleId = 1;
+    mapping(uint256 => Role) public roles;
+    mapping(uint256 => EnumerableSet.AddressSet) public roleMembers; // roleId => set of members
+    mapping(address => mapping(uint256 => uint256)) public memberRoleExpiry; // account => roleId => expiryTimestamp (0 if permanent or not assigned)
+
+    uint256 public nextProposalId = 1;
+    mapping(uint256 => RoleAssignmentProposal) public proposals;
+    mapping(uint256 => mapping(address => bool)) public proposalApprovals; // proposalId => approver => hasApproved
+
+    // Role Hierarchy
+    mapping(uint256 => uint256) public childRoles; // parentRoleId => childRoleId (simplistic: one child per parent for now)
+
+    // Configuration
+    uint256 public defaultProposalExpiry = 3 days; // Default expiry for role assignment proposals
+
+    // --- Modifiers ---
+    modifier onlyRole(uint256 _roleId) {
+        require(hasRole(_roleId, msg.sender), "Caller does not have the required role");
+        _;
+    }
+
+    modifier roleExists(uint256 _roleId) {
+        require(_roleId > 0 && _roleId < nextRoleId, "Role does not exist");
+        _;
+    }
+
+    modifier proposalExists(uint256 _proposalId) {
+        require(_proposalId > 0 && _proposalId < nextProposalId, "Proposal does not exist");
+        _;
+    }
+
+    modifier proposalNotExecuted(uint256 _proposalId) {
+        require(!proposals[_proposalId].executed, "Proposal already executed");
+        _;
+    }
+
+    modifier proposalNotCancelled(uint256 _proposalId) {
+        require(!proposals[_proposalId].cancelled, "Proposal cancelled");
+        _;
+    }
+
+    modifier proposalStillValid(uint256 _proposalId) {
+        require(block.timestamp <= proposals[_proposalId].expiryTimestamp, "Proposal expired");
+        _;
+    }
+
+    // --- Constructor ---
+    constructor(address initialOwner) Ownable(initialOwner) {
+        // Create a default 'Admin' role (roleId 0 is reserved for no role)
+        _createRole("Admin", 0);
+        // Grant the initial owner the 'Admin' role permanently
+        _grantRole(msg.sender, roles[1].id, 0);
+    }
+
+    // --- Role Management ---
+
+    /**
+     * @notice Creates a new role. Only roles with parent roles can be created.
+     * @param _name The name of the role.
+     * @param _parentRoleId The ID of the parent role. Set to 0 for top-level roles.
+     * @return roleId The ID of the newly created role.
+     */
+    function createRole(string memory _name, uint256 _parentRoleId) public onlyRole(roles[1].id) returns (uint256 roleId) {
+        if (_parentRoleId != 0) {
+            roleExists(_parentRoleId);
+            // Ensure only one child role per parent for simplicity in this example
+            require(childRoles[_parentRoleId] == 0, "Parent role already has a child role assigned");
+            childRoles[_parentRoleId] = nextRoleId;
+        }
+        return _createRole(_name, _parentRoleId);
+    }
+
+    function _createRole(string memory _name, uint256 _parentRoleId) internal returns (uint256) {
+        uint256 currentRoleId = nextRoleId;
+        roles[currentRoleId] = Role(currentRoleId, _name, _parentRoleId);
+        nextRoleId++;
+        emit RoleHierarchyChanged(_parentRoleId, currentRoleId);
+        return currentRoleId;
+    }
+
+    /**
+     * @notice Checks if an account has a specific role.
+     * @param _roleId The ID of the role to check.
+     * @param _account The address of the account.
+     * @return bool True if the account has the role, false otherwise.
+     */
+    function hasRole(uint256 _roleId, address _account) public view roleExists(_roleId) returns (bool) {
+        if (_account == address(0)) return false;
+        if (memberRoleExpiry[_account][_roleId] == 0) return false; // Not assigned or expired
+        if (memberRoleExpiry[_account][_roleId] < block.timestamp && memberRoleExpiry[_account][_roleId] != 0) {
+            return false; // Expired
+        }
+        return roleMembers[_roleId].contains(_account);
+    }
+
+    /**
+     * @notice Grants a role to an account with an optional expiry timestamp.
+     * @param _account The address of the account to grant the role to.
+     * @param _roleId The ID of the role to grant.
+     * @param _expiryTimestamp The timestamp when the role expires. 0 for permanent.
+     */
+    function grantRole(address _account, uint256 _roleId, uint256 _expiryTimestamp) public onlyRole(roles[1].id) roleExists(_roleId) {
+        require(_account != address(0), "Cannot grant role to zero address");
+        _grantRole(_account, _roleId, _expiryTimestamp);
+    }
+
+    function _grantRole(address _account, uint256 _roleId, uint256 _expiryTimestamp) internal {
+        if (hasRole(_roleId, _account)) {
+            // Update expiry if role already exists
+            memberRoleExpiry[_account][_roleId] = _expiryTimestamp;
+            emit RoleGranted(_account, _roleId, _expiryTimestamp);
+            return;
+        }
+
+        roleMembers[_roleId].add(_account);
+        memberRoleExpiry[_account][_roleId] = _expiryTimestamp;
+        emit RoleGranted(_account, _roleId, _expiryTimestamp);
+    }
+
+    /**
+     * @notice Revokes a role from an account.
+     * @param _account The address of the account to revoke the role from.
+     * @param _roleId The ID of the role to revoke.
+     */
+    function revokeRole(address _account, uint256 _roleId) public onlyRole(roles[1].id) roleExists(_roleId) {
+        require(_account != address(0), "Cannot revoke role from zero address");
+        require(hasRole(_roleId, _account), "Account does not have the role");
+
+        roleMembers[_roleId].remove(_account);
+        memberRoleExpiry[_account][_roleId] = 0; // Clear expiry
+        emit RoleRevoked(_account, _roleId);
+    }
+
+    /**
+     * @notice Gets the number of members for a specific role.
+     * @param _roleId The ID of the role.
+     * @return uint256 The number of members.
+     */
+    function getRoleMemberCount(uint256 _roleId) public view roleExists(_roleId) returns (uint256) {
+        return roleMembers[_roleId].length();
+    }
+
+    /**
+     * @notice Gets a member of a role at a specific index.
+     * @param _roleId The ID of the role.
+     * @param _index The index of the member.
+     * @return address The address of the member.
+     */
+    function getRoleMember(uint256 _roleId, uint256 _index) public view roleExists(_roleId) returns (address) {
+        return roleMembers[_roleId].at(_index);
+    }
+
+    /**
+     * @notice Gets the expiry timestamp of a role for a specific account.
+     * @param _account The address of the account.
+     * @param _roleId The ID of the role.
+     * @return uint256 The expiry timestamp. 0 if permanent or not assigned.
+     */
+    function getRoleExpiry(address _account, uint256 _roleId) public view roleExists(_roleId) returns (uint256) {
+        return memberRoleExpiry[_account][_roleId];
+    }
+
+    // --- Role Hierarchy ---
+
+    /**
+     * @notice Gets the parent role ID of a given role.
+     * @param _roleId The ID of the role.
+     * @return uint256 The ID of the parent role. 0 if it's a top-level role.
+     */
+    function getParentRole(uint256 _roleId) public view roleExists(_roleId) returns (uint256) {
+        return roles[_roleId].parentRoleId;
+    }
+
+    /**
+     * @notice Gets the child role ID of a given role.
+     * @param _roleId The ID of the role.
+     * @return uint256 The ID of the child role. 0 if no direct child role exists.
+     */
+    function getChildRole(uint256 _roleId) public view roleExists(_roleId) returns (uint256) {
+        return childRoles[_roleId];
+    }
+
+    /**
+     * @notice Checks if an account has a role or any of its parent roles.
+     * @param _roleId The ID of the role to check against.
+     * @param _account The address of the account.
+     * @return bool True if the account has the role or a parent role, false otherwise.
+     */
+    function hasRoleOrAncestor(uint256 _roleId, address _account) public view returns (bool) {
+        if (_roleId == 0) return true; // No role is the base case
+        uint256 currentRoleId = _roleId;
+        while (currentRoleId != 0) {
+            if (hasRole(currentRoleId, _account)) {
+                return true;
+            }
+            currentRoleId = roles[currentRoleId].parentRoleId;
+        }
+        return false;
+    }
+
+    // --- Multi-Sig Role Assignment Proposals ---
+
+    /**
+     * @notice Proposes a role assignment to another account.
+     * @param _grantee The address to grant the role to.
+     * @param _roleId The ID of the role to grant.
+     * @param _expiryTimestamp The timestamp when the role expires. 0 for permanent.
+     * @param _requiredApprovals The number of approvals needed for this proposal.
+     */
+    function proposeRoleAssignment(address _grantee, uint256 _roleId, uint256 _expiryTimestamp, uint256 _requiredApprovals)
+        public
+        onlyRole(roles[1].id) // Only Admins can propose role assignments
+        roleExists(_roleId)
+        nonReentrant
+    {
+        require(_grantee != address(0), "Cannot propose role assignment to zero address");
+        require(_requiredApprovals > 0, "Must require at least one approval");
+
+        // Optional: Check if the granter already has the role or a parent role
+        // require(hasRoleOrAncestor(_roleId, msg.sender), "Granter must have the role or an ancestor role");
+
+        uint256 proposalId = nextProposalId;
+        proposals[proposalId].granter = msg.sender;
+        proposals[proposalId].grantee = _grantee;
+        proposals[proposalId].roleId = _roleId;
+        proposals[proposalId].expiryTimestamp = _expiryTimestamp == 0 ? block.timestamp.add(defaultProposalExpiry) : _expiryTimestamp;
+        proposals[proposalId].requiredApprovals = _requiredApprovals;
+        proposals[proposalId].approvedCount = 0;
+        proposals[proposalId].executed = false;
+        proposals[proposalId].cancelled = false;
+
+        nextProposalId++;
+        emit RoleAssignmentProposed(msg.sender, _grantee, _roleId, proposals[proposalId].expiryTimestamp, proposalId);
+    }
+
+    /**
+     * @notice Approves a pending role assignment proposal.
+     * @param _proposalId The ID of the proposal to approve.
+     */
+    function approveRoleAssignment(uint256 _proposalId)
+        public
+        proposalExists(_proposalId)
+        proposalNotExecuted(_proposalId)
+        proposalNotCancelled(_proposalId)
+        proposalStillValid(_proposalId)
+        nonReentrant
+    {
+        RoleAssignmentProposal storage prop = proposals[_proposalId];
+        require(prop.granter != msg.sender, "Granter cannot approve their own proposal");
+        require(!proposalApprovals[_proposalId][msg.sender], "Already approved by this address");
+
+        // Only roles that are administrators or have a parent role of the proposed role can approve
+        // This is a simplified policy. More complex policies can be implemented.
+        require(hasRoleOrAncestor(roles[1].id, msg.sender), "Only an Admin can approve proposals");
+
+        proposalApprovals[_proposalId][msg.sender] = true;
+        prop.approvedCount++;
+        emit RoleAssignmentApproved(_proposalId, msg.sender);
+
+        if (prop.approvedCount >= prop.requiredApprovals) {
+            executeRoleAssignment(_proposalId);
+        }
+    }
+
+    /**
+     * @notice Rejects a pending role assignment proposal.
+     * @param _proposalId The ID of the proposal to reject.
+     */
+    function rejectRoleAssignment(uint256 _proposalId)
+        public
+        proposalExists(_proposalId)
+        proposalNotExecuted(_proposalId)
+        proposalNotCancelled(_proposalId)
+        nonReentrant
+    {
+        RoleAssignmentProposal storage prop = proposals[_proposalId];
+        require(prop.granter != msg.sender, "Granter cannot reject their own proposal");
+        require(!proposalApprovals[_proposalId][msg.sender], "Already approved by this address"); // Cannot reject if already approved
+
+        // Only roles that are administrators or have a parent role of the proposed role can reject
+        require(hasRoleOrAncestor(roles[1].id, msg.sender), "Only an Admin can reject proposals");
+
+        prop.cancelled = true;
+        emit RoleAssignmentRejected(_proposalId, msg.sender);
+        emit RoleAssignmentCancelled(_proposalId);
+    }
+
+    /**
+     * @notice Cancels a pending role assignment proposal.
+     * @param _proposalId The ID of the proposal to cancel.
+     */
+    function cancelRoleAssignment(uint256 _proposalId)
+        public
+        proposalExists(_proposalId)
+        proposalNotExecuted(_proposalId)
+        proposalNotCancelled(_proposalId)
+        nonReentrant
+    {
+        RoleAssignmentProposal storage prop = proposals[_proposalId];
+        require(prop.granter == msg.sender, "Only the granter can cancel the proposal");
+
+        prop.cancelled = true;
+        emit RoleAssignmentCancelled(_proposalId);
+    }
+
+    /**
+     * @notice Executes a role assignment proposal once enough approvals are gathered.
+     * @param _proposalId The ID of the proposal to execute.
+     */
+    function executeRoleAssignment(uint256 _proposalId) internal proposalExists(_proposalId) nonReentrant {
+        RoleAssignmentProposal storage prop = proposals[_proposalId];
+        require(prop.approvedCount >= prop.requiredApprovals, "Not enough approvals");
+        require(!prop.executed, "Proposal already executed");
+        require(!prop.cancelled, "Proposal cancelled");
+        require(block.timestamp <= prop.expiryTimestamp, "Proposal expired");
+
+        prop.executed = true;
+        _grantRole(prop.grantee, prop.roleId, prop.expiryTimestamp);

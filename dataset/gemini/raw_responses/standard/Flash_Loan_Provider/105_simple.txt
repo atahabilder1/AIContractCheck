@@ -1,0 +1,126 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+interface IFlashLoanReceiver {
+    function executeOperation(
+        address,
+        address,
+        uint256,
+        uint256,
+        uint256,
+        bytes calldata
+    ) external returns (bool);
+}
+
+contract BasicFlashLoan is IFlashLoanReceiver {
+    address public owner;
+    address public feeReceiver;
+    uint256 public feePercentage; // e.g., 0.3 for 0.3%
+
+    event FlashLoan(address indexed borrower, address indexed asset, uint256 amount, uint256 fee);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner");
+        _;
+    }
+
+    constructor(address _feeReceiver, uint256 _feePercentage) {
+        owner = msg.sender;
+        feeReceiver = _feeReceiver;
+        feePercentage = _feePercentage;
+    }
+
+    function setFeeReceiver(address _feeReceiver) public onlyOwner {
+        feeReceiver = _feeReceiver;
+    }
+
+    function setFeePercentage(uint256 _feePercentage) public onlyOwner {
+        feePercentage = _feePercentage;
+    }
+
+    function requestFlashLoan(
+        IERC20 _asset,
+        uint256 _amount,
+        bytes calldata _data
+    ) external {
+        require(_amount > 0, "Amount must be positive");
+
+        uint256 balanceBefore = _asset.balanceOf(address(this));
+        require(balanceBefore >= _amount, "Insufficient contract balance");
+
+        // Transfer loan amount to the borrower
+        _asset.transfer(msg.sender, _amount);
+
+        // Execute the borrower's logic
+        bool success = IFlashLoanReceiver(_asset).executeOperation(
+            address(this), // This contract's address acting as the lender
+            address(_asset),
+            _amount,
+            0, // interestRate (for simplicity, we don't use it here directly, fee is calculated later)
+            0, // fee (for simplicity, we don't use it here directly, fee is calculated later)
+            _data
+        );
+        require(success, "Flash loan operation failed");
+
+        // Calculate and collect fee
+        uint256 feeAmount = (_amount * feePercentage) / 1000; // feePercentage is like 0.3 for 0.3%
+        uint256 totalRepayment = _amount + feeAmount;
+
+        // Ensure the borrower has enough to repay
+        require(_asset.balanceOf(msg.sender) >= totalRepayment, "Borrower cannot repay");
+
+        // Transfer repayment and fee back to this contract
+        _asset.transfer(address(this), totalRepayment);
+
+        // Transfer fee to the fee receiver
+        _asset.transfer(feeReceiver, feeAmount);
+
+        emit FlashLoan(msg.sender, address(_asset), _amount, feeAmount);
+    }
+
+    // This function is called by the asset contract to initiate the loan
+    // In a real-world scenario, you'd interact with a lending pool contract.
+    // For this basic example, we'll simulate the loan by assuming the asset
+    // can be sent directly from this contract.
+    // The `requestFlashLoan` function above is the primary entry point for borrowers.
+    // This `executeOperation` is what the borrower's contract will implement
+    // and call back to this contract (or an intermediary) to confirm repayment.
+
+    // The `executeOperation` is typically implemented by the borrower's contract.
+    // This contract itself acts as the lender and also has a placeholder `executeOperation`
+    // to fulfill the interface requirement for calling the borrower's logic.
+    // In a real flash loan system, the `requestFlashLoan` would interact with a
+    // lending pool contract that provides the loan and receives repayment.
+
+    function executeOperation(
+        address, // initiator
+        address, // asset
+        uint256, // amount
+        uint256, // interestRate
+        uint256, // fee
+        bytes calldata // data
+    ) external override returns (bool) {
+        // This function is a placeholder for the interface.
+        // The actual logic is in the borrower's contract.
+        // This contract doesn't perform the borrower's arbitrary logic.
+        // It facilitates the loan and expects repayment.
+        return true;
+    }
+
+    // Function to deposit tokens into the contract to be used for lending
+    function depositTokens(IERC20 _token, uint256 _amount) public onlyOwner {
+        _token.transferFrom(msg.sender, address(this), _amount);
+    }
+
+    // Function to withdraw tokens from the contract (only owner)
+    function withdrawTokens(IERC20 _token, uint256 _amount) public onlyOwner {
+        _token.transfer(msg.sender, _amount);
+    }
+
+    // Fallback function to receive Ether if needed (not used in this ERC20 flash loan)
+    receive() external payable {}
+}
+```

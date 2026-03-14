@@ -1,0 +1,74 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract RBAC {
+    address public owner;
+
+    mapping(address => mapping(string => bool)) private roles;
+    mapping(string => bool) private validRoles;
+
+    event RoleGranted(address indexed account, string indexed role);
+    event RoleRevoked(address indexed account, string indexed role);
+    event RoleCreated(string indexed role);
+    event RoleDeleted(string indexed role);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "RBAC: Caller is not the owner");
+        _;
+    }
+
+    modifier onlyRole(string memory _role) {
+        require(hasRole(msg.sender, _role), "RBAC: Caller does not have the required role");
+        _;
+    }
+
+    modifier roleExists(string memory _role) {
+        require(validRoles[_role], "RBAC: Role does not exist");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function createRole(string memory _role) public onlyOwner {
+        require(!validRoles[_role], "RBAC: Role already exists");
+        validRoles[_role] = true;
+        emit RoleCreated(_role);
+    }
+
+    function deleteRole(string memory _role) public onlyOwner roleExists(_role) {
+        // Revoke role from all accounts before deleting
+        // This requires iterating through all accounts, which is not feasible in a scalable way.
+        // For simplicity, we will not automatically revoke roles here.
+        // A more robust implementation might involve an array of accounts or a more complex data structure.
+        // However, to prevent granting the deleted role, we mark it as invalid.
+        validRoles[_role] = false;
+        emit RoleDeleted(_role);
+    }
+
+    function grantRole(address _account, string memory _role) public onlyOwner roleExists(_role) {
+        require(_account != address(0), "RBAC: Invalid address");
+        roles[_account][_role] = true;
+        emit RoleGranted(_account, _role);
+    }
+
+    function revokeRole(address _account, string memory _role) public onlyOwner roleExists(_role) {
+        require(_account != address(0), "RBAC: Invalid address");
+        roles[_account][_role] = false;
+        emit RoleRevoked(_account, _role);
+    }
+
+    function hasRole(address _account, string memory _role) public view roleExists(_role) returns (bool) {
+        return roles[_account][_role];
+    }
+
+    function renounceOwnership() public onlyOwner {
+        owner = address(0);
+    }
+
+    function transferOwnership(address _newOwner) public onlyOwner {
+        require(_newOwner != address(0), "RBAC: New owner cannot be the zero address");
+        owner = _newOwner;
+    }
+}

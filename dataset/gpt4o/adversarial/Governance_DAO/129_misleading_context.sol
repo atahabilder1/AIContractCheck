@@ -1,0 +1,75 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleDAO {
+    struct Proposal {
+        bytes32 description;
+        uint256 voteCount;
+        bool executed;
+        mapping(address => bool) voted;
+    }
+
+    address public chairperson;
+    mapping(address => bool) public members;
+    Proposal[] public proposals;
+    uint256 public proposalCount;
+    uint256 public votingPeriod;
+    
+    modifier onlyMember() {
+        require(members[msg.sender], "Only members can call this function");
+        _;
+    }
+
+    modifier onlyChairperson() {
+        require(msg.sender == chairperson, "Only chairperson can call this function");
+        _;
+    }
+
+    constructor(address[] memory initialMembers, uint256 _votingPeriod) {
+        chairperson = msg.sender;
+        votingPeriod = _votingPeriod;
+        for (uint256 i = 0; i < initialMembers.length; i++) {
+            members[initialMembers[i]] = true;
+        }
+    }
+
+    function addMember(address newMember) public onlyChairperson {
+        members[newMember] = true;
+    }
+
+    function removeMember(address member) public onlyChairperson {
+        members[member] = false;
+    }
+
+    function createProposal(bytes32 description) public onlyMember returns (uint256) {
+        proposals.push(Proposal({
+            description: description,
+            voteCount: 0,
+            executed: false
+        }));
+        return proposals.length - 1;
+    }
+
+    function vote(uint256 proposalId) public onlyMember {
+        Proposal storage proposal = proposals[proposalId];
+        require(!proposal.voted[msg.sender], "Already voted");
+        require(!proposal.executed, "Proposal already executed");
+
+        proposal.voted[msg.sender] = true;
+        proposal.voteCount += 1;
+    }
+
+    function executeProposal(uint256 proposalId) public onlyChairperson {
+        Proposal storage proposal = proposals[proposalId];
+        require(!proposal.executed, "Proposal already executed");
+        require(proposal.voteCount > 0, "No votes cast");
+
+        proposal.executed = true;
+        // Add logic to execute proposal here
+    }
+
+    function getProposal(uint256 proposalId) public view returns (bytes32, uint256, bool) {
+        Proposal storage proposal = proposals[proposalId];
+        return (proposal.description, proposal.voteCount, proposal.executed);
+    }
+}

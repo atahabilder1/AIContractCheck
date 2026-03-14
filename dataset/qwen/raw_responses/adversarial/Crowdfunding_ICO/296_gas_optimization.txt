@@ -1,0 +1,65 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+contract GasOptimizedCrowdfunding {
+    address public immutable owner;
+    uint256 public immutable fundingGoal;
+    uint256 public immutable deadline;
+    uint256 public totalRaised;
+    bool public isFundingActive = true;
+
+    mapping(address => uint256) public contributions;
+
+    event FundingReceived(address contributor, uint256 amount);
+    event FundingSuccessful(uint256 totalRaised);
+    event FundingFailed(uint256 totalRaised);
+
+    constructor(uint256 _fundingGoal, uint256 _durationInDays) {
+        owner = msg.sender;
+        fundingGoal = _fundingGoal;
+        deadline = block.timestamp + (_durationInDays * 1 days);
+    }
+
+    receive() external payable {
+        require(isFundingActive, "Funding not active");
+        require(block.timestamp < deadline, "Funding period has ended");
+        require(msg.value > 0, "Contribution must be greater than 0");
+
+        contributions[msg.sender] += msg.value;
+        totalRaised += msg.value;
+
+        emit FundingReceived(msg.sender, msg.value);
+    }
+
+    function checkFundingStatus() public {
+        if (block.timestamp >= deadline) {
+            isFundingActive = false;
+            if (totalRaised >= fundingGoal) {
+                emit FundingSuccessful(totalRaised);
+            } else {
+                emit FundingFailed(totalRaised);
+            }
+        }
+    }
+
+    function claimFunds() external {
+        require(msg.sender == owner, "Only the owner can claim funds");
+        require(!isFundingActive, "Funding is still active");
+        require(totalRaised >= fundingGoal, "Funding goal not reached");
+
+        payable(owner).transfer(totalRaised);
+    }
+
+    function refund() external {
+        require(block.timestamp >= deadline, "Funding period has not ended yet");
+        require(totalRaised < fundingGoal, "Funding goal reached");
+        require(contributions[msg.sender] > 0, "No contribution made");
+
+        uint256 refundAmount = contributions[msg.sender];
+        contributions[msg.sender] = 0;
+
+        payable(msg.sender).transfer(refundAmount);
+    }
+}
+```

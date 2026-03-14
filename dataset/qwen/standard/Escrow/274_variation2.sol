@@ -1,0 +1,73 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
+
+contract NFTEscrow is ReentrancyGuard {
+    using Counters for Counters.Counter;
+    Counters.Counter private _escrowIds;
+
+    struct Escrow {
+        address nftContract;
+        uint256 tokenId;
+        address buyer;
+        address seller;
+        uint256 price;
+        bool active;
+    }
+
+    mapping(uint256 => Escrow) public escrows;
+
+    event EscrowCreated(uint256 escrowId, address nftContract, uint256 tokenId, address seller, uint256 price);
+    event EscrowCompleted(uint256 escrowId, address buyer, address seller, uint256 price);
+    event EscrowCancelled(uint256 escrowId, address seller);
+
+    function createEscrow(address _nftContract, uint256 _tokenId, uint256 _price) external {
+        require(_price > 0, "Price must be greater than zero");
+        
+        IERC721(_nftContract).transferFrom(msg.sender, address(this), _tokenId);
+
+        _escrowIds.increment();
+        uint256 escrowId = _escrowIds.current();
+
+        escrows[escrowId] = Escrow({
+            nftContract: _nftContract,
+            tokenId: _tokenId,
+            buyer: address(0),
+            seller: msg.sender,
+            price: _price,
+            active: true
+        });
+
+        emit EscrowCreated(escrowId, _nftContract, _tokenId, msg.sender, _price);
+    }
+
+    function completeEscrow(uint256 _escrowId) external payable nonReentrant {
+        Escrow storage escrow = escrows[_escrowId];
+        require(escrow.active, "Escrow is not active");
+        require(msg.sender != escrow.seller, "Seller cannot complete their own escrow");
+        require(msg.value == escrow.price, "Incorrect payment amount");
+
+        escrow.buyer = msg.sender;
+        escrow.active = false;
+
+        IERC721(escrow.nftContract).transferFrom(address(this), escrow.buyer, escrow.tokenId);
+        payable(escrow.seller).transfer(msg.value);
+
+        emit EscrowCompleted(_escrowId, escrow.buyer, escrow.seller, escrow.price);
+    }
+
+    function cancelEscrow(uint256 _escrowId) external nonReentrant {
+        Escrow storage escrow = escrows[_escrowId];
+        require(escrow.active, "Escrow is not active");
+        require(msg.sender == escrow.seller, "Only the seller can cancel the escrow");
+
+        escrow.active = false;
+
+        IERC721(escrow.nftContract).transferFrom(address(this), escrow.seller, escrow.tokenId);
+
+        emit EscrowCancelled(_escrowId, escrow.seller);
+    }
+}

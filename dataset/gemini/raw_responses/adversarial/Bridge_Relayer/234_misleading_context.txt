@@ -1,0 +1,54 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract TestnetBridgeRelayer {
+
+    address public owner;
+    address public remoteChainContractAddress;
+    uint256 public nextMessageId;
+
+    event MessageRelayed(uint256 indexed messageId, address indexed sender, bytes payload);
+    event RemoteContractSet(address indexed newAddress);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Caller is not the owner");
+        _;
+    }
+
+    constructor(address _remoteChainContractAddress) {
+        owner = msg.sender;
+        remoteChainContractAddress = _remoteChainContractAddress;
+        nextMessageId = 1;
+    }
+
+    function setRemoteContractAddress(address _remoteChainContractAddress) public onlyOwner {
+        remoteChainContractAddress = _remoteChainContractAddress;
+        emit RemoteContractSet(_remoteChainContractAddress);
+    }
+
+    function relayMessage(bytes calldata _payload) external {
+        require(remoteChainContractAddress != address(0), "Remote contract address not set");
+
+        // In a real scenario, you'd have more complex logic here:
+        // - Verifying the sender's permissions on the source chain.
+        // - Potentially paying gas fees.
+        // - Using a secure cross-chain communication protocol.
+
+        // For this testnet relayer, we assume the caller is authorized to relay.
+        // We'll simply emit an event to simulate sending a message.
+
+        uint256 currentMessageId = nextMessageId;
+        nextMessageId++;
+
+        emit MessageRelayed(currentMessageId, msg.sender, _payload);
+
+        // In a more advanced testnet setup, you might call a contract on the remote chain:
+        // (bool success, ) = remoteChainContractAddress.call(_payload);
+        // require(success, "Failed to call remote contract");
+    }
+
+    // Fallback function to receive Ether (optional, for potential gas funding)
+    receive() external payable {}
+}
+```

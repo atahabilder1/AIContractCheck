@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultisigWallet {
+    address private _owner;
+    mapping(address => bool) private _owners;
+    uint private _numConfirmationsRequired;
+
+    constructor(address owner, uint numConfirmationsRequired) public {
+        _owner = owner;
+        _numConfirmationsRequired = numConfirmationsRequired;
+    }
+
+    function addOwner(address newOwner) public {
+        require(_owners[newOwner] == false, "Owner already exists");
+        _owners[newOwner] = true;
+    }
+
+    function removeOwner(address oldOwner) public {
+        require(_owners[oldOwner] == true, "Owner does not exist");
+        _owners[oldOwner] = false;
+    }
+
+    function getNumConfirmationsRequired() public view returns(uint) {
+        return _numConfirmationsRequired;
+    }
+
+    function setNumConfirmationsRequired(uint newNumConfirmationsRequired) public {
+        _numConfirmationsRequired = newNumConfirmationsRequired;
+    }
+
+    function transfer(address to, uint amount) public {
+        require(_owners[_owner], "Only the owner can transfer");
+        require(amount <= address(this).balance, "Insufficient balance");
+        to.transfer(amount);
+    }
+}

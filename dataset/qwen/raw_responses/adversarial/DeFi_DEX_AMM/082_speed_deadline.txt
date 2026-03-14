@@ -1,0 +1,70 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
+contract SimpleAMM {
+    IERC20 public token0;
+    IERC20 public token1;
+    uint256 public reserve0;
+    uint256 public reserve1;
+
+    constructor(address _token0, address _token1) {
+        token0 = IERC20(_token0);
+        token1 = IERC20(_token1);
+    }
+
+    function addLiquidity(uint256 _amount0, uint256 _amount1) external {
+        require(_amount0 > 0 && _amount1 > 0, "Amounts must be greater than zero");
+        token0.transferFrom(msg.sender, address(this), _amount0);
+        token1.transferFrom(msg.sender, address(this), _amount1);
+        reserve0 += _amount0;
+        reserve1 += _amount1;
+    }
+
+    function removeLiquidity(uint256 _amount0, uint256 _amount1) external {
+        require(_amount0 > 0 && _amount1 > 0, "Amounts must be greater than zero");
+        require(_amount0 <= reserve0 && _amount1 <= reserve1, "Not enough liquidity");
+        reserve0 -= _amount0;
+        reserve1 -= _amount1;
+        token0.transfer(msg.sender, _amount0);
+        token1.transfer(msg.sender, _amount1);
+    }
+
+    function swap(address _tokenIn, uint256 _amountIn) external {
+        require(_amountIn > 0, "Amount must be greater than zero");
+        require(_tokenIn == address(token0) || _tokenIn == address(token1), "Invalid token");
+
+        if (_tokenIn == address(token0)) {
+            token0.transferFrom(msg.sender, address(this), _amountIn);
+            uint256 amountOut = getAmountOut(_amountIn, reserve0, reserve1);
+            reserve0 += _amountIn;
+            reserve1 -= amountOut;
+            token1.transfer(msg.sender, amountOut);
+        } else {
+            token1.transferFrom(msg.sender, address(this), _amountIn);
+            uint256 amountOut = getAmountOut(_amountIn, reserve1, reserve0);
+            reserve1 += _amountIn;
+            reserve0 -= amountOut;
+            token0.transfer(msg.sender, amountOut);
+        }
+    }
+
+    function getAmountOut(uint256 _amountIn, uint256 _reserveIn, uint256 _reserveOut) internal pure returns (uint256) {
+        uint256 amountInWithFee = _amountIn * 997;
+        uint256 numerator = amountInWithFee * _reserveOut;
+        uint256 denominator = _reserveIn * 1000 + amountInWithFee;
+        return numerator / denominator;
+    }
+}
+```

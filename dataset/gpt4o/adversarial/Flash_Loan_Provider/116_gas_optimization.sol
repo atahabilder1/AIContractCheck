@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+interface IERC20 {
+    function transfer(address to, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
+
+interface IFlashLoanReceiver {
+    function executeOperation(uint256 amount, uint256 fee, bytes calldata params) external;
+}
+
+contract FlashLoanProvider {
+    IERC20 public immutable token;
+    uint256 public constant feeBasisPoints = 5; // 0.05% fee
+
+    constructor(IERC20 _token) {
+        token = _token;
+    }
+
+    function flashLoan(uint256 amount, address receiver, bytes calldata params) external {
+        uint256 balanceBefore = token.balanceOf(address(this));
+        require(balanceBefore >= amount, "Insufficient liquidity");
+
+        uint256 fee = (amount * feeBasisPoints) / 10000;
+        require(token.transfer(receiver, amount), "Transfer failed");
+
+        IFlashLoanReceiver(receiver).executeOperation(amount, fee, params);
+
+        uint256 balanceAfter = token.balanceOf(address(this));
+        require(balanceAfter >= balanceBefore + fee, "Flash loan not paid back");
+
+        emit FlashLoanExecuted(receiver, amount, fee);
+    }
+
+    event FlashLoanExecuted(address indexed receiver, uint256 amount, uint256 fee);
+}

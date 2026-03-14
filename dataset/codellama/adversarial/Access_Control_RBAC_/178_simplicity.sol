@@ -1,0 +1,42 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract AccessControl {
+    address public owner;
+    mapping(address => bool) public admins;
+    mapping(address => mapping(string => bool)) public permissions;
+
+    constructor() public {
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can call this function");
+        _;
+    }
+
+    modifier onlyAdmin() {
+        require(admins[msg.sender], "Only an admin can call this function");
+        _;
+    }
+
+    function addAdmin(address _admin) public onlyOwner {
+        admins[_admin] = true;
+    }
+
+    function removeAdmin(address _admin) public onlyOwner {
+        admins[_admin] = false;
+    }
+
+    function grantPermission(address _user, string _permission) public onlyAdmin {
+        permissions[_user][_permission] = true;
+    }
+
+    function revokePermission(address _user, string _permission) public onlyAdmin {
+        permissions[_user][_permission] = false;
+    }
+
+    function hasPermission(address _user, string _permission) public view returns (bool) {
+        return permissions[_user][_permission];
+    }
+}

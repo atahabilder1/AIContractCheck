@@ -1,0 +1,53 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrowdfundingICO {
+    address public admin;
+    address public beneficiary;
+    uint256 public goal;
+    uint256 public raisedAmount;
+    bool public paused;
+
+    event GoalReached(address beneficiary, uint256 amountRaised);
+    event FundTransfer(address to, uint256 amount);
+
+    constructor(uint256 _goal, address _beneficiary) {
+        admin = msg.sender;
+        goal = _goal;
+        beneficiary = _beneficiary;
+    }
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin can call this function");
+        _;
+    }
+
+    function contribute() public payable {
+        require(!paused, "Contract is paused");
+        raisedAmount += msg.value;
+        if (raisedAmount >= goal) {
+            emit GoalReached(beneficiary, raisedAmount);
+            beneficiary.transfer(raisedAmount);
+            emit FundTransfer(beneficiary, raisedAmount);
+            raisedAmount = 0;
+        }
+    }
+
+    function withdrawFunds() public onlyAdmin {
+        beneficiary.transfer(address(this).balance);
+        emit FundTransfer(beneficiary, address(this).balance);
+    }
+
+    function emergencyWithdraw() public onlyAdmin {
+        payable(admin).transfer(address(this).balance);
+        emit FundTransfer(admin, address(this).balance);
+    }
+
+    function pause() public onlyAdmin {
+        paused = true;
+    }
+
+    function unpause() public onlyAdmin {
+        paused = false;
+    }
+}

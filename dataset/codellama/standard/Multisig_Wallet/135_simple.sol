@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultiSigWallet {
+    address[2] private owners;
+    mapping(address => bool) private ownerApprovals;
+
+    constructor(address[2] memory _owners) public {
+        owners = _owners;
+    }
+
+    function executeTransaction(address payable recipient, uint amount, bytes memory data) public {
+        require(msg.sender == owners[0] || msg.sender == owners[1], "Only owners can execute transactions");
+        require(ownerApprovals[msg.sender] == false, "Transaction already approved");
+        ownerApprovals[msg.sender] = true;
+        uint numApprovals = 0;
+        for (uint i = 0; i < owners.length; i++) {
+            if (ownerApprovals[owners[i]]) {
+                numApprovals++;
+            }
+        }
+        if (numApprovals == 2) {
+            recipient.transfer(amount);
+            ownerApprovals = [false, false];
+        }
+    }
+}

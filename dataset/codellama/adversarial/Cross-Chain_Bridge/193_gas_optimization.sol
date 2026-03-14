@@ -1,0 +1,51 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address private _sourceChain;
+    address private _destinationChain;
+    mapping(address => bool) private _relayers;
+    mapping(bytes32 => bool) private _txHashes;
+
+    event Relayed(address indexed from, address indexed to, uint256 value);
+
+    constructor(address sourceChain, address destinationChain) public {
+        _sourceChain = sourceChain;
+        _destinationChain = destinationChain;
+    }
+
+    function addRelayer(address relayer) public {
+        require(msg.sender == _sourceChain, "Only the source chain can add relayers");
+        _relayers[relayer] = true;
+    }
+
+    function removeRelayer(address relayer) public {
+        require(msg.sender == _sourceChain, "Only the source chain can remove relayers");
+        _relayers[relayer] = false;
+    }
+
+    function relayTx(bytes memory txData) public {
+        require(_relayers[msg.sender], "Only relayers can call this function");
+
+        // Parse the transaction data
+        (address from, address to, uint256 value) = parseTxData(txData);
+
+        // Check if the transaction has already been relayed
+        bytes32 txHash = keccak256(abi.encode(txData));
+        require(!_txHashes[txHash], "Transaction has already been relayed");
+
+        // Relay the transaction to the destination chain
+        _destinationChain.call.value(value)(from, to);
+
+        // Emit an event to signal that the transaction has been relayed
+        emit Relayed(from, to, value);
+
+        // Mark the transaction as relayed
+        _txHashes[txHash] = true;
+    }
+
+    function parseTxData(bytes memory txData) public pure returns (address, address, uint256) {
+        // Parse the transaction data
+        // ...
+    }
+}

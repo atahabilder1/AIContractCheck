@@ -1,0 +1,22 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract YieldAggregator {
+    mapping(address => mapping(uint256 => uint256)) public yields;
+
+    function addYield(address token, uint256 amount) external {
+        yields[token][block.number] = amount;
+    }
+
+    function getYield(address token, uint256 blockNumber) external view returns (uint256) {
+        return yields[token][blockNumber];
+    }
+
+    function getTotalYield(address token) external view returns (uint256) {
+        uint256 totalYield = 0;
+        for (uint256 i = 0; i < block.number; i++) {
+            totalYield += yields[token][i];
+        }
+        return totalYield;
+    }
+}

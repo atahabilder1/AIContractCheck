@@ -1,0 +1,78 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+
+contract Crowdfunding {
+    address public owner;
+    uint256 public fundingGoal;
+    uint256 public currentBalance;
+    uint256 public deadline;
+    bool public isFundingClosed;
+
+    AggregatorV3Interface internal priceFeed;
+
+    mapping(address => uint256) public ethContributions;
+    mapping(address => uint256) public stablecoinContributions;
+
+    event ContributionReceived(address contributor, uint256 amount, string currency);
+    event GoalReached(uint256 totalAmountRaised);
+    event FundingClosed(bool success);
+
+    constructor(
+        uint256 _fundingGoal,
+        uint256 _deadline,
+        address _priceFeedAddress
+    ) {
+        owner = msg.sender;
+        fundingGoal = _fundingGoal;
+        deadline = block.timestamp + _deadline;
+        priceFeed = AggregatorV3Interface(_priceFeedAddress);
+    }
+
+    function contributeEth() external payable {
+        require(!isFundingClosed, "Funding is closed");
+        require(block.timestamp < deadline, "Deadline passed");
+        ethContributions[msg.sender] += msg.value;
+        currentBalance += msg.value;
+        emit ContributionReceived(msg.sender, msg.value, "ETH");
+        checkGoalReached();
+    }
+
+    function contributeStablecoin(uint256 _amount) external {
+        require(!isFundingClosed, "Funding is closed");
+        require(block.timestamp < deadline, "Deadline passed");
+        stablecoinContributions[msg.sender] += _amount;
+        currentBalance += convertToEth(_amount);
+        emit ContributionReceived(msg.sender, _amount, "Stablecoin");
+        checkGoalReached();
+    }
+
+    function convertToEth(uint256 _stablecoinAmount) internal view returns (uint256) {
+        (, int256 price, , , ) = priceFeed.latestRoundData();
+        return (_stablecoinAmount * 1e18) / uint256(price);
+    }
+
+    function checkGoalReached() internal {
+        if (currentBalance >= fundingGoal) {
+            isFundingClosed = true;
+            emit GoalReached(currentBalance);
+        }
+    }
+
+    function closeFunding() external {
+        require(msg.sender == owner, "Not the contract owner");
+        require(block.timestamp >= deadline, "Deadline not passed yet");
+        isFundingClosed = true;
+        emit FundingClosed(currentBalance >= fundingGoal);
+    }
+
+    function withdraw() external {
+        require(msg.sender == owner, "Not the contract owner");
+        require(isFundingClosed, "Funding is not closed yet");
+        require(currentBalance >= fundingGoal, "Funding goal not reached");
+        payable(owner).transfer(currentBalance);
+    }
+}
+```

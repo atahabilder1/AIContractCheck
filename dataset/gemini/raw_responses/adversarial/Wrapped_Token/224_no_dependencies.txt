@@ -1,0 +1,104 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract WrappedToken {
+    string public name = "Wrapped Token";
+    string public symbol = "WTOK";
+    uint8 public decimals = 18;
+
+    mapping(address => uint256) public balanceOf;
+    uint256 public totalSupply;
+
+    address public owner;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Deposit(address indexed account, uint256 value);
+    event Withdrawal(address indexed account, uint256 value);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Caller is not the owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function mint(address account, uint256 amount) public onlyOwner {
+        totalSupply += amount;
+        balanceOf[account] += amount;
+        emit Transfer(address(0), account, amount);
+    }
+
+    function burn(address account, uint256 amount) public onlyOwner {
+        require(balanceOf[account] >= amount, "Balance too low to burn");
+        totalSupply -= amount;
+        balanceOf[account] -= amount;
+        emit Transfer(account, address(0), amount);
+    }
+
+    function transfer(address recipient, uint256 amount) public virtual returns (bool) {
+        require(recipient != address(0), "Transfer to the zero address");
+        require(balanceOf[msg.sender] >= amount, "Balance too low to transfer");
+
+        balanceOf[msg.sender] -= amount;
+        balanceOf[recipient] += amount;
+        emit Transfer(msg.sender, recipient, amount);
+        return true;
+    }
+
+    function transferFrom(address sender, address recipient, uint256 amount) public virtual returns (bool) {
+        require(recipient != address(0), "Transfer to the zero address");
+        require(balanceOf[sender] >= amount, "Balance too low to transfer");
+
+        balanceOf[sender] -= amount;
+        balanceOf[recipient] += amount;
+        emit Transfer(sender, recipient, amount);
+        return true;
+    }
+
+    function approve(address spender, uint256 amount) public virtual returns (bool) {
+        // This is a simplified ERC20-like approval.
+        // In a real-world scenario, you'd need an allowance mapping.
+        // For this standalone contract, we'll assume direct transfer capabilities.
+        // This function is included for interface compatibility but has no effect.
+        return true;
+    }
+
+    function allowance(address owner, address spender) public view virtual returns (uint256) {
+        // This is a simplified ERC20-like allowance.
+        // In a real-world scenario, you'd need an allowance mapping.
+        // For this standalone contract, we'll assume direct transfer capabilities.
+        // This function is included for interface compatibility but returns 0.
+        return 0;
+    }
+
+    // The deposit and withdrawal functions are placeholders for interacting with an underlying asset.
+    // In a real wrapped token, these would interact with the native asset's contract.
+    // For this standalone example, they do nothing but emit events.
+
+    function deposit() public payable {
+        // In a real scenario, this would involve receiving an underlying asset.
+        // For example, if this were WETH, it would receive ETH.
+        // Here, we just acknowledge the deposit with an event.
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function withdraw(uint256 amount) public {
+        // In a real scenario, this would involve sending back an underlying asset.
+        // For example, if this were WETH, it would send back ETH.
+        // This requires the owner to be able to call the underlying contract to send assets.
+        // For this standalone example, we just acknowledge the withdrawal with an event.
+        require(balanceOf[msg.sender] >= amount, "Balance too low to withdraw");
+        balanceOf[msg.sender] -= amount;
+        emit Withdrawal(msg.sender, amount);
+        // In a real implementation, you would send the underlying asset here.
+        // e.g., payable(msg.sender).transfer(amount); if it were ETH and this was WETH.
+    }
+
+    function renounceOwnership() public virtual onlyOwner {
+        owner = address(0);
+    }
+}
+```

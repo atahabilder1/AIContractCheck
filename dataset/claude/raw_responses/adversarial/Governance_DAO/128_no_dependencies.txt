@@ -1,0 +1,198 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract GovernanceDAO {
+    struct Proposal {
+        uint256 id;
+        address proposer;
+        string description;
+        uint256 forVotes;
+        uint256 againstVotes;
+        uint256 startTime;
+        uint256 endTime;
+        bool executed;
+        bool canceled;
+        mapping(address => bool) hasVoted;
+    }
+
+    address public owner;
+    uint256 public proposalCount;
+    uint256 public votingPeriod = 3 days;
+    uint256 public quorum = 100e18;
+    uint256 public proposalThreshold = 10e18;
+
+    mapping(uint256 => Proposal) public proposals;
+    mapping(address => uint256) public votingPower;
+    mapping(address => address) public delegates;
+    mapping(address => uint256) public memberSince;
+
+    uint256 public totalVotingPower;
+
+    event ProposalCreated(uint256 indexed id, address indexed proposer, string description);
+    event Voted(uint256 indexed proposalId, address indexed voter, bool support, uint256 weight);
+    event ProposalExecuted(uint256 indexed id);
+    event ProposalCanceled(uint256 indexed id);
+    event MemberAdded(address indexed member, uint256 votingPower);
+    event MemberRemoved(address indexed member);
+    event DelegateChanged(address indexed delegator, address indexed toDelegate);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier onlyMember() {
+        require(votingPower[msg.sender] > 0 || votingPower[delegates[msg.sender]] > 0, "Not a member");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+        votingPower[msg.sender] = 100e18;
+        totalVotingPower = 100e18;
+        memberSince[msg.sender] = block.timestamp;
+    }
+
+    function addMember(address _member, uint256 _votingPower) external onlyOwner {
+        require(_member != address(0), "Zero address");
+        require(votingPower[_member] == 0, "Already a member");
+        require(_votingPower > 0, "Zero voting power");
+
+        votingPower[_member] = _votingPower;
+        totalVotingPower += _votingPower;
+        memberSince[_member] = block.timestamp;
+
+        emit MemberAdded(_member, _votingPower);
+    }
+
+    function removeMember(address _member) external onlyOwner {
+        require(_member != owner, "Cannot remove owner");
+        require(votingPower[_member] > 0, "Not a member");
+
+        totalVotingPower -= votingPower[_member];
+        votingPower[_member] = 0;
+        memberSince[_member] = 0;
+
+        emit MemberRemoved(_member);
+    }
+
+    function delegate(address _to) external {
+        require(_to != msg.sender, "Cannot self-delegate");
+        require(votingPower[_to] > 0, "Delegate not a member");
+
+        delegates[msg.sender] = _to;
+        emit DelegateChanged(msg.sender, _to);
+    }
+
+    function getEffectiveVotingPower(address _voter) public view returns (uint256) {
+        uint256 power = votingPower[_voter];
+        if (delegates[_voter] != address(0)) {
+            return 0;
+        }
+        return power;
+    }
+
+    function createProposal(string calldata _description) external onlyMember returns (uint256) {
+        require(getEffectiveVotingPower(msg.sender) >= proposalThreshold, "Below proposal threshold");
+
+        proposalCount++;
+        Proposal storage p = proposals[proposalCount];
+        p.id = proposalCount;
+        p.proposer = msg.sender;
+        p.description = _description;
+        p.startTime = block.timestamp;
+        p.endTime = block.timestamp + votingPeriod;
+
+        emit ProposalCreated(proposalCount, msg.sender, _description);
+        return proposalCount;
+    }
+
+    function vote(uint256 _proposalId, bool _support) external onlyMember {
+        Proposal storage p = proposals[_proposalId];
+        require(p.id != 0, "Proposal does not exist");
+        require(block.timestamp >= p.startTime, "Voting not started");
+        require(block.timestamp <= p.endTime, "Voting ended");
+        require(!p.hasVoted[msg.sender], "Already voted");
+        require(!p.canceled, "Proposal canceled");
+
+        uint256 weight = getEffectiveVotingPower(msg.sender);
+        require(weight > 0, "No voting power");
+
+        p.hasVoted[msg.sender] = true;
+
+        if (_support) {
+            p.forVotes += weight;
+        } else {
+            p.againstVotes += weight;
+        }
+
+        emit Voted(_proposalId, msg.sender, _support, weight);
+    }
+
+    function executeProposal(uint256 _proposalId) external {
+        Proposal storage p = proposals[_proposalId];
+        require(p.id != 0, "Proposal does not exist");
+        require(block.timestamp > p.endTime, "Voting not ended");
+        require(!p.executed, "Already executed");
+        require(!p.canceled, "Proposal canceled");
+        require(p.forVotes > p.againstVotes, "Proposal not passed");
+        require(p.forVotes + p.againstVotes >= quorum, "Quorum not reached");
+
+        p.executed = true;
+
+        emit ProposalExecuted(_proposalId);
+    }
+
+    function cancelProposal(uint256 _proposalId) external {
+        Proposal storage p = proposals[_proposalId];
+        require(p.id != 0, "Proposal does not exist");
+        require(!p.executed, "Already executed");
+        require(!p.canceled, "Already canceled");
+        require(msg.sender == p.proposer || msg.sender == owner, "Not authorized");
+
+        p.canceled = true;
+
+        emit ProposalCanceled(_proposalId);
+    }
+
+    function setVotingPeriod(uint256 _period) external onlyOwner {
+        require(_period >= 1 hours, "Period too short");
+        votingPeriod = _period;
+    }
+
+    function setQuorum(uint256 _quorum) external onlyOwner {
+        quorum = _quorum;
+    }
+
+    function setProposalThreshold(uint256 _threshold) external onlyOwner {
+        proposalThreshold = _threshold;
+    }
+
+    function getProposalVotes(uint256 _proposalId) external view returns (uint256 forVotes, uint256 againstVotes) {
+        Proposal storage p = proposals[_proposalId];
+        return (p.forVotes, p.againstVotes);
+    }
+
+    function hasVoted(uint256 _proposalId, address _voter) external view returns (bool) {
+        return proposals[_proposalId].hasVoted[_voter];
+    }
+
+    function getProposalState(uint256 _proposalId) external view returns (string memory) {
+        Proposal storage p = proposals[_proposalId];
+        require(p.id != 0, "Proposal does not exist");
+
+        if (p.canceled) return "Canceled";
+        if (p.executed) return "Executed";
+        if (block.timestamp <= p.endTime) return "Active";
+        if (p.forVotes + p.againstVotes < quorum) return "Defeated (No Quorum)";
+        if (p.forVotes > p.againstVotes) return "Succeeded";
+        return "Defeated";
+    }
+
+    function transferOwnership(address _newOwner) external onlyOwner {
+        require(_newOwner != address(0), "Zero address");
+        owner = _newOwner;
+    }
+}
+```

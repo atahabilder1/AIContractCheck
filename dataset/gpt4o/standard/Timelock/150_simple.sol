@@ -1,0 +1,97 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    struct Transaction {
+        address target;
+        uint256 value;
+        string signature;
+        bytes data;
+        uint256 eta;
+    }
+
+    uint256 public constant GRACE_PERIOD = 14 days;
+    uint256 public constant MINIMUM_DELAY = 1 days;
+    uint256 public constant MAXIMUM_DELAY = 30 days;
+
+    address public admin;
+    uint256 public delay;
+
+    mapping(bytes32 => bool) public queuedTransactions;
+
+    event NewAdmin(address indexed newAdmin);
+    event NewDelay(uint256 indexed newDelay);
+    event CancelTransaction(bytes32 indexed txHash, address indexed target, uint256 value, string signature, bytes data, uint256 eta);
+    event ExecuteTransaction(bytes32 indexed txHash, address indexed target, uint256 value, string signature, bytes data, uint256 eta);
+    event QueueTransaction(bytes32 indexed txHash, address indexed target, uint256 value, string signature, bytes data, uint256 eta);
+
+    constructor(address admin_, uint256 delay_) {
+        require(delay_ >= MINIMUM_DELAY, "Timelock: Delay must exceed minimum delay.");
+        require(delay_ <= MAXIMUM_DELAY, "Timelock: Delay must not exceed maximum delay.");
+
+        admin = admin_;
+        delay = delay_;
+    }
+
+    receive() external payable {}
+
+    function setDelay(uint256 delay_) public {
+        require(msg.sender == admin, "Timelock: Call must come from admin.");
+        require(delay_ >= MINIMUM_DELAY, "Timelock: Delay must exceed minimum delay.");
+        require(delay_ <= MAXIMUM_DELAY, "Timelock: Delay must not exceed maximum delay.");
+        delay = delay_;
+
+        emit NewDelay(delay);
+    }
+
+    function acceptAdmin() public {
+        require(msg.sender == admin, "Timelock: Call must come from admin.");
+        emit NewAdmin(admin);
+    }
+
+    function queueTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta) public returns (bytes32) {
+        require(msg.sender == admin, "Timelock: Call must come from admin.");
+        require(eta >= block.timestamp + delay, "Timelock: Estimated execution block must satisfy delay.");
+
+        bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
+        queuedTransactions[txHash] = true;
+
+        emit QueueTransaction(txHash, target, value, signature, data, eta);
+        return txHash;
+    }
+
+    function cancelTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta) public {
+        require(msg.sender == admin, "Timelock: Call must come from admin.");
+
+        bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
+        queuedTransactions[txHash] = false;
+
+        emit CancelTransaction(txHash, target, value, signature, data, eta);
+    }
+
+    function executeTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta) public payable returns (bytes memory) {
+        require(msg.sender == admin, "Timelock: Call must come from admin.");
+
+        bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
+        require(queuedTransactions[txHash], "Timelock: Transaction hasn't been queued.");
+        require(block.timestamp >= eta, "Timelock: Transaction hasn't surpassed time lock.");
+        require(block.timestamp <= eta + GRACE_PERIOD, "Timelock: Transaction is stale.");
+
+        queuedTransactions[txHash] = false;
+
+        bytes memory callData;
+
+        if (bytes(signature).length == 0) {
+            callData = data;
+        } else {
+            callData = abi.encodePacked(bytes4(keccak256(bytes(signature))), data);
+        }
+
+        (bool success, bytes memory returnData) = target.call{value: value}(callData);
+        require(success, "Timelock: Transaction execution reverted.");
+
+        emit ExecuteTransaction(txHash, target, value, signature, data, eta);
+
+        return returnData;
+    }
+}

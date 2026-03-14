@@ -1,0 +1,107 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    // Minimum delay before a transaction can be executed.
+    uint256 public immutable delay;
+    // Maximum grace period before a transaction can be executed.
+    uint256 public immutable gracePeriod;
+    // Address of the admin.
+    address public admin;
+    // Mapping to store the execution status of transactions.
+    mapping(bytes32 => bool) public executed;
+
+    // Event emitted when a new transaction is queued.
+    event NewAdmin(address indexed newAdmin);
+    event NewDelay(uint256 indexed newDelay);
+    event NewGracePeriod(uint256 indexed newGracePeriod);
+    event CancelTransaction(bytes32 indexed txHash, address indexed target, uint256 value, string signature, bytes data, address sender);
+    event ExecuteTransaction(bytes32 indexed txHash, address indexed target, uint256 value, string signature, bytes data, address sender);
+
+    // Constructor to set the initial delay, grace period, and admin.
+    constructor(uint256 initialDelay, uint256 initialGracePeriod, address initialAdmin) {
+        require(initialDelay >= 0 && initialGracePeriod >= 0, "Timelock: Delay and grace period must be non-negative");
+        require(initialAdmin != address(0), "Timelock: Admin must be a valid address");
+
+        delay = initialDelay;
+        gracePeriod = initialGracePeriod;
+        admin = initialAdmin;
+    }
+
+    // Modifier to restrict access to the admin.
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Timelock: caller is not the admin");
+        _;
+    }
+
+    // Function to queue a new transaction.
+    function queueTransaction(address target, uint256 value, string memory signature, bytes memory data) public onlyAdmin returns (bytes32) {
+        bytes32 txHash = keccak256(abi.encode(target, value, signature, data));
+        require(!executed[txHash], "Timelock: Transaction already executed");
+        require(block.timestamp + delay >= block.timestamp, "Timelock: Delay has not passed");
+
+        // Emit event for the queued transaction.
+        emit ExecuteTransaction(txHash, target, value, signature, data, msg.sender);
+        return txHash;
+    }
+
+    // Function to cancel a transaction.
+    function cancelTransaction(address target, uint256 value, string memory signature, bytes memory data) public onlyAdmin {
+        bytes32 txHash = keccak256(abi.encode(target, value, signature, data));
+        require(!executed[txHash], "Timelock: Transaction already executed");
+        require(block.timestamp + gracePeriod >= block.timestamp, "Timelock: Grace period has passed");
+
+        // Mark the transaction as canceled.
+        executed[txHash] = true;
+
+        // Emit event for the canceled transaction.
+        emit CancelTransaction(txHash, target, value, signature, data, msg.sender);
+    }
+
+    // Function to execute a transaction.
+    function executeTransaction(address target, uint256 value, string memory signature, bytes memory data) public payable onlyAdmin returns (bytes memory) {
+        bytes32 txHash = keccak256(abi.encode(target, value, signature, data));
+        require(!executed[txHash], "Timelock: Transaction already executed");
+        require(block.timestamp >= block.timestamp + delay, "Timelock: Delay has not passed");
+
+        // Mark the transaction as executed.
+        executed[txHash] = true;
+
+        // Perform the transaction.
+        (bool success, bytes memory returnData) = target.call{value: value}(abi.encodeWithSignature(signature, data));
+        require(success, string(returnData));
+
+        // Emit event for the executed transaction.
+        emit ExecuteTransaction(txHash, target, value, signature, data, msg.sender);
+        return returnData;
+    }
+
+    // Function to change the admin.
+    function setAdmin(address newAdmin) public onlyAdmin {
+        require(newAdmin != address(0), "Timelock: Admin must be a valid address");
+        admin = newAdmin;
+
+        // Emit event for the new admin.
+        emit NewAdmin(newAdmin);
+    }
+
+    // Function to set a new delay.
+    function setDelay(uint256 newDelay) public onlyAdmin {
+        require(newDelay >= 0, "Timelock: Delay must be non-negative");
+        delay = newDelay;
+
+        // Emit event for the new delay.
+        emit NewDelay(newDelay);
+    }
+
+    // Function to set a new grace period.
+    function setGracePeriod(uint256 newGracePeriod) public onlyAdmin {
+        require(newGracePeriod >= 0, "Timelock: Grace period must be non-negative");
+        gracePeriod = newGracePeriod;
+
+        // Emit event for the new grace period.
+        emit NewGracePeriod(newGracePeriod);
+    }
+}
+```

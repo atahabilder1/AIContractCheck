@@ -1,0 +1,80 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
+
+contract StakableNFT is ERC721, Ownable {
+    using Counters for Counters.Counter;
+    Counters.Counter private _tokenIds;
+
+    IERC20 public rewardToken;
+    uint256 public rewardRate; // ERC20 tokens per second per NFT
+
+    mapping(uint256 => uint256) public stakingTimestamps;
+    mapping(address => uint256) public stakedNFTs;
+
+    event Staked(address indexed user, uint256 indexed tokenId);
+    event Unstaked(address indexed user, uint256 indexed tokenId);
+    event Claimed(address indexed user, uint256 amount);
+
+    constructor(address _rewardToken, uint256 _rewardRate) ERC721("StakableNFT", "SNFT") {
+        rewardToken = IERC20(_rewardToken);
+        rewardRate = _rewardRate;
+    }
+
+    function mintNFT(address recipient) public onlyOwner returns (uint256) {
+        _tokenIds.increment();
+        uint256 newItemId = _tokenIds.current();
+        _mint(recipient, newItemId);
+        return newItemId;
+    }
+
+    function stake(uint256 tokenId) public {
+        require(ownerOf(tokenId) == msg.sender, "You are not the owner of this NFT");
+        require(stakingTimestamps[tokenId] == 0, "This NFT is already staked");
+        _transfer(msg.sender, address(this), tokenId);
+        stakingTimestamps[tokenId] = block.timestamp;
+        stakedNFTs[msg.sender]++;
+        emit Staked(msg.sender, tokenId);
+    }
+
+    function unstake(uint256 tokenId) public {
+        require(ownerOf(tokenId) == address(this), "This NFT is not staked");
+        require(stakingTimestamps[tokenId] != 0, "This NFT was not staked");
+        uint256 reward = calculateRewards(tokenId);
+        _transfer(address(this), msg.sender, tokenId);
+        stakingTimestamps[tokenId] = 0;
+        stakedNFTs[msg.sender]--;
+        if (reward > 0) {
+            rewardToken.transfer(msg.sender, reward);
+            emit Claimed(msg.sender, reward);
+        }
+        emit Unstaked(msg.sender, tokenId);
+    }
+
+    function claimRewards(uint256 tokenId) public {
+        require(ownerOf(tokenId) == address(this), "This NFT is not staked");
+        require(stakingTimestamps[tokenId] != 0, "This NFT was not staked");
+        uint256 reward = calculateRewards(tokenId);
+        if (reward > 0) {
+            rewardToken.transfer(msg.sender, reward);
+            emit Claimed(msg.sender, reward);
+        }
+        stakingTimestamps[tokenId] = block.timestamp;
+    }
+
+    function calculateRewards(uint256 tokenId) public view returns (uint256) {
+        require(stakingTimestamps[tokenId] != 0, "This NFT was not staked");
+        uint256 timeStaked = block.timestamp - stakingTimestamps[tokenId];
+        return timeStaked * rewardRate;
+    }
+
+    function setRewardRate(uint256 _rewardRate) public onlyOwner {
+        rewardRate = _rewardRate;
+    }
+}
+```

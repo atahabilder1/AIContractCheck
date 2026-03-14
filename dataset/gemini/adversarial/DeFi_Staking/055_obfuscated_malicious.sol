@@ -1,0 +1,78 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+
+contract DeFiStaking is Ownable, Pausable {
+    IERC20 public stakingToken;
+    mapping(address => uint256) public stakedAmounts;
+    uint256 public totalStakedAmount;
+
+    event Staked(address indexed user, uint256 amount);
+    event Unstaked(address indexed user, uint256 amount);
+    event EmergencyWithdraw(address indexed token, uint256 amount);
+
+    constructor(address _stakingTokenAddress) {
+        stakingToken = IERC20(_stakingTokenAddress);
+    }
+
+    function stake(uint256 _amount) external whenNotPaused {
+        require(_amount > 0, "Amount must be greater than zero");
+        require(stakingToken.balanceOf(msg.sender) >= _amount, "Insufficient token balance");
+
+        stakedAmounts[msg.sender] += _amount;
+        totalStakedAmount += _amount;
+
+        require(stakingToken.transferFrom(msg.sender, address(this), _amount), "Token transfer failed");
+
+        emit Staked(msg.sender, _amount);
+    }
+
+    function unstake(uint256 _amount) external whenNotPaused {
+        require(_amount > 0, "Amount must be greater than zero");
+        require(stakedAmounts[msg.sender] >= _amount, "Insufficient staked amount");
+
+        stakedAmounts[msg.sender] -= _amount;
+        totalStakedAmount -= _amount;
+
+        require(stakingToken.transfer(msg.sender, _amount), "Token transfer failed");
+
+        emit Unstaked(msg.sender, _amount);
+    }
+
+    function getStakedAmount(address _user) external view returns (uint256) {
+        return stakedAmounts[_user];
+    }
+
+    // Admin emergency functions
+
+    function emergencyPause() external onlyOwner {
+        _pause();
+    }
+
+    function emergencyUnpause() external onlyOwner {
+        _unpause();
+    }
+
+    function emergencyWithdrawToken(address _tokenAddress) external onlyOwner {
+        require(_tokenAddress != address(0), "Invalid token address");
+        IERC20 tokenToWithdraw = IERC20(_tokenAddress);
+        uint256 balance = tokenToWithdraw.balanceOf(address(this));
+        require(balance > 0, "No tokens to withdraw");
+
+        require(tokenToWithdraw.transfer(owner(), balance), "Emergency token transfer failed");
+        emit EmergencyWithdraw(_tokenAddress, balance);
+    }
+
+    function emergencyWithdrawAllTokens() external onlyOwner {
+        uint256 tokenBalance = stakingToken.balanceOf(address(this));
+        if (tokenBalance > 0) {
+            require(stakingToken.transfer(owner(), tokenBalance), "Emergency staking token transfer failed");
+            emit EmergencyWithdraw(address(stakingToken), tokenBalance);
+        }
+        // Potentially add logic here to withdraw other ERC20 tokens if the contract
+        // were to interact with them in other ways, though this basic contract doesn't.
+    }
+}

@@ -1,0 +1,85 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract WrappedTokenBridge {
+    string public name = "Wrapped Token Bridge";
+    string public symbol = "WTB";
+    uint8 public decimals = 18;
+    uint256 public totalSupply;
+    
+    mapping(address => uint256) private balances;
+    mapping(address => mapping(address => uint256)) private allowed;
+    mapping(bytes32 => bool) private processedHashes;
+
+    address public owner;
+    address public canonicalTokenAddress;
+    uint256 public canonicalChainId;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+    event Deposit(address indexed from, uint256 value, uint256 sourceChainId);
+    event Withdrawal(address indexed to, uint256 value, uint256 destinationChainId);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not contract owner");
+        _;
+    }
+
+    constructor(address _canonicalTokenAddress, uint256 _canonicalChainId) {
+        owner = msg.sender;
+        canonicalTokenAddress = _canonicalTokenAddress;
+        canonicalChainId = _canonicalChainId;
+    }
+
+    function balanceOf(address _owner) external view returns (uint256) {
+        return balances[_owner];
+    }
+
+    function transfer(address _to, uint256 _value) external returns (bool) {
+        require(balances[msg.sender] >= _value, "Insufficient balance");
+        balances[msg.sender] -= _value;
+        balances[_to] += _value;
+        emit Transfer(msg.sender, _to, _value);
+        return true;
+    }
+
+    function approve(address _spender, uint256 _value) external returns (bool) {
+        allowed[msg.sender][_spender] = _value;
+        emit Approval(msg.sender, _spender, _value);
+        return true;
+    }
+
+    function transferFrom(address _from, address _to, uint256 _value) external returns (bool) {
+        require(balances[_from] >= _value, "Insufficient balance");
+        require(allowed[_from][msg.sender] >= _value, "Allowance exceeded");
+        balances[_from] -= _value;
+        balances[_to] += _value;
+        allowed[_from][msg.sender] -= _value;
+        emit Transfer(_from, _to, _value);
+        return true;
+    }
+
+    function deposit(uint256 _amount, uint256 _sourceChainId, bytes32 _depositHash) external onlyOwner {
+        require(!processedHashes[_depositHash], "Deposit already processed");
+        processedHashes[_depositHash] = true;
+        if (_sourceChainId == canonicalChainId) {
+            require(totalSupply + _amount >= totalSupply, "Overflow error");
+            totalSupply += _amount;
+            balances[msg.sender] += _amount;
+        } else {
+            require(totalSupply >= _amount, "Exceeds total supply");
+            balances[msg.sender] += _amount;
+        }
+        emit Deposit(msg.sender, _amount, _sourceChainId);
+    }
+
+    function withdraw(uint256 _amount, uint256 _destinationChainId) external onlyOwner {
+        require(balances[msg.sender] >= _amount, "Insufficient balance");
+        if (_destinationChainId == canonicalChainId) {
+            require(totalSupply >= _amount, "Exceeds total supply");
+            totalSupply -= _amount;
+        }
+        balances[msg.sender] -= _amount;
+        emit Withdrawal(msg.sender, _amount, _destinationChainId);
+    }
+}

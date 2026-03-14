@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract FeeOnTransferToken is ERC20, Ownable {
+    address public treasury;
+    uint256 public constant FEE_PERCENT = 2;
+
+    constructor(
+        string memory name,
+        string memory symbol,
+        uint256 initialSupply,
+        address _treasury
+    ) ERC20(name, symbol) Ownable(msg.sender) {
+        require(_treasury != address(0), "Treasury cannot be zero address");
+        treasury = _treasury;
+        _mint(msg.sender, initialSupply);
+    }
+
+    function setTreasury(address _treasury) external onlyOwner {
+        require(_treasury != address(0), "Treasury cannot be zero address");
+        treasury = _treasury;
+    }
+
+    function _update(address from, address to, uint256 amount) internal virtual override {
+        if (from == address(0) || to == address(0) || from == treasury || to == treasury) {
+            super._update(from, to, amount);
+        } else {
+            uint256 fee = (amount * FEE_PERCENT) / 100;
+            uint256 netAmount = amount - fee;
+            super._update(from, treasury, fee);
+            super._update(from, to, netAmount);
+        }
+    }
+}

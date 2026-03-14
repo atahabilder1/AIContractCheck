@@ -1,0 +1,139 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/governance/TimelockController.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+
+contract TimelockWithEmergencyAdmin is TimelockController, Ownable, Pausable {
+
+    address public emergencyAdmin;
+
+    event EmergencyAdminSet(address indexed newEmergencyAdmin);
+    event FundsWithdrawn(address indexed token, address indexed to, uint256 amount);
+    event OperationsPaused();
+    event OperationsResumed();
+
+    constructor(
+        address[] memory eta,
+        address[] memory targets,
+        bytes[] memory calldatas,
+        uint256 _minDelay
+    ) TimelockController(eta, targets, calldatas, _minDelay) {
+        // The deployer of this contract is initially the owner and can set the emergency admin.
+        // The TimelockController itself needs an admin to set up initial operations.
+        // For simplicity, we'll use the deployer as the initial admin for TimelockController setup.
+        // The emergency admin will be set separately.
+    }
+
+    /**
+     * @dev Sets the emergency admin. Can only be called by the owner.
+     * @param _emergencyAdmin The address of the new emergency admin.
+     */
+    function setEmergencyAdmin(address _emergencyAdmin) public onlyOwner {
+        emergencyAdmin = _emergencyAdmin;
+        emit EmergencyAdminSet(_emergencyAdmin);
+    }
+
+    /**
+     * @dev Pauses all operations. Can only be called by the emergency admin.
+     * This function inherits from Pausable and adds a check for the emergency admin.
+     */
+    function pause() public override whenNotPaused emergencyAdminOnly {
+        _pause();
+        emit OperationsPaused();
+    }
+
+    /**
+     * @dev Resumes all operations. Can only be called by the emergency admin.
+     * This function inherits from Pausable and adds a check for the emergency admin.
+     */
+    function unpause() public whenPaused emergencyAdminOnly {
+        _unpause();
+        emit OperationsResumed();
+    }
+
+    /**
+     * @dev Withdraws all tokens of a specific ERC20 token from this contract.
+     * Can only be called by the emergency admin.
+     * @param tokenAddress The address of the ERC20 token to withdraw.
+     * @param to The address to send the tokens to.
+     */
+    function withdrawAllTokens(address tokenAddress, address to) public emergencyAdminOnly {
+        require(tokenAddress != address(0), "TimelockWithEmergencyAdmin: Invalid token address");
+        require(to != address(0), "TimelockWithEmergencyAdmin: Invalid recipient address");
+
+        IERC20 token = IERC20(tokenAddress);
+        uint256 balance = token.balanceOf(address(this));
+
+        require(balance > 0, "TimelockWithEmergencyAdmin: No tokens to withdraw");
+
+        token.transfer(to, balance);
+        emit FundsWithdrawn(tokenAddress, to, balance);
+    }
+
+    /**
+     * @dev Withdraws all native Ether from this contract.
+     * Can only be called by the emergency admin.
+     * @param to The address to send the Ether to.
+     */
+    function withdrawAllEther(address to) public emergencyAdminOnly {
+        require(to != address(0), "TimelockWithEmergencyAdmin: Invalid recipient address");
+
+        uint256 balance = address(this).balance;
+        require(balance > 0, "TimelockWithEmergencyAdmin: No Ether to withdraw");
+
+        (bool success, ) = payable(to).call{value: balance}("");
+        require(success, "TimelockWithEmergencyAdmin: Ether transfer failed");
+
+        emit FundsWithdrawn(address(0), to, balance); // address(0) signifies native Ether
+    }
+
+    /**
+     * @dev Modifier that checks if the caller is the emergency admin.
+     */
+    modifier emergencyAdminOnly() {
+        require(msg.sender == emergencyAdmin, "TimelockWithEmergencyAdmin: Caller is not the emergency admin");
+        _;
+    }
+
+    // The TimelockController contract requires an admin to manage its operations.
+    // We will use the owner of this contract as the initial admin for the TimelockController.
+    // The emergency admin has separate powers.
+
+    // Override to use the owner as the admin for TimelockController functions
+    function setAdmin(address target, address admin) public override onlyOwner {
+        super.setAdmin(target, admin);
+    }
+
+    // Override to use the owner as the admin for TimelockController functions
+    function queue(address target, bytes calldata data, string calldata description) public override onlyOwner returns (bytes32) {
+        return super.queue(target, data, description);
+    }
+
+    // Override to use the owner as the admin for TimelockController functions
+    function execute(address to, bytes calldata data, string calldata description) public override onlyOwner returns (bytes32) {
+        return super.execute(to, data, description);
+    }
+
+    // Override to use the owner as the admin for TimelockController functions
+    function cancel(bytes32 txHash) public override onlyOwner {
+        super.cancel(txHash);
+    }
+
+    // Override to use the owner as the admin for TimelockController functions
+    function acceptAdmin() public override onlyOwner {
+        super.acceptAdmin();
+    }
+
+    // Override to use the owner as the admin for TimelockController functions
+    function acceptRoles() public override onlyOwner {
+        super.acceptRoles();
+    }
+
+    // The TimelockController requires a role manager. We'll use the owner as the default role manager.
+    // The emergency admin has separate powers outside of the TimelockController's core functions.
+
+    // Fallback function to receive Ether
+    receive() external payable {}
+}

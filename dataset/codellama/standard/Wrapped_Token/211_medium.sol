@@ -1,0 +1,107 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract WrappedToken {
+    // The wrapped token's total supply
+    uint256 public totalSupply;
+
+    // The wrapped token's name
+    string public name;
+
+    // The wrapped token's symbol
+    string public symbol;
+
+    // The wrapped token's decimals
+    uint8 public decimals;
+
+    // Mapping of addresses to their balances
+    mapping(address => uint256) public balances;
+
+    // Mapping of addresses to their allowances
+    mapping(address => mapping(address => uint256)) public allowances;
+
+    // Mapping of addresses to their permit nonces
+    mapping(address => uint256) public permitNonces;
+
+    // Mapping of addresses to their flash mint limits
+    mapping(address => uint256) public flashMintLimits;
+
+    // Mapping of addresses to their flash mint amounts
+    mapping(address => uint256) public flashMintAmounts;
+
+    // Mapping of addresses to their flash mint expiries
+    mapping(address => uint256) public flashMintExpiries;
+
+    // Mapping of addresses to their flash mint limits
+    mapping(address => mapping(address => uint256)) public flashMintLimits;
+
+    // Mapping of addresses to their flash mint amounts
+    mapping(address => mapping(address => uint256)) public flashMintAmounts;
+
+    // Mapping of addresses to their flash mint expiries
+    mapping(address => mapping(address => uint256)) public flashMintExpiries;
+
+    constructor(string memory _name, string memory _symbol, uint8 _decimals) {
+        name = _name;
+        symbol = _symbol;
+        decimals = _decimals;
+    }
+
+    function deposit(uint256 amount) public {
+        // Transfer the specified amount of tokens from the caller to the contract
+        balances[msg.sender] += amount;
+        totalSupply += amount;
+    }
+
+    function withdraw(uint256 amount) public {
+        // Transfer the specified amount of tokens from the contract to the caller
+        balances[msg.sender] -= amount;
+        totalSupply -= amount;
+    }
+
+    function permit(address spender, uint256 amount, uint256 expiry, bytes memory signature) public {
+        // Verify the signature and ensure the permit is valid
+        require(isValidPermit(spender, amount, expiry, signature), "Invalid permit");
+
+        // Increment the permit nonce
+        permitNonces[spender]++;
+
+        // Update the allowance for the specified spender
+        allowances[msg.sender][spender] += amount;
+    }
+
+    function flashMint(uint256 amount) public {
+        // Verify that the caller is a valid flash mint minter
+        require(isValidFlashMinter(msg.sender), "Invalid flash minter");
+
+        // Verify that the amount is within the flash mint limit
+        require(amount <= flashMintLimits[msg.sender], "Amount exceeds flash mint limit");
+
+        // Mint the specified amount of tokens to the caller
+        balances[msg.sender] += amount;
+        totalSupply += amount;
+
+        // Update the flash mint amount for the caller
+        flashMintAmounts[msg.sender] += amount;
+    }
+
+    function isValidPermit(address spender, uint256 amount, uint256 expiry, bytes memory signature) public view returns (bool) {
+        // Verify the signature and ensure the permit is valid
+        return isValidSignature(signature, abi.encodePacked(spender, amount, expiry)) && now <= expiry;
+    }
+
+    function isValidFlashMinter(address minter) public view returns (bool) {
+        // Verify that the minter is a valid flash minter
+        return flashMintLimits[minter] > 0;
+    }
+
+    function isValidSignature(bytes memory signature, bytes memory data) public view returns (bool) {
+        // Verify the signature and ensure it is valid
+        return signature.length == 65 && data.length == 32 && recoverSigner(signature, data) == address(this);
+    }
+
+    function recoverSigner(bytes memory signature, bytes memory data) public pure returns (address) {
+        // Recover the signer's address from the signature and data
+        return ecrecover(hash(data), signature);
+    }
+}

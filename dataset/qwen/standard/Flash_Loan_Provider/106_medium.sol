@@ -1,0 +1,41 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract FlashLoanProvider {
+    mapping(address => uint256) public balances;
+    mapping(address => uint256) public fees;
+
+    event LoanFunded(address indexed token, uint256 amount);
+    event LoanTaken(address indexed borrower, address indexed token, uint256 amount, uint256 fee);
+    event LoanRepaid(address indexed borrower, address indexed token, uint256 amount, uint256 fee);
+
+    function fund(address _token, uint256 _amount) external {
+        IERC20(_token).transferFrom(msg.sender, address(this), _amount);
+        balances[_token] += _amount;
+        emit LoanFunded(_token, _amount);
+    }
+
+    function setFee(address _token, uint256 _fee) external {
+        fees[_token] = _fee;
+        emit LoanFunded(_token, _fee);
+    }
+
+    function flashLoan(address _token, uint256 _amount) external {
+        require(balances[_token] >= _amount, "Insufficient balance");
+        uint256 fee = (_amount * fees[_token]) / 10000; // Assuming fee is in basis points
+        uint256 amountToRepay = _amount + fee;
+
+        balances[_token] -= _amount;
+        IERC20(_token).transfer(msg.sender, _amount);
+
+        emit LoanTaken(msg.sender, _token, _amount, fee);
+
+        require(IERC20(_token).transferFrom(msg.sender, address(this), amountToRepay), "Repayment failed");
+
+        balances[_token] += amountToRepay;
+
+        emit LoanRepaid(msg.sender, _token, _amount, fee);
+    }
+}

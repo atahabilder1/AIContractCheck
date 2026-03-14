@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract AccessControl {
+    struct Role {
+        mapping(address => bool) members;
+    }
+
+    mapping(bytes32 => Role) roles;
+
+    function addRole(bytes32 _roleName) public {
+        roles[_roleName] = Role(msg.sender);
+    }
+
+    function removeRole(bytes32 _roleName) public {
+        delete roles[_roleName];
+    }
+
+    function hasRole(bytes32 _roleName, address _addr) public view returns (bool) {
+        return roles[_roleName].members[_addr];
+    }
+
+    function addMember(bytes32 _roleName, address _addr) public {
+        roles[_roleName].members[_addr] = true;
+    }
+
+    function removeMember(bytes32 _roleName, address _addr) public {
+        delete roles[_roleName].members[_addr];
+    }
+}

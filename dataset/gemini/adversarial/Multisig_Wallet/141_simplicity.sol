@@ -1,0 +1,116 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleMultiSig {
+    address[] public owners;
+    uint public required;
+    mapping(uint => mapping(address => bool)) public confirmations;
+    mapping(uint => Transaction) public transactions;
+    uint public transactionCount;
+
+    struct Transaction {
+        address destination;
+        uint value;
+        bytes data;
+        bool executed;
+    }
+
+    event Submission(uint transactionId);
+    event Confirmation(address indexed sender, uint transactionId);
+    event Revocation(address indexed sender, uint transactionId);
+    event Execution(uint transactionId);
+
+    modifier onlyOwner() {
+        bool isOwner = false;
+        for (uint i = 0; i < owners.length; i++) {
+            if (owners[i] == msg.sender) {
+                isOwner = true;
+                break;
+            }
+        }
+        require(isOwner, "Not an owner");
+        _;
+    }
+
+    modifier txExists(uint _txId) {
+        require(_txId < transactionCount, "Transaction does not exist");
+        _;
+    }
+
+    modifier notConfirmed(uint _txId, address _owner) {
+        require(!confirmations[_txId][_owner], "Already confirmed");
+        _;
+    }
+
+    modifier notExecuted(uint _txId) {
+        require(!transactions[_txId].executed, "Transaction already executed");
+        _;
+    }
+
+    constructor(address[] memory _owners, uint _required) {
+        require(_owners.length > 0, "Owners cannot be empty");
+        require(_required > 0 && _required <= _owners.length, "Invalid number of required confirmations");
+        owners = _owners;
+        required = _required;
+    }
+
+    function submit(address _destination, uint _value, bytes memory _data) public onlyOwner {
+        uint txId = transactionCount;
+        transactions[txId] = Transaction({
+            destination: _destination,
+            value: _value,
+            data: _data,
+            executed: false
+        });
+        transactionCount++;
+        emit Submission(txId);
+    }
+
+    function confirm(uint _txId) public onlyOwner txExists(_txId) notConfirmed(_txId, msg.sender) notExecuted(_txId) {
+        confirmations[_txId][msg.sender] = true;
+        emit Confirmation(msg.sender, _txId);
+
+        if (isConfirmed(_txId)) {
+            execute(_txId);
+        }
+    }
+
+    function revoke(uint _txId) public onlyOwner txExists(_txId) {
+        require(confirmations[_txId][msg.sender], "Not confirmed");
+        confirmations[_txId][msg.sender] = false;
+        emit Revocation(msg.sender, _txId);
+    }
+
+    function execute(uint _txId) public txExists(_txId) notExecuted(_txId) {
+        require(isConfirmed(_txId), "Not confirmed");
+
+        Transaction storage t = transactions[_txId];
+        t.executed = true;
+
+        (bool success, ) = t.destination.call{value: t.value}(t.data);
+        require(success, "Transaction failed");
+
+        emit Execution(_txId);
+    }
+
+    function isConfirmed(uint _txId) public view returns (bool) {
+        uint count = 0;
+        for (uint i = 0; i < owners.length; i++) {
+            if (confirmations[_txId][owners[i]]) {
+                count++;
+            }
+        }
+        return count >= required;
+    }
+
+    function getOwners() public view returns (address[] memory) {
+        return owners;
+    }
+
+    function getTransaction(uint _txId) public view returns (address destination, uint value, bytes memory data, bool executed) {
+        Transaction storage t = transactions[_txId];
+        return (t.destination, t.value, t.data, t.executed);
+    }
+
+    receive() external payable {}
+}

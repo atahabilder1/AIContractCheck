@@ -1,0 +1,63 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DAOVoting {
+    struct Proposal {
+        string description;
+        uint256 voteCount;
+        bool executed;
+        mapping(address => bool) voted;
+    }
+
+    mapping(uint256 => Proposal) public proposals;
+    uint256 public proposalCount;
+    address public tokenAddress;
+    mapping(address => uint256) public tokenBalance;
+
+    constructor(address _tokenAddress) {
+        tokenAddress = _tokenAddress;
+    }
+
+    modifier onlyTokenHolders() {
+        require(tokenBalance[msg.sender] > 0, "Only token holders can perform this action");
+        _;
+    }
+
+    function depositTokens(uint256 amount) external {
+        require(IERC20(tokenAddress).transferFrom(msg.sender, address(this), amount), "Token transfer failed");
+        tokenBalance[msg.sender] += amount;
+    }
+
+    function withdrawTokens(uint256 amount) external {
+        require(tokenBalance[msg.sender] >= amount, "Insufficient balance");
+        tokenBalance[msg.sender] -= amount;
+        require(IERC20(tokenAddress).transfer(msg.sender, amount), "Token transfer failed");
+    }
+
+    function createProposal(string memory description) external onlyTokenHolders {
+        Proposal storage proposal = proposals[proposalCount++];
+        proposal.description = description;
+    }
+
+    function vote(uint256 proposalId) external onlyTokenHolders {
+        Proposal storage proposal = proposals[proposalId];
+        require(!proposal.voted[msg.sender], "Already voted");
+        proposal.voted[msg.sender] = true;
+        proposal.voteCount += tokenBalance[msg.sender];
+    }
+
+    function executeProposal(uint256 proposalId) external {
+        Proposal storage proposal = proposals[proposalId];
+        require(proposal.voteCount > 0, "No votes");
+        require(!proposal.executed, "Already executed");
+        proposal.executed = true;
+        // Implementation of proposal execution goes here.
+    }
+}
+
+interface IERC20 {
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+}
+```

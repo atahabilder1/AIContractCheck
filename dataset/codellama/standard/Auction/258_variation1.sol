@@ -1,0 +1,35 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DutchAuction {
+    uint public startingPrice;
+    uint public priceDecayRate;
+    address payable public highestBidder;
+    uint public highestBid;
+
+    constructor(uint _startingPrice, uint _priceDecayRate) public {
+        startingPrice = _startingPrice;
+        priceDecayRate = _priceDecayRate;
+    }
+
+    function bid() public payable {
+        require(msg.value > highestBid, "Your bid is too low");
+
+        uint currentPrice = getCurrentPrice();
+        require(msg.value >= currentPrice, "Your bid is too low");
+
+        highestBidder = msg.sender;
+        highestBid = msg.value;
+    }
+
+    function getCurrentPrice() public view returns (uint) {
+        return startingPrice - (block.timestamp - block.timestamp) * priceDecayRate;
+    }
+
+    function withdraw() public {
+        require(msg.sender == highestBidder, "You are not the highest bidder");
+
+        uint amount = highestBid - getCurrentPrice();
+        msg.sender.transfer(amount);
+    }
+}

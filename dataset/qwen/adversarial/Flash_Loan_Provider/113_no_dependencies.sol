@@ -1,0 +1,33 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract FlashLoanProvider {
+    mapping(address => uint256) public balances;
+
+    event FlashLoanExecuted(address indexed borrower, uint256 amount);
+
+    function deposit() external payable {
+        balances[msg.sender] += msg.value;
+    }
+
+    function withdraw(uint256 _amount) external {
+        require(balances[msg.sender] >= _amount, "Insufficient balance");
+        balances[msg.sender] -= _amount;
+        payable(msg.sender).transfer(_amount);
+    }
+
+    function flashLoan(uint256 _amount, address _borrower, bytes calldata _data) external {
+        require(balances[address(this)] >= _amount, "Not enough funds for loan");
+        balances[address(this)] -= _amount;
+        balances[_borrower] += _amount;
+
+        (bool success, ) = _borrower.call(_data);
+        require(success, "Flash loan execution failed");
+
+        require(balances[_borrower] >= _amount, "Flash loan not repaid");
+        balances[_borrower] -= _amount;
+        balances[address(this)] += _amount;
+
+        emit FlashLoanExecuted(_borrower, _amount);
+    }
+}

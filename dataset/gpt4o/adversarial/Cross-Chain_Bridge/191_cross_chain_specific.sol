@@ -1,0 +1,63 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address public admin;
+    mapping(bytes32 => bool) public processedTransactions;
+
+    event TransferInitiated(
+        address indexed from,
+        address indexed to,
+        uint256 amount,
+        uint256 targetChainId,
+        bytes32 indexed transactionId
+    );
+
+    event TransferCompleted(
+        address indexed from,
+        address indexed to,
+        uint256 amount,
+        bytes32 indexed transactionId
+    );
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin can execute this function.");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+    }
+
+    function initiateTransfer(
+        address to,
+        uint256 amount,
+        uint256 targetChainId
+    ) external {
+        bytes32 transactionId = keccak256(
+            abi.encodePacked(msg.sender, to, amount, targetChainId, block.timestamp)
+        );
+
+        emit TransferInitiated(msg.sender, to, amount, targetChainId, transactionId);
+    }
+
+    function completeTransfer(
+        address from,
+        address to,
+        uint256 amount,
+        bytes32 transactionId
+    ) external onlyAdmin {
+        require(!processedTransactions[transactionId], "Transaction already processed.");
+
+        processedTransactions[transactionId] = true;
+
+        // Implement token minting or transferring logic here
+        // Example: ERC20(to).mint(to, amount);
+
+        emit TransferCompleted(from, to, amount, transactionId);
+    }
+
+    function updateAdmin(address newAdmin) external onlyAdmin {
+        admin = newAdmin;
+    }
+}

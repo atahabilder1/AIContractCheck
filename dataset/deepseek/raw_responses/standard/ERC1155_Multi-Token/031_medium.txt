@@ -1,0 +1,49 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract ERC1155WithRoyalties is ERC1155, Ownable {
+    using SafeMath for uint256;
+
+    uint256 private _nextTokenId = 1;
+    mapping(uint256 => uint256) private _tokenSupplyCap;
+    mapping(uint256 => uint256) private _tokenRoyalties;
+
+    constructor() ERC1155("") {}
+
+    function mintBatch(address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data) external onlyOwner {
+        require(ids.length == amounts.length, "ERC1155WithRoyalties: IDs and amounts length mismatch");
+        for (uint256 i = 0; i < ids.length; i++) {
+            require(_nextTokenId.add(i) <= _tokenSupplyCap[ids[i]] || _tokenSupplyCap[ids[i]] == 0, "ERC1155WithRoyalties: Supply cap exceeded for token ID");
+            _mint(to, _nextTokenId.add(i), amounts[i], data);
+        }
+        _nextTokenId = _nextTokenId.add(ids.length);
+    }
+
+    function setTokenSupplyCap(uint256 id, uint256 cap) external onlyOwner {
+        _tokenSupplyCap[id] = cap;
+    }
+
+    function setTokenRoyalties(uint256 id, uint256 royalties) external onlyOwner {
+        _tokenRoyalties[id] = royalties;
+    }
+
+    function getTokenRoyalties(uint256 id) external view returns (uint256) {
+        return _tokenRoyalties[id];
+    }
+
+    function _beforeTokenTransfer(address operator, address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data) internal override {
+        super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
+        for (uint256 i = 0; i < ids.length; i++) {
+            if (to != address(0) && _tokenSupplyCap[ids[i]] != 0) {
+                uint256 currentSupply = balanceOf(to, ids[i]);
+                require(currentSupply.add(amounts[i]) <= _tokenSupplyCap[ids[i]], "ERC1155WithRoyalties: Supply cap exceeded for token ID");
+            }
+        }
+    }
+}
+```

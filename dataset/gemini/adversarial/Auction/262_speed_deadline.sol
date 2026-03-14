@@ -1,0 +1,77 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract HackathonAuction {
+    address payable public owner;
+    uint256 public auctionEndTime;
+    address payable public highestBidder;
+    uint256 public highestBid;
+    bool public auctionEnded;
+
+    event BidPlaced(address bidder, uint256 amount);
+    event AuctionWon(address winner, uint256 amount);
+
+    modifier onlyBeforeAuctionEnd() {
+        require(!auctionEnded, "Auction has already ended.");
+        require(block.timestamp < auctionEndTime, "Auction has ended.");
+        _;
+    }
+
+    modifier onlyAfterAuctionEnd() {
+        require(auctionEnded, "Auction has not ended yet.");
+        _;
+    }
+
+    constructor(uint256 _auctionDurationInSeconds) {
+        owner = payable(msg.sender);
+        auctionEndTime = block.timestamp + _auctionDurationInSeconds;
+        auctionEnded = false;
+    }
+
+    function placeBid() public payable onlyBeforeAuctionEnd {
+        require(msg.value > highestBid, "Bid must be higher than the current highest bid.");
+        
+        if (highestBidder != address(0)) {
+            // Refund previous highest bidder
+            (bool success, ) = highestBidder.call{value: highestBid}("");
+            require(success, "Refund failed.");
+        }
+
+        highestBidder = payable(msg.sender);
+        highestBid = msg.value;
+
+        emit BidPlaced(msg.sender, msg.value);
+    }
+
+    function endAuction() public {
+        require(block.timestamp >= auctionEndTime, "Auction has not ended yet.");
+        require(!auctionEnded, "Auction has already ended.");
+
+        auctionEnded = true;
+        emit AuctionWon(highestBidder, highestBid);
+    }
+
+    function claimFunds() public onlyAfterAuctionEnd {
+        require(msg.sender == owner, "Only the owner can claim funds.");
+        require(highestBid > 0, "No bids were placed.");
+
+        (bool success, ) = owner.call{value: address(this).balance}("");
+        require(success, "Fund withdrawal failed.");
+    }
+
+    // Fallback function to receive Ether if someone sends it directly
+    receive() external payable {
+        // Can optionally implement logic here, e.g., to allow direct bids if auction hasn't started or ended
+    }
+
+    // Function to check the current state of the auction
+    function getAuctionState() public view returns (
+        address payable _owner,
+        uint256 _auctionEndTime,
+        address payable _highestBidder,
+        uint256 _highestBid,
+        bool _auctionEnded
+    ) {
+        return (owner, auctionEndTime, highestBidder, highestBid, auctionEnded);
+    }
+}

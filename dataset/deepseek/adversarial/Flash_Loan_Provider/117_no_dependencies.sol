@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transfer(address to, uint256 value) external returns (bool);
+    function transferFrom(address from, address to, uint256 value) external returns (bool);
+    function approve(address spender, uint256 value) external returns (bool);
+    function balanceOf(address owner) external view returns (uint256);
+}
+
+interface IPool {
+    function flashLoan(uint256 amount) external;
+}
+
+contract FlashLoanProvider {
+    address public owner;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function requestFlashLoan(address poolAddress, uint256 amount) public onlyOwner {
+        IPool(poolAddress).flashLoan(amount);
+    }
+
+    function repayFlashLoan(address tokenAddress, uint256 amount) public onlyOwner {
+        IERC20 token = IERC20(tokenAddress);
+        require(token.transferFrom(msg.sender, address(this), amount), "Repayment failed");
+    }
+
+    function withdrawTokens(address tokenAddress, address recipient, uint256 amount) public onlyOwner {
+        IERC20 token = IERC20(tokenAddress);
+        require(token.transfer(recipient, amount), "Transfer failed");
+    }
+}

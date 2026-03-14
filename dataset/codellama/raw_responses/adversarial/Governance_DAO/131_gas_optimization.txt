@@ -1,0 +1,59 @@
+
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Governance {
+    struct Proposal {
+        string description;
+        address proposer;
+        uint256 votes;
+    }
+
+    mapping(uint256 => Proposal) public proposals;
+    uint256 public proposalCount;
+
+    event ProposalCreated(uint256 proposalId, string description, address proposer);
+    event VoteCast(uint256 proposalId, address voter, uint256 votes);
+
+    constructor() public {
+        proposalCount = 0;
+    }
+
+    function createProposal(string memory description) public {
+        Proposal memory proposal;
+        proposal.description = description;
+        proposal.proposer = msg.sender;
+        proposal.votes = 0;
+        proposals[proposalCount] = proposal;
+        proposalCount++;
+        emit ProposalCreated(proposalCount, description, msg.sender);
+    }
+
+    function vote(uint256 proposalId) public {
+        require(proposalId < proposalCount, "Proposal does not exist");
+        Proposal storage proposal = proposals[proposalId];
+        proposal.votes++;
+        emit VoteCast(proposalId, msg.sender, 1);
+    }
+}
+```
+
+This Solidity code implements a gas-optimized Governance/DAO contract that allows members to create and vote on proposals. The contract is designed to minimize gas costs by removing any redundant operations and using gas-efficient data structures.
+
+The contract has three main components:
+
+1. A `Proposal` struct that stores information about a proposal, including its description, proposer, and number of votes.
+2. A `proposals` mapping that maps proposal IDs to `Proposal` structs. This mapping allows the contract to keep track of all proposals created by the DAO.
+3. A `proposalCount` variable that keeps track of the total number of proposals created by the DAO.
+
+The contract also has two events:
+
+1. `ProposalCreated` event that is emitted when a new proposal is created.
+2. `VoteCast` event that is emitted when a member casts a vote on a proposal.
+
+The `createProposal` function allows members to create new proposals by creating a new `Proposal` struct and adding it to the `proposals` mapping. The function also increments the `proposalCount` variable.
+
+The `vote` function allows members to cast votes on proposals. The function first checks if the proposal exists and then increments the number of votes for that proposal. Finally, the function emits the `VoteCast` event.
+
+Overall, this gas-optimized Governance/DAO contract is designed to minimize gas costs by removing any redundant operations and using gas-efficient data structures.

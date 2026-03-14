@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    enum State { AWAITING_PAYMENT, AWAITING_DELIVERY, COMPLETE, REFUNDED }
+    State public currentState;
+
+    address public buyer;
+    address payable public seller;
+    uint256 public amount;
+
+    modifier onlyBuyer() {
+        require(msg.sender == buyer, "Only buyer can call this method");
+        _;
+    }
+
+    modifier onlySeller() {
+        require(msg.sender == seller, "Only seller can call this method");
+        _;
+    }
+
+    modifier inState(State expectedState) {
+        require(currentState == expectedState, "Invalid state");
+        _;
+    }
+
+    constructor(address _buyer, address payable _seller, uint256 _amount) {
+        buyer = _buyer;
+        seller = _seller;
+        amount = _amount;
+        currentState = State.AWAITING_PAYMENT;
+    }
+
+    function deposit() external payable onlyBuyer inState(State.AWAITING_PAYMENT) {
+        require(msg.value == amount, "Incorrect deposit amount");
+        currentState = State.AWAITING_DELIVERY;
+    }
+
+    function confirmDelivery() external onlyBuyer inState(State.AWAITING_DELIVERY) {
+        seller.transfer(amount);
+        currentState = State.COMPLETE;
+    }
+
+    function refundBuyer() external onlySeller inState(State.AWAITING_DELIVERY) {
+        payable(buyer).transfer(amount);
+        currentState = State.REFUNDED;
+    }
+}

@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    address public immutable admin;
+    mapping(bytes32 => bool) public processedMessages;
+
+    event MessageRelayed(address indexed sender, bytes32 indexed messageId, address indexed destination, bytes data);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not admin");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+    }
+
+    function relayMessage(
+        bytes32 messageId,
+        address destination,
+        bytes calldata data
+    ) external onlyAdmin {
+        require(!processedMessages[messageId], "Message already processed");
+        processedMessages[messageId] = true;
+
+        (bool success, ) = destination.call(data);
+        require(success, "Call failed");
+
+        emit MessageRelayed(msg.sender, messageId, destination, data);
+    }
+}

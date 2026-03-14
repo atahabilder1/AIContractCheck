@@ -1,0 +1,29 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract TestnetNFT is ERC721, Ownable {
+    uint256 private _currentTokenId = 0;
+    string private _baseTokenURI;
+
+    constructor(string memory name, string memory symbol, string memory baseTokenURI) ERC721(name, symbol) {
+        _baseTokenURI = baseTokenURI;
+    }
+
+    function _baseURI() internal view override returns (string memory) {
+        return _baseTokenURI;
+    }
+
+    function mintTo(address recipient) public onlyOwner returns (uint256) {
+        uint256 newTokenId = _currentTokenId;
+        _safeMint(recipient, newTokenId);
+        _currentTokenId++;
+        return newTokenId;
+    }
+
+    function setBaseURI(string memory baseTokenURI) public onlyOwner {
+        _baseTokenURI = baseTokenURI;
+    }
+}

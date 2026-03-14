@@ -1,0 +1,84 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+contract Timelock {
+    uint256 public constant MINIMUM_DELAY = 1 days;
+    uint256 public constant MAXIMUM_DELAY = 30 days;
+
+    address public admin;
+    uint256 public delay;
+
+    struct Transaction {
+        bool executed;
+        uint256 eta;
+    }
+
+    mapping(bytes32 => Transaction) public transactions;
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not admin");
+        _;
+    }
+
+    modifier notExecuted(bytes32 txId) {
+        require(!transactions[txId].executed, "Already executed");
+        _;
+    }
+
+    modifier timeNotPassed(bytes32 txId) {
+        require(block.timestamp < transactions[txId].eta, "Time has passed");
+        _;
+    }
+
+    modifier timePassed(bytes32 txId) {
+        require(block.timestamp >= transactions[txId].eta, "Time has not passed");
+        _;
+    }
+
+    constructor(uint256 _delay) {
+        require(_delay >= MINIMUM_DELAY && _delay <= MAXIMUM_DELAY, "Invalid delay");
+        admin = msg.sender;
+        delay = _delay;
+    }
+
+    function schedule(
+        address target,
+        uint256 value,
+        bytes calldata data,
+        uint256 eta
+    ) external onlyAdmin returns (bytes32 txId) {
+        require(eta >= block.timestamp + delay, "Delay not met");
+        txId = keccak256(abi.encode(target, value, data, eta));
+        transactions[txId] = Transaction(false, eta);
+    }
+
+    function execute(
+        address target,
+        uint256 value,
+        bytes calldata data
+    ) external onlyAdmin returns (bytes memory) {
+        bytes32 txId = keccak256(abi.encode(target, value, data, block.timestamp + delay));
+        Transaction storage tx = transactions[txId];
+        require(!tx.executed, "Already executed");
+        require(block.timestamp >= tx.eta, "Time has not passed");
+        tx.executed = true;
+        (bool success, bytes memory returnData) = target.call{value: value}(data);
+        require(success, "Execution failed");
+        return returnData;
+    }
+
+    function cancel(bytes32 txId) external onlyAdmin notExecuted(txId) timeNotPassed(txId) {
+        delete transactions[txId];
+    }
+
+    function updateAdmin(address newAdmin) external onlyAdmin {
+        admin = newAdmin;
+    }
+
+    function updateDelay(uint256 newDelay) external onlyAdmin {
+        require(newDelay >= MINIMUM_DELAY && newDelay <= MAXIMUM_DELAY, "Invalid delay");
+        delay = newDelay;
+    }
+}
+```

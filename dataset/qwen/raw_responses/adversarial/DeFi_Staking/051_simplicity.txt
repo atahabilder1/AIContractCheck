@@ -1,0 +1,22 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleStaking {
+    mapping(address => uint256) public stakedBalances;
+    uint256 public totalStaked;
+
+    function stake(uint256 amount) public {
+        require(amount > 0, "Amount must be greater than 0");
+        stakedBalances[msg.sender] += amount;
+        totalStaked += amount;
+    }
+
+    function unstake(uint256 amount) public {
+        require(amount > 0, "Amount must be greater than 0");
+        require(stakedBalances[msg.sender] >= amount, "Insufficient balance");
+        stakedBalances[msg.sender] -= amount;
+        totalStaked -= amount;
+    }
+}
+```

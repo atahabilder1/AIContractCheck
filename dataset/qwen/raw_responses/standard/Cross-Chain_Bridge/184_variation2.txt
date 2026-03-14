@@ -1,0 +1,76 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+contract CrossChainBridge {
+    uint256 public constant MIN_STAKE = 10000;
+    uint256 public constant SLASH_AMOUNT = 5000;
+
+    struct Validator {
+        uint256 stake;
+        bool isActive;
+    }
+
+    mapping(address => Validator) public validators;
+    mapping(bytes32 => bool) public processedMessages;
+
+    address[] public validatorList;
+
+    event ValidatorStaked(address indexed validator, uint256 amount);
+    event ValidatorSlashed(address indexed validator, uint256 amount);
+    event MessageProcessed(bytes32 indexed messageId);
+
+    modifier onlyActiveValidator() {
+        require(validators[msg.sender].isActive, "Validator is not active");
+        _;
+    }
+
+    function stake() external payable {
+        require(msg.value >= MIN_STAKE, "Stake amount is too low");
+        if (!validators[msg.sender].isActive) {
+            validatorList.push(msg.sender);
+        }
+        validators[msg.sender].stake += msg.value;
+        validators[msg.sender].isActive = true;
+        emit ValidatorStaked(msg.sender, msg.value);
+    }
+
+    function slashValidator(address _validator) external onlyActiveValidator {
+        require(validators[_validator].isActive, "Validator is not active");
+        require(validators[_validator].stake >= SLASH_AMOUNT, "Insufficient stake to slash");
+
+        validators[_validator].stake -= SLASH_AMOUNT;
+        payable(_validator).transfer(SLASH_AMOUNT);
+
+        emit ValidatorSlashed(_validator, SLASH_AMOUNT);
+    }
+
+    function processMessage(bytes32 _messageId) external onlyActiveValidator {
+        require(!processedMessages[_messageId], "Message already processed");
+
+        // Logic to verify message validity
+        bool isValid = verifyMessage(_messageId);
+        require(isValid, "Message is invalid");
+
+        processedMessages[_messageId] = true;
+        emit MessageProcessed(_messageId);
+    }
+
+    function verifyMessage(bytes32 _messageId) internal pure returns (bool) {
+        // Placeholder for message verification logic
+        // This should include signature validation and other checks
+        return true;
+    }
+
+    function unstake() external {
+        require(validators[msg.sender].stake > 0, "No stake to withdraw");
+        uint256 amount = validators[msg.sender].stake;
+        validators[msg.sender].stake = 0;
+        validators[msg.sender].isActive = false;
+
+        payable(msg.sender).transfer(amount);
+    }
+
+    receive() external payable {}
+}
+```

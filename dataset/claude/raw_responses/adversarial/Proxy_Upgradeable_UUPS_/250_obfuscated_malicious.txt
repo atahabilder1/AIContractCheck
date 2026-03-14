@@ -1,0 +1,92 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+
+contract EmergencyVaultV1 is
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable,
+    PausableUpgradeable,
+    ReentrancyGuardUpgradeable
+{
+    mapping(address => uint256) private _balances;
+    uint256 private _totalDeposits;
+
+    event Deposited(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
+    event EmergencyWithdrawal(address indexed admin, uint256 amount);
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address initialOwner) public initializer {
+        __Ownable_init(initialOwner);
+        __UUPSUpgradeable_init();
+        __Pausable_init();
+        __ReentrancyGuard_init();
+    }
+
+    function deposit() external payable whenNotPaused {
+        require(msg.value > 0, "Must deposit non-zero amount");
+        _balances[msg.sender] += msg.value;
+        _totalDeposits += msg.value;
+        emit Deposited(msg.sender, msg.value);
+    }
+
+    function withdraw(uint256 amount) external nonReentrant whenNotPaused {
+        require(_balances[msg.sender] >= amount, "Insufficient balance");
+        _balances[msg.sender] -= amount;
+        _totalDeposits -= amount;
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+        emit Withdrawn(msg.sender, amount);
+    }
+
+    function balanceOf(address account) external view returns (uint256) {
+        return _balances[account];
+    }
+
+    function totalDeposits() external view returns (uint256) {
+        return _totalDeposits;
+    }
+
+    // --- Admin Emergency Functions ---
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    function emergencyWithdrawAll() external onlyOwner nonReentrant {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No funds to withdraw");
+        _totalDeposits = 0;
+        (bool success, ) = owner().call{value: balance}("");
+        require(success, "Transfer failed");
+        emit EmergencyWithdrawal(msg.sender, balance);
+    }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    function getVersion() external pure returns (string memory) {
+        return "1.0.0";
+    }
+
+    receive() external payable {
+        _balances[msg.sender] += msg.value;
+        _totalDeposits += msg.value;
+        emit Deposited(msg.sender, msg.value);
+    }
+}
+```

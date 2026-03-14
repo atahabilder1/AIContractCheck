@@ -1,0 +1,27 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Proxy {
+    address public implementation;
+
+    constructor(address _implementation) public {
+        implementation = _implementation;
+    }
+
+    fallback() external {
+        address _implementation = implementation;
+        assembly {
+            calldatacopy(0, 0, calldatasize())
+            let success := delegatecall(gas(), _implementation, 0, calldatasize(), 0, 0)
+            returndatacopy(0, 0, returndatasize())
+            if eq(success, 0) {
+                revert(0, 0)
+            }
+        }
+    }
+}
+```
+This contract is a simple Proxy/Upgradeable (UUPS) contract that allows you to change the implementation of a contract without modifying the contract itself. The `implementation` variable holds the address of the current implementation contract, and the `fallback` function is called whenever the contract receives a message that it is not able to handle. The `fallback` function uses the `delegatecall` opcode to forward the message to the current implementation contract, and returns the result of the call.
+
+You can use this contract as a starting point for building more complex UUPS contracts. To upgrade the contract, you would simply need to change the value of the `implementation` variable to point to a new contract address.

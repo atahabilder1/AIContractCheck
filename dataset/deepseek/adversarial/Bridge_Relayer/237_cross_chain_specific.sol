@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IBridge {
+    function sourceChainData() external view returns (bytes32);
+}
+
+contract BridgeRelayer {
+    address public immutable bridge;
+
+    constructor(address _bridge) {
+        bridge = _bridge;
+    }
+
+    function relay(address target, bytes memory data) external {
+        require(msg.sender == bridge, "Only bridge can call this function");
+        (bool success, ) = target.call(data);
+        require(success, "Relay failed");
+    }
+
+    function getSourceChainData() external view returns (bytes32) {
+        return IBridge(bridge).sourceChainData();
+    }
+}

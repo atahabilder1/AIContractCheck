@@ -1,0 +1,121 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract LendingProtocol is ReentrancyGuard {
+    IERC20 public stableToken;
+
+    struct Borrower {
+        uint256 collateralAmount;
+        uint256 debtAmount;
+        uint256 interestRate;
+        uint256 lastInterestUpdate;
+    }
+
+    mapping(address => Borrower) public borrowers;
+
+    uint256 public constant LIQUIDATION_THRESHOLD = 75; // 75%
+    uint256 public constant HEALTH_FACTOR_PRECISION = 1e18;
+
+    event DepositCollateral(address indexed borrower, uint256 amount);
+    event WithdrawCollateral(address indexed borrower, uint256 amount);
+    event Borrow(address indexed borrower, uint256 amount);
+    event Repay(address indexed borrower, uint256 amount);
+    event Liquidate(address indexed borrower, address indexed liquidator);
+
+    constructor(IERC20 _stableToken) {
+        stableToken = _stableToken;
+    }
+
+    function depositCollateral(uint256 amount) external nonReentrant {
+        require(amount > 0, "Amount must be greater than zero");
+        borrowers[msg.sender].collateralAmount += amount;
+        stableToken.transferFrom(msg.sender, address(this), amount);
+        emit DepositCollateral(msg.sender, amount);
+    }
+
+    function withdrawCollateral(uint256 amount) external nonReentrant {
+        Borrower storage borrower = borrowers[msg.sender];
+        require(amount > 0, "Amount must be greater than zero");
+        require(borrower.collateralAmount >= amount, "Insufficient collateral");
+        require(_healthFactor(msg.sender) > HEALTH_FACTOR_PRECISION, "Cannot withdraw, health factor too low");
+
+        borrower.collateralAmount -= amount;
+        stableToken.transfer(msg.sender, amount);
+        emit WithdrawCollateral(msg.sender, amount);
+    }
+
+    function borrow(uint256 amount) external nonReentrant {
+        require(amount > 0, "Amount must be greater than zero");
+        Borrower storage borrower = borrowers[msg.sender];
+        borrower.debtAmount += _calculateAccruedInterest(msg.sender);
+        borrower.lastInterestUpdate = block.timestamp;
+        borrower.interestRate = _calculateInterestRate(borrower.debtAmount);
+        
+        require(_healthFactor(msg.sender) > HEALTH_FACTOR_PRECISION, "Cannot borrow, health factor too low");
+
+        borrower.debtAmount += amount;
+        stableToken.transfer(msg.sender, amount);
+        emit Borrow(msg.sender, amount);
+    }
+
+    function repay(uint256 amount) external nonReentrant {
+        require(amount > 0, "Amount must be greater than zero");
+        Borrower storage borrower = borrowers[msg.sender];
+        uint256 interest = _calculateAccruedInterest(msg.sender);
+        borrower.debtAmount += interest;
+
+        require(borrower.debtAmount >= amount, "Repay amount exceeds debt");
+
+        borrower.debtAmount -= amount;
+        borrower.lastInterestUpdate = block.timestamp;
+        stableToken.transferFrom(msg.sender, address(this), amount);
+        emit Repay(msg.sender, amount);
+    }
+
+    function liquidate(address borrowerAddress) external nonReentrant {
+        Borrower storage borrower = borrowers[borrowerAddress];
+        require(_healthFactor(borrowerAddress) < HEALTH_FACTOR_PRECISION, "Borrower is not eligible for liquidation");
+
+        uint256 debtPlusInterest = borrower.debtAmount + _calculateAccruedInterest(borrowerAddress);
+        uint256 collateralToSeize = (debtPlusInterest * 100) / LIQUIDATION_THRESHOLD;
+
+        require(borrower.collateralAmount >= collateralToSeize, "Insufficient collateral for liquidation");
+
+        borrower.collateralAmount -= collateralToSeize;
+        borrower.debtAmount = 0;
+        borrower.lastInterestUpdate = block.timestamp;
+
+        stableToken.transfer(msg.sender, collateralToSeize);
+        emit Liquidate(borrowerAddress, msg.sender);
+    }
+
+    function _calculateAccruedInterest(address borrowerAddress) internal view returns (uint256) {
+        Borrower storage borrower = borrowers[borrowerAddress];
+        uint256 timeElapsed = block.timestamp - borrower.lastInterestUpdate;
+        return (borrower.debtAmount * borrower.interestRate * timeElapsed) / (365 days * 100);
+    }
+
+    function _calculateInterestRate(uint256 debtAmount) internal pure returns (uint256) {
+        if (debtAmount == 0) return 0;
+        // Example interest rate calculation (can be modified)
+        if (debtAmount < 1000 ether) return 5; // 5%
+        if (debtAmount < 5000 ether) return 10; // 10%
+        return 15; // 15%
+    }
+
+    function _healthFactor(address borrowerAddress) internal view returns (uint256) {
+        Borrower storage borrower = borrowers[borrowerAddress];
+        uint256 debtPlusInterest = borrower.debtAmount + _calculateAccruedInterest(borrowerAddress);
+        if (debtPlusInterest == 0) return type(uint256).max;
+        return (borrower.collateralAmount * HEALTH_FACTOR_PRECISION) / debtPlusInterest;
+    }
+
+    function getHealthFactor(address borrowerAddress) external view returns (uint256) {
+        return _healthFactor(borrowerAddress);
+    }
+}
+```

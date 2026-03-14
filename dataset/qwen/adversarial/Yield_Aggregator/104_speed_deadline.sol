@@ -1,0 +1,42 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+contract SimpleYieldAggregator {
+    using SafeERC20 for IERC20;
+
+    IERC20 public immutable token;
+    uint256 public totalStaked;
+
+    event Staked(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
+
+    constructor(address _tokenAddress) {
+        token = IERC20(_tokenAddress);
+    }
+
+    function stake(uint256 _amount) external {
+        require(_amount > 0, "Amount must be greater than 0");
+        token.safeTransferFrom(msg.sender, address(this), _amount);
+        totalStaked += _amount;
+        emit Staked(msg.sender, _amount);
+    }
+
+    function withdraw(uint256 _amount) external {
+        require(_amount > 0, "Amount must be greater than 0");
+        require(_amount <= token.balanceOf(address(this)), "Not enough tokens in the contract");
+        require(_amount <= getUserStake(msg.sender), "Not enough tokens staked by the user");
+
+        totalStaked -= _amount;
+        token.safeTransfer(msg.sender, _amount);
+        emit Withdrawn(msg.sender, _amount);
+    }
+
+    function getUserStake(address _user) public view returns (uint256) {
+        return (token.balanceOf(address(this)) * balanceOfUser[_user]) / totalStaked;
+    }
+
+    mapping(address => uint256) public balanceOfUser;
+}

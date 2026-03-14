@@ -1,0 +1,44 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiStaking {
+    address public owner;
+    mapping(address => uint256) public stakes;
+    mapping(address => uint256) public rewards;
+
+    constructor() public {
+        owner = msg.sender;
+    }
+
+    function stake(uint256 amount) public {
+        require(msg.value >= amount, "Insufficient balance");
+        stakes[msg.sender] += amount;
+    }
+
+    function withdraw(uint256 amount) public {
+        require(stakes[msg.sender] >= amount, "Insufficient stake");
+        stakes[msg.sender] -= amount;
+        msg.sender.transfer(amount);
+    }
+
+    function getReward() public {
+        require(rewards[msg.sender] > 0, "No rewards available");
+        uint256 reward = rewards[msg.sender];
+        rewards[msg.sender] = 0;
+        msg.sender.transfer(reward);
+    }
+}
+```
+This contract has three functions:
+
+* `stake`: Allows users to stake their tokens and earn rewards.
+* `withdraw`: Allows users to withdraw their staked tokens.
+* `getReward`: Allows users to claim their rewards.
+
+The contract also has two mappings:
+
+* `stakes`: Maps each user's address to their staked amount.
+* `rewards`: Maps each user's address to their reward amount.
+
+The constructor sets the owner of the contract to the deployer.

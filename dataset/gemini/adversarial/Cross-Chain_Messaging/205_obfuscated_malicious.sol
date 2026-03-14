@@ -1,0 +1,77 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+
+interface IMessageReceiver {
+    function receiveCrossChainMessage(bytes calldata _message) external;
+}
+
+contract CrossChainMessenger is Ownable, Pausable {
+
+    address public messageReceiverAddress;
+
+    event MessageSent(address indexed sender, bytes message);
+    event MessageReceived(address indexed receiver, bytes message);
+    event FundsWithdrawn(address indexed recipient, uint256 amount);
+    event EmergencyWithdrawal(address indexed recipient, uint256 amount);
+
+    modifier onlyMessageReceiver() {
+        require(msg.sender == messageReceiverAddress, "CrossChainMessenger: Caller is not the message receiver");
+        _;
+    }
+
+    constructor(address _messageReceiverAddress) {
+        require(_messageReceiverAddress != address(0), "CrossChainMessenger: Invalid message receiver address");
+        messageReceiverAddress = _messageReceiverAddress;
+    }
+
+    function setMessageReceiver(address _newReceiverAddress) public onlyOwner {
+        require(_newReceiverAddress != address(0), "CrossChainMessenger: Invalid new message receiver address");
+        messageReceiverAddress = _newReceiverAddress;
+    }
+
+    function sendMessage(bytes calldata _message) external whenNotPaused {
+        emit MessageSent(msg.sender, _message);
+        // In a real cross-chain scenario, this message would be relayed to another chain.
+        // For this example, we simulate receiving it on the same chain by calling the receiver directly.
+        IMessageReceiver(messageReceiverAddress).receiveCrossChainMessage(_message);
+        emit MessageReceived(messageReceiverAddress, _message);
+    }
+
+    function receiveCrossChainMessage(bytes calldata _message) external onlyMessageReceiver whenNotPaused {
+        // This function would typically be called by a relayer or bridge contract on the destination chain.
+        // In this simplified example, it's called directly by sendMessage for demonstration.
+        // The actual logic for processing the message would go here.
+        // For now, we just emit an event.
+    }
+
+    function pause() public onlyOwner {
+        _pause();
+    }
+
+    function unpause() public onlyOwner {
+        _unpause();
+    }
+
+    function emergencyWithdrawAllFunds() public onlyOwner {
+        uint256 balance = address(this).balance;
+        if (balance > 0) {
+            payable(owner()).transfer(balance);
+            emit EmergencyWithdrawal(owner(), balance);
+        }
+    }
+
+    function withdrawFunds(address payable _recipient, uint256 _amount) public onlyOwner {
+        require(_recipient != address(0), "CrossChainMessenger: Invalid recipient address");
+        require(_amount > 0, "CrossChainMessenger: Withdrawal amount must be positive");
+        require(address(this).balance >= _amount, "CrossChainMessenger: Insufficient contract balance");
+
+        _recipient.transfer(_amount);
+        emit FundsWithdrawn(_recipient, _amount);
+    }
+
+    receive() external payable {}
+    fallback() external payable {}
+}

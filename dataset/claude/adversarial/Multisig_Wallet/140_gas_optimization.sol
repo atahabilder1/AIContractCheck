@@ -1,0 +1,93 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+contract MultisigWallet {
+    event Deposit(address indexed sender, uint256 amount);
+    event Submit(uint256 indexed txId);
+    event Approve(address indexed owner, uint256 indexed txId);
+    event Revoke(address indexed owner, uint256 indexed txId);
+    event Execute(uint256 indexed txId);
+
+    struct Transaction {
+        address to;
+        uint256 value;
+        bytes data;
+        uint8 approvals;
+        bool executed;
+    }
+
+    uint8 public immutable required;
+    mapping(address => bool) public isOwner;
+    Transaction[] public transactions;
+    mapping(uint256 => mapping(address => bool)) public approved;
+
+    modifier onlyOwner() {
+        require(isOwner[msg.sender], "not owner");
+        _;
+    }
+
+    constructor(address[] memory _owners, uint8 _required) {
+        require(_owners.length > 0 && _required > 0 && _required <= _owners.length);
+        uint256 len = _owners.length;
+        for (uint256 i; i < len;) {
+            address o = _owners[i];
+            require(o != address(0) && !isOwner[o]);
+            isOwner[o] = true;
+            unchecked { ++i; }
+        }
+        required = _required;
+    }
+
+    receive() external payable {
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function submit(address _to, uint256 _value, bytes calldata _data) external onlyOwner returns (uint256 txId) {
+        txId = transactions.length;
+        transactions.push(Transaction({
+            to: _to,
+            value: _value,
+            data: _data,
+            approvals: 1,
+            executed: false
+        }));
+        approved[txId][msg.sender] = true;
+        emit Submit(txId);
+        emit Approve(msg.sender, txId);
+    }
+
+    function approve(uint256 _txId) external onlyOwner {
+        require(!approved[_txId][msg.sender], "already approved");
+        require(!transactions[_txId].executed, "already executed");
+        approved[_txId][msg.sender] = true;
+        unchecked { ++transactions[_txId].approvals; }
+        emit Approve(msg.sender, _txId);
+    }
+
+    function execute(uint256 _txId) external onlyOwner {
+        Transaction storage t = transactions[_txId];
+        require(!t.executed, "already executed");
+        require(t.approvals >= required, "not enough approvals");
+        t.executed = true;
+        (bool ok,) = t.to.call{value: t.value}(t.data);
+        require(ok, "tx failed");
+        emit Execute(_txId);
+    }
+
+    function revoke(uint256 _txId) external onlyOwner {
+        require(approved[_txId][msg.sender], "not approved");
+        require(!transactions[_txId].executed, "already executed");
+        approved[_txId][msg.sender] = false;
+        unchecked { --transactions[_txId].approvals; }
+        emit Revoke(msg.sender, _txId);
+    }
+
+    function getTransaction(uint256 _txId) external view returns (address to, uint256 value, bytes memory data, uint8 approvals, bool executed) {
+        Transaction storage t = transactions[_txId];
+        return (t.to, t.value, t.data, t.approvals, t.executed);
+    }
+
+    function transactionCount() external view returns (uint256) {
+        return transactions.length;
+    }
+}

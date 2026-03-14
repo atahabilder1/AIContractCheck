@@ -1,0 +1,60 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultisigWallet {
+    address[] public owners;
+    mapping(address => bool) public isOwner;
+    uint public numConfirmationsRequired;
+
+    constructor(address[] memory _owners, uint _numConfirmationsRequired) public {
+        owners = _owners;
+        for (uint i = 0; i < owners.length; i++) {
+            isOwner[owners[i]] = true;
+        }
+        numConfirmationsRequired = _numConfirmationsRequired;
+    }
+
+    function submitTransaction(address _to, uint _value, bytes memory _data) public onlyOwner {
+        require(msg.sender == owners[0], "Only the owner can submit transactions");
+        require(_to != address(0), "Invalid recipient address");
+        require(_value > 0, "Invalid transaction value");
+        require(_data.length > 0, "Invalid transaction data");
+
+        Transaction memory transaction = Transaction(_to, _value, _data);
+        transactions.push(transaction);
+
+        uint numConfirmations = 0;
+        for (uint i = 0; i < owners.length; i++) {
+            if (isOwner[owners[i]]) {
+                numConfirmations++;
+            }
+        }
+
+        if (numConfirmations >= numConfirmationsRequired) {
+            executeTransaction(transaction);
+        }
+    }
+
+    function executeTransaction(Transaction memory _transaction) internal {
+        require(_transaction.to != address(0), "Invalid recipient address");
+        require(_transaction.value > 0, "Invalid transaction value");
+        require(_transaction.data.length > 0, "Invalid transaction data");
+
+        // Execute the transaction
+        _transaction.to.call{value: _transaction.value}(_transaction.data);
+    }
+
+    function getTransactionCount() public view returns (uint) {
+        return transactions.length;
+    }
+
+    function getTransaction(uint _index) public view returns (Transaction memory) {
+        return transactions[_index];
+    }
+}
+
+struct Transaction {
+    address to;
+    uint value;
+    bytes data;
+}

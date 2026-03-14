@@ -1,0 +1,101 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+contract WrappedTokenBridge {
+    string public name;
+    string public symbol;
+    uint8 public decimals;
+    uint256 public totalSupply;
+
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+
+    bool public isCanonical;
+    address public canonicalToken;
+    mapping(address => uint256) public depositedTokens;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+    event Deposit(address indexed depositor, uint256 amount);
+    event Withdrawal(address indexed recipient, uint256 amount);
+
+    modifier onlyCanonical() {
+        require(isCanonical, "Not the canonical token");
+        _;
+    }
+
+    modifier onlyBridge() {
+        require(msg.sender == canonicalToken, "Not the bridge");
+        _;
+    }
+
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        uint8 _decimals,
+        bool _isCanonical,
+        address _canonicalToken
+    ) {
+        name = _name;
+        symbol = _symbol;
+        decimals = _decimals;
+        isCanonical = _isCanonical;
+        canonicalToken = _canonicalToken;
+    }
+
+    function transfer(address to, uint256 value) external returns (bool) {
+        _transfer(msg.sender, to, value);
+        return true;
+    }
+
+    function approve(address spender, uint256 value) external returns (bool) {
+        allowance[msg.sender][spender] = value;
+        emit Approval(msg.sender, spender, value);
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 value) external returns (bool) {
+        require(value <= allowance[from][msg.sender], "Allowance exceeded");
+        allowance[from][msg.sender] -= value;
+        _transfer(from, to, value);
+        return true;
+    }
+
+    function _transfer(address from, address to, uint256 value) internal {
+        require(balanceOf[from] >= value, "Insufficient balance");
+        balanceOf[from] -= value;
+        balanceOf[to] += value;
+        emit Transfer(from, to, value);
+    }
+
+    function deposit(uint256 amount) external {
+        require(isCanonical, "Deposits only on canonical token");
+        balanceOf[msg.sender] += amount;
+        totalSupply += amount;
+        depositedTokens[msg.sender] += amount;
+        emit Deposit(msg.sender, amount);
+    }
+
+    function withdraw(uint256 amount) external {
+        require(!isCanonical, "Withdrawals only on bridged token");
+        require(balanceOf[msg.sender] >= amount, "Insufficient balance");
+        balanceOf[msg.sender] -= amount;
+        totalSupply -= amount;
+        emit Withdrawal(msg.sender, amount);
+    }
+
+    function bridgeTransfer(address recipient, uint256 amount) external onlyBridge {
+        require(isCanonical, "Bridge transfers only from canonical token");
+        require(balanceOf[recipient] >= amount, "Insufficient balance");
+        balanceOf[recipient] -= amount;
+        totalSupply -= amount;
+        emit Transfer(recipient, address(0), amount);
+    }
+
+    function mint(address recipient, uint256 amount) external onlyBridge {
+        require(!isCanonical, "Minting only on bridged token");
+        balanceOf[recipient] += amount;
+        totalSupply += amount;
+        emit Transfer(address(0), recipient, amount);
+    }
+}

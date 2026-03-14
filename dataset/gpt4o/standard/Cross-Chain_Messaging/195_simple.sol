@@ -1,0 +1,35 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface ICrossChainMessenger {
+    function sendMessage(address targetChainContract, bytes calldata message) external payable;
+    function receiveMessage(bytes calldata message) external;
+}
+
+contract CrossChainMessenger is ICrossChainMessenger {
+    event MessageSent(address indexed targetChainContract, bytes message);
+    event MessageReceived(address indexed sender, bytes message);
+
+    address public owner;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not authorized");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function sendMessage(address targetChainContract, bytes calldata message) external payable override onlyOwner {
+        // Logic for sending the message to the target chain
+        // This would typically interact with a cross-chain protocol
+        emit MessageSent(targetChainContract, message);
+    }
+
+    function receiveMessage(bytes calldata message) external override {
+        // Logic for handling the incoming message
+        // This would typically be restricted to calls from a trusted cross-chain protocol
+        emit MessageReceived(msg.sender, message);
+    }
+}

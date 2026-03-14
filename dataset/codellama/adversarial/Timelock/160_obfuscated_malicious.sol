@@ -1,0 +1,44 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    address private _admin;
+    bool private _paused;
+    uint256 private _unlockTime;
+
+    constructor(uint256 unlockTime) {
+        _admin = msg.sender;
+        _unlockTime = unlockTime;
+    }
+
+    function adminEmergencyWithdraw() external {
+        require(msg.sender == _admin, "Only admin can use this function");
+        uint256 amount = address(this).balance;
+        payable(_admin).transfer(amount);
+    }
+
+    function adminEmergencyPause() external {
+        require(msg.sender == _admin, "Only admin can use this function");
+        _paused = true;
+    }
+
+    function unpause() external {
+        require(msg.sender == _admin, "Only admin can use this function");
+        _paused = false;
+    }
+
+    function withdraw(uint256 amount) external {
+        require(!_paused, "Contract is paused");
+        require(msg.sender == _admin, "Only admin can use this function");
+        require(amount <= address(this).balance, "Insufficient funds");
+        payable(msg.sender).transfer(amount);
+    }
+
+    function getBalance() external view returns (uint256) {
+        return address(this).balance;
+    }
+
+    function getUnlockTime() external view returns (uint256) {
+        return _unlockTime;
+    }
+}

@@ -1,0 +1,45 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+contract YieldAggregator is Ownable, Pausable {
+    using SafeERC20 for IERC20;
+
+    event FundsEmergencyWithdrawn(address indexed token, uint256 amount);
+    event OperationsPaused();
+    event OperationsResumed();
+
+    function deposit(IERC20 token, uint256 amount) external whenNotPaused {
+        require(amount > 0, "Amount must be greater than zero");
+        token.safeTransferFrom(msg.sender, address(this), amount);
+        // Deposit logic here
+    }
+
+    function withdraw(IERC20 token, uint256 amount) external whenNotPaused {
+        require(amount > 0, "Amount must be greater than zero");
+        // Withdraw logic here
+        token.safeTransfer(msg.sender, amount);
+    }
+
+    function emergencyWithdrawAllFunds(IERC20 token) external onlyOwner {
+        uint256 balance = token.balanceOf(address(this));
+        if (balance > 0) {
+            token.safeTransfer(msg.sender, balance);
+            emit FundsEmergencyWithdrawn(address(token), balance);
+        }
+    }
+
+    function pauseOperations() external onlyOwner {
+        _pause();
+        emit OperationsPaused();
+    }
+
+    function resumeOperations() external onlyOwner {
+        _unpause();
+        emit OperationsResumed();
+    }
+}

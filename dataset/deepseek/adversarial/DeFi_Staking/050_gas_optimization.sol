@@ -1,0 +1,86 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Staking {
+    using SafeMath for uint256;
+
+    struct Stake {
+        uint256 amount;
+        uint256 startTime;
+    }
+
+    address public owner;
+    uint256 public totalStaked;
+    mapping(address => Stake) public stakes;
+
+    event Staked(address indexed user, uint256 amount);
+    event Unstaked(address indexed user, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function stake(uint256 amount) public {
+        require(amount > 0, "Amount must be greater than zero");
+        if (stakes[msg.sender].amount == 0) {
+            stakes[msg.sender].startTime = block.timestamp;
+        }
+        stakes[msg.sender].amount += amount;
+        totalStaked += amount;
+        emit Staked(msg.sender, amount);
+    }
+
+    function unstake(uint256 amount) public {
+        require(stakes[msg.sender].amount >= amount, "Insufficient balance");
+        require(stakes[msg.sender].amount > 0, "No staked amount");
+        stakes[msg.sender].amount -= amount;
+        totalStaked -= amount;
+        emit Unstaked(msg.sender, amount);
+    }
+
+    function withdrawEarnings() public {
+        uint256 earnings = calculateEarnings(msg.sender);
+        require(earnings > 0, "No earnings to withdraw");
+        stakes[msg.sender].amount = 0;
+        totalStaked -= earnings;
+        payable(msg.sender).transfer(earnings);
+    }
+
+    function calculateEarnings(address user) public view returns (uint256) {
+        uint256 stakedAmount = stakes[user].amount;
+        uint256 duration = block.timestamp - stakes[user].startTime;
+        uint256 earnings = stakedAmount.mul(duration).div(1 days); // Simplified interest calculation
+        return earnings;
+    }
+
+    function getStake(address user) public view returns (uint256) {
+        return stakes[user].amount;
+    }
+
+    function transferOwnership(address newOwner) public onlyOwner {
+        require(newOwner != address(0), "Invalid address");
+        owner = newOwner;
+    }
+}
+
+library SafeMath {
+    function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+        if (a == 0) {
+            return 0;
+        }
+        uint256 c = a * b;
+        require(c / a == b, "SafeMath: multiplication overflow");
+        return c;
+    }
+
+    function div(uint256 a, uint256 b) internal pure returns (uint256) {
+        require(b > 0, "SafeMath: division by zero");
+        uint256 c = a / b;
+        return c;
+    }
+}

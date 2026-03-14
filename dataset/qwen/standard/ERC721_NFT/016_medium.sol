@@ -1,0 +1,80 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "@openzeppelin/contracts/interfaces/IERC2981.sol";
+
+contract WhitelistMintNFT is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard, IERC2981 {
+    bytes32 public merkleRoot;
+    uint256 public constant MAX_SUPPLY = 1000;
+    uint256 public constant MAX_MINT_PER_TX = 20;
+    uint256 public constant PRICE = 0.05 ether;
+    uint256 public constant ROYALTY_FEE_Numerator = 750; // 7.5%
+    bool public isRevealed = false;
+    string public notRevealedUri;
+    string private baseURI;
+
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        string memory _initNotRevealedUri,
+        bytes32 _merkleRoot
+    ) ERC721(_name, _symbol) {
+        merkleRoot = _merkleRoot;
+        notRevealedUri = _initNotRevealedUri;
+    }
+
+    function _baseURI() internal view virtual override returns (string memory) {
+        return baseURI;
+    }
+
+    function setBaseURI(string memory _newBaseURI) public onlyOwner {
+        baseURI = _newBaseURI;
+    }
+
+    function reveal() public onlyOwner {
+        isRevealed = true;
+    }
+
+    function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
+        require(_exists(tokenId), "ERC721Metadata: URI query for nonexistent token");
+
+        if (isRevealed == false) {
+            return notRevealedUri;
+        }
+
+        string memory currentBaseURI = _baseURI();
+        return bytes(currentBaseURI).length > 0 ? string(abi.encodePacked(currentBaseURI, tokenId.toString(), ".json")) : "";
+    }
+
+    function mint(bytes32[] calldata _merkleProof, uint256 _amount) public payable nonReentrant {
+        require(_amount > 0 && _amount <= MAX_MINT_PER_TX, "Invalid mint amount");
+        require(totalSupply() + _amount <= MAX_SUPPLY, "Exceeds max supply");
+        require(msg.value >= PRICE * _amount, "Insufficient funds");
+
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+        require(MerkleProof.verify(_merkleProof, merkleRoot, leaf), "Invalid proof");
+
+        for (uint256 i = 0; i < _amount; i++) {
+            _safeMint(msg.sender, totalSupply() + 1);
+        }
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721, ERC721Enumerable, IERC165) returns (bool) {
+        return interfaceId == type(IERC2981).interfaceId || super.supportsInterface(interfaceId);
+    }
+
+    function royaltyInfo(uint256 _tokenId, uint256 _salePrice) external view override returns (address receiver, uint256 royaltyAmount) {
+        require(_exists(_tokenId), "Nonexistent token");
+        return (owner(), (_salePrice * ROYALTY_FEE_Numerator) / 10000);
+    }
+
+    function withdraw() external onlyOwner {
+        (bool success, ) = msg.sender.call{value: address(this).balance}("");
+        require(success, "Transfer failed");
+    }
+}

@@ -1,0 +1,40 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20FlashMint.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract WrappedToken is ERC20, ERC20Permit, ERC20FlashMint, ReentrancyGuard {
+    event Deposit(address indexed account, uint256 amount);
+    event Withdrawal(address indexed account, uint256 amount);
+
+    constructor() ERC20("Wrapped Ether", "WETH") ERC20Permit("Wrapped Ether") {}
+
+    receive() external payable {
+        deposit();
+    }
+
+    function deposit() public payable nonReentrant {
+        require(msg.value > 0, "Must deposit non-zero amount");
+        _mint(msg.sender, msg.value);
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function withdraw(uint256 amount) external nonReentrant {
+        require(amount > 0, "Must withdraw non-zero amount");
+        require(balanceOf(msg.sender) >= amount, "Insufficient balance");
+        _burn(msg.sender, amount);
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        require(success, "ETH transfer failed");
+        emit Withdrawal(msg.sender, amount);
+    }
+
+    function flashFee(address token, uint256 amount) public view override returns (uint256) {
+        require(token == address(this), "ERC20FlashMint: wrong token");
+        return amount / 1000; // 0.1% fee
+    }
+}
+```

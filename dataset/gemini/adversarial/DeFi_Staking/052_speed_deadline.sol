@@ -1,0 +1,144 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract DeFiStaking is Ownable {
+    using SafeMath for uint256;
+
+    IERC20 public immutable stakingToken;
+    uint256 public rewardRate; // rewards per second
+    uint256 public constant PERIOD_SECONDS = 1 days; // Example period for rewards calculation
+    uint256 public lastRewardCalculation;
+
+    struct StakerInfo {
+        uint256 amount;
+        uint256 lastStakedTime;
+        uint256 rewardsClaimed;
+    }
+
+    mapping(address => StakerInfo) public stakers;
+    uint256 public totalStakedAmount;
+
+    event Staked(address indexed user, uint256 amount);
+    event Unstaked(address indexed user, uint256 amount);
+    event RewardsClaimed(address indexed user, uint256 rewardAmount);
+    event RewardRateChanged(uint256 newRewardRate);
+
+    constructor(address _stakingTokenAddress, uint256 _initialRewardRate) {
+        stakingToken = IERC20(_stakingTokenAddress);
+        rewardRate = _initialRewardRate;
+        lastRewardCalculation = block.timestamp;
+    }
+
+    function stake(uint256 _amount) external {
+        require(_amount > 0, "Amount must be greater than zero");
+        require(stakingToken.balanceOf(msg.sender) >= _amount, "Insufficient token balance");
+
+        // Transfer tokens from user to the contract
+        require(stakingToken.transferFrom(msg.sender, address(this), _amount), "Token transfer failed");
+
+        // Update staker info
+        StakerInfo storage staker = stakers[msg.sender];
+        staker.amount = staker.amount.add(_amount);
+        staker.lastStakedTime = block.timestamp; // Reset last staked time for simplicity in this hackathon version
+        totalStakedAmount = totalStakedAmount.add(_amount);
+
+        emit Staked(msg.sender, _amount);
+    }
+
+    function unstake(uint256 _amount) external {
+        require(_amount > 0, "Amount must be greater than zero");
+        StakerInfo storage staker = stakers[msg.sender];
+        require(staker.amount >= _amount, "Insufficient staked amount");
+
+        // Calculate and distribute rewards before unstaking
+        _calculateAndDistributeRewards(msg.sender);
+
+        staker.amount = staker.amount.sub(_amount);
+        totalStakedAmount = totalStakedAmount.sub(_amount);
+
+        // Transfer tokens back to user
+        require(stakingToken.transfer(msg.sender, _amount), "Token transfer failed");
+
+        emit Unstaked(msg.sender, _amount);
+    }
+
+    function claimRewards() external {
+        _calculateAndDistributeRewards(msg.sender);
+    }
+
+    function _calculateAndDistributeRewards(address _user) internal {
+        StakerInfo storage staker = stakers[_user];
+        uint256 stakedAmount = staker.amount;
+
+        if (stakedAmount == 0) {
+            return; // No stakes, no rewards
+        }
+
+        // Update global last reward calculation time
+        uint256 currentTimestamp = block.timestamp;
+        uint256 timeElapsed = currentTimestamp.sub(lastRewardCalculation);
+        // For simplicity in hackathon, we might not need to calculate for all users who haven't claimed.
+        // A more robust implementation would iterate or use a more complex reward distribution.
+        // Here, we'll calculate rewards based on the time since the last global calculation.
+        lastRewardCalculation = currentTimestamp;
+
+        // Calculate rewards for the user based on their staked amount and time elapsed
+        // This is a simplified reward calculation. A real-world scenario would be more complex.
+        uint256 rewards = stakedAmount.mul(rewardRate).mul(timeElapsed).div(1 ether); // Assuming rewardRate is scaled
+
+        if (rewards > 0) {
+            // To distribute rewards, the contract needs to hold the reward tokens.
+            // In this hackathon version, we'll assume the stakingToken IS the reward token.
+            // A real scenario might have a separate reward token.
+            // We need to ensure the contract has enough tokens to distribute.
+            require(stakingToken.balanceOf(address(this)) >= rewards, "Insufficient contract balance for rewards");
+
+            // Transfer rewards to the user
+            require(stakingToken.transfer(_user, rewards), "Reward transfer failed");
+
+            staker.rewardsClaimed = staker.rewardsClaimed.add(rewards);
+            emit RewardsClaimed(_user, rewards);
+        }
+    }
+
+    function updateRewardRate(uint256 _newRewardRate) external onlyOwner {
+        // Update reward rate and recalculate lastRewardCalculation for accurate future rewards
+        uint256 currentTimestamp = block.timestamp;
+        lastRewardCalculation = currentTimestamp;
+        rewardRate = _newRewardRate;
+        emit RewardRateChanged(_newRewardRate);
+    }
+
+    function withdrawStakedTokens() external onlyOwner {
+        // Emergency withdraw for contract owner if needed
+        uint256 balance = stakingToken.balanceOf(address(this));
+        require(balance > 0, "No tokens to withdraw");
+        require(stakingToken.transfer(owner(), balance), "Withdrawal failed");
+    }
+
+    // Function to check pending rewards without claiming
+    function pendingRewards(address _user) public view returns (uint256) {
+        StakerInfo storage staker = stakers[_user];
+        uint256 stakedAmount = staker.amount;
+
+        if (stakedAmount == 0) {
+            return 0;
+        }
+
+        uint256 currentTimestamp = block.timestamp;
+        uint256 timeElapsed = currentTimestamp.sub(lastRewardCalculation); // Time since last global calculation
+
+        // Calculate rewards based on time elapsed since last global calculation
+        uint256 rewards = stakedAmount.mul(rewardRate).mul(timeElapsed).div(1 ether); // Assuming rewardRate is scaled
+
+        return rewards;
+    }
+
+    // Fallback function to receive Ether if needed (not directly used in this ERC20 staking)
+    receive() external payable {}
+    fallback() external payable {}
+}

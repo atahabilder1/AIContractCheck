@@ -1,0 +1,275 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract CrossChainBridge {
+    struct BridgeTransfer {
+        address sender;
+        address recipient;
+        uint256 amount;
+        uint256 sourceChain;
+        uint256 destChain;
+        uint256 nonce;
+        uint256 timestamp;
+        bool processed;
+    }
+
+    address public owner;
+    address[] public validators;
+    uint256 public requiredConfirmations;
+    uint256 public chainId;
+    uint256 public nonce;
+    uint256 public bridgeFee; // in basis points (e.g., 30 = 0.3%)
+    uint256 public minTransfer;
+    uint256 public maxTransfer;
+    uint256 public dailyLimit;
+    uint256 public dailyTransferred;
+    uint256 public lastResetDay;
+    bool public paused;
+
+    mapping(bytes32 => BridgeTransfer) public transfers;
+    mapping(bytes32 => mapping(address => bool)) public confirmations;
+    mapping(bytes32 => uint256) public confirmationCount;
+    mapping(address => bool) public isValidator;
+    mapping(address => bool) public supportedTokens;
+    mapping(uint256 => bool) public supportedChains;
+    mapping(bytes32 => bool) public processedHashes;
+
+    event Deposited(
+        bytes32 indexed transferId,
+        address indexed sender,
+        address indexed recipient,
+        uint256 amount,
+        uint256 sourceChain,
+        uint256 destChain,
+        uint256 nonce
+    );
+    event Confirmed(bytes32 indexed transferId, address indexed validator);
+    event Released(bytes32 indexed transferId, address indexed recipient, uint256 amount);
+    event ValidatorAdded(address indexed validator);
+    event ValidatorRemoved(address indexed validator);
+    event ChainToggled(uint256 indexed chainId, bool supported);
+    event FeeUpdated(uint256 newFee);
+    event Paused(bool isPaused);
+    event OwnershipTransferred(address indexed oldOwner, address indexed newOwner);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier onlyValidator() {
+        require(isValidator[msg.sender], "Not validator");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "Bridge paused");
+        _;
+    }
+
+    constructor(
+        uint256 _chainId,
+        uint256 _requiredConfirmations,
+        address[] memory _validators,
+        uint256 _bridgeFee,
+        uint256 _minTransfer,
+        uint256 _maxTransfer,
+        uint256 _dailyLimit
+    ) {
+        require(_validators.length >= _requiredConfirmations, "Not enough validators");
+        require(_requiredConfirmations > 0, "Need >= 1 confirmation");
+
+        owner = msg.sender;
+        chainId = _chainId;
+        requiredConfirmations = _requiredConfirmations;
+        bridgeFee = _bridgeFee;
+        minTransfer = _minTransfer;
+        maxTransfer = _maxTransfer;
+        dailyLimit = _dailyLimit;
+        lastResetDay = block.timestamp / 1 days;
+
+        for (uint256 i = 0; i < _validators.length; i++) {
+            address v = _validators[i];
+            require(v != address(0), "Zero address");
+            require(!isValidator[v], "Duplicate validator");
+            isValidator[v] = true;
+            validators.push(v);
+        }
+    }
+
+    receive() external payable {}
+
+    function deposit(
+        address _recipient,
+        uint256 _destChain
+    ) external payable whenNotPaused {
+        require(supportedChains[_destChain], "Chain not supported");
+        require(_recipient != address(0), "Zero recipient");
+        require(msg.value >= minTransfer, "Below min transfer");
+        require(msg.value <= maxTransfer, "Above max transfer");
+
+        _resetDailyLimitIfNeeded();
+        dailyTransferred += msg.value;
+        require(dailyTransferred <= dailyLimit, "Daily limit exceeded");
+
+        uint256 fee = (msg.value * bridgeFee) / 10000;
+        uint256 netAmount = msg.value - fee;
+
+        uint256 currentNonce = nonce++;
+        bytes32 transferId = keccak256(
+            abi.encodePacked(
+                msg.sender,
+                _recipient,
+                netAmount,
+                chainId,
+                _destChain,
+                currentNonce,
+                block.timestamp
+            )
+        );
+
+        require(transfers[transferId].timestamp == 0, "Transfer exists");
+
+        transfers[transferId] = BridgeTransfer({
+            sender: msg.sender,
+            recipient: _recipient,
+            amount: netAmount,
+            sourceChain: chainId,
+            destChain: _destChain,
+            nonce: currentNonce,
+            timestamp: block.timestamp,
+            processed: false
+        });
+
+        emit Deposited(
+            transferId,
+            msg.sender,
+            _recipient,
+            netAmount,
+            chainId,
+            _destChain,
+            currentNonce
+        );
+    }
+
+    function confirmTransfer(bytes32 _transferId) external onlyValidator whenNotPaused {
+        require(!processedHashes[_transferId], "Already processed");
+        require(!confirmations[_transferId][msg.sender], "Already confirmed");
+
+        confirmations[_transferId][msg.sender] = true;
+        confirmationCount[_transferId]++;
+
+        emit Confirmed(_transferId, msg.sender);
+    }
+
+    function release(
+        bytes32 _transferId,
+        address _recipient,
+        uint256 _amount
+    ) external onlyValidator whenNotPaused {
+        require(!processedHashes[_transferId], "Already processed");
+        require(
+            confirmationCount[_transferId] >= requiredConfirmations,
+            "Not enough confirmations"
+        );
+        require(address(this).balance >= _amount, "Insufficient bridge balance");
+
+        processedHashes[_transferId] = true;
+
+        (bool success, ) = _recipient.call{value: _amount}("");
+        require(success, "Transfer failed");
+
+        emit Released(_transferId, _recipient, _amount);
+    }
+
+    function addValidator(address _validator) external onlyOwner {
+        require(_validator != address(0), "Zero address");
+        require(!isValidator[_validator], "Already validator");
+
+        isValidator[_validator] = true;
+        validators.push(_validator);
+
+        emit ValidatorAdded(_validator);
+    }
+
+    function removeValidator(address _validator) external onlyOwner {
+        require(isValidator[_validator], "Not a validator");
+        require(validators.length - 1 >= requiredConfirmations, "Too few validators");
+
+        isValidator[_validator] = false;
+
+        for (uint256 i = 0; i < validators.length; i++) {
+            if (validators[i] == _validator) {
+                validators[i] = validators[validators.length - 1];
+                validators.pop();
+                break;
+            }
+        }
+
+        emit ValidatorRemoved(_validator);
+    }
+
+    function setRequiredConfirmations(uint256 _required) external onlyOwner {
+        require(_required > 0 && _required <= validators.length, "Invalid count");
+        requiredConfirmations = _required;
+    }
+
+    function setSupportedChain(uint256 _chainId, bool _supported) external onlyOwner {
+        supportedChains[_chainId] = _supported;
+        emit ChainToggled(_chainId, _supported);
+    }
+
+    function setBridgeFee(uint256 _fee) external onlyOwner {
+        require(_fee <= 1000, "Fee too high"); // max 10%
+        bridgeFee = _fee;
+        emit FeeUpdated(_fee);
+    }
+
+    function setTransferLimits(
+        uint256 _min,
+        uint256 _max,
+        uint256 _daily
+    ) external onlyOwner {
+        require(_min <= _max, "Min > max");
+        minTransfer = _min;
+        maxTransfer = _max;
+        dailyLimit = _daily;
+    }
+
+    function setPaused(bool _paused) external onlyOwner {
+        paused = _paused;
+        emit Paused(_paused);
+    }
+
+    function transferOwnership(address _newOwner) external onlyOwner {
+        require(_newOwner != address(0), "Zero address");
+        emit OwnershipTransferred(owner, _newOwner);
+        owner = _newOwner;
+    }
+
+    function withdrawFees(address _to, uint256 _amount) external onlyOwner {
+        require(_to != address(0), "Zero address");
+        (bool success, ) = _to.call{value: _amount}("");
+        require(success, "Withdraw failed");
+    }
+
+    function getValidators() external view returns (address[] memory) {
+        return validators;
+    }
+
+    function getTransfer(bytes32 _transferId) external view returns (BridgeTransfer memory) {
+        return transfers[_transferId];
+    }
+
+    function hasConfirmed(bytes32 _transferId, address _validator) external view returns (bool) {
+        return confirmations[_transferId][_validator];
+    }
+
+    function _resetDailyLimitIfNeeded() internal {
+        uint256 today = block.timestamp / 1 days;
+        if (today > lastResetDay) {
+            dailyTransferred = 0;
+            lastResetDay = today;
+        }
+    }
+}

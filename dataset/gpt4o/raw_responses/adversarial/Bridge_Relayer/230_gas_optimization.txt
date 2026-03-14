@@ -1,0 +1,29 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    address public owner;
+    mapping(bytes32 => bool) public processedMessages;
+
+    event MessageRelayed(bytes32 indexed messageId, address indexed receiver, uint256 amount);
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    function relayMessage(bytes32 messageId, address payable receiver, uint256 amount) external onlyOwner {
+        require(!processedMessages[messageId], "Message already processed");
+        processedMessages[messageId] = true;
+        receiver.transfer(amount);
+        emit MessageRelayed(messageId, receiver, amount);
+    }
+
+    receive() external payable {}
+}
+```

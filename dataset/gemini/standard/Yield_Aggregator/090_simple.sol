@@ -1,0 +1,156 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IStrategy {
+    function deposit() external payable;
+    function withdraw(uint256 amount) external;
+    function balanceOf() external view returns (uint256);
+    function availableToWithdraw() external view returns (uint256);
+    function earn() external;
+}
+
+contract YieldVault {
+    address public owner;
+    address public strategy;
+    address public underlyingToken; // The token users deposit into the vault
+
+    mapping(address => uint256) public shares;
+    uint256 public totalShares;
+
+    event Deposit(address indexed user, uint256 amount, uint256 userShares);
+    event Withdraw(address indexed user, uint256 amount, uint256 userShares);
+    event StrategyUpdated(address newStrategy);
+    event StrategyHarvested(uint256 earnings);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    constructor(address _underlyingToken, address _strategy) {
+        owner = msg.sender;
+        underlyingToken = _underlyingToken;
+        strategy = _strategy;
+    }
+
+    function setStrategy(address _strategy) public onlyOwner {
+        strategy = _strategy;
+        emit StrategyUpdated(_strategy);
+    }
+
+    function deposit(uint256 _amount) public {
+        require(_amount > 0, "Amount must be greater than zero");
+
+        // Transfer underlying tokens from user to the vault
+        // Assuming ERC20 token, adjust if using native ETH
+        // IERC20(underlyingToken).transferFrom(msg.sender, address(this), _amount);
+
+        // For native ETH deposit:
+        require(msg.value == _amount, "Incorrect ETH amount sent");
+        // No transferFrom needed for native ETH
+
+        // Calculate shares to mint
+        uint256 sharesToMint;
+        if (totalShares == 0) {
+            sharesToMint = _amount; // First depositor gets shares equal to amount
+        } else {
+            // Proportionate shares based on current vault value
+            // This is a simplified calculation. A more robust vault would track underlying value.
+            // For now, we assume 1 share = 1 underlying token for simplicity in share calculation.
+            sharesToMint = (_amount * totalShares) / _getVaultBalance();
+        }
+
+        require(sharesToMint > 0, "No shares minted");
+
+        shares[msg.sender] += sharesToMint;
+        totalShares += sharesToMint;
+
+        // Deposit into the strategy
+        // For native ETH:
+        (bool success, ) = payable(strategy).call{value: _amount}("");
+        require(success, "Strategy deposit failed");
+
+        // For ERC20:
+        // IERC20(underlyingToken).transfer(strategy, _amount);
+
+        emit Deposit(msg.sender, _amount, sharesToMint);
+    }
+
+    function withdraw(uint256 _sharesToWithdraw) public {
+        require(_sharesToWithdraw > 0, "Shares must be greater than zero");
+        require(_sharesToWithdraw <= shares[msg.sender], "Insufficient shares");
+
+        // Calculate amount to withdraw from strategy
+        // Simplified: assume 1 share = 1 underlying token for withdrawal calculation
+        uint256 amountToWithdraw = (_sharesToWithdraw * _getVaultBalance()) / totalShares;
+
+        require(amountToWithdraw > 0, "No amount to withdraw");
+
+        // Withdraw from strategy
+        // Note: The strategy needs to be able to handle this withdrawal amount.
+        // A more complex vault might track availableToWithdraw from strategy.
+        // For native ETH:
+        IStrategy(strategy).withdraw(amountToWithdraw); // Strategy needs to send ETH back to this contract
+
+        // For ERC20:
+        // IERC20(strategy).transfer(address(this), amountToWithdraw);
+
+        // Update shares
+        shares[msg.sender] -= _sharesToWithdraw;
+        totalShares -= _sharesToWithdraw;
+
+        // Transfer underlying tokens to user
+        // For native ETH:
+        (bool success, ) = payable(msg.sender).call{value: amountToWithdraw}("");
+        require(success, "ETH transfer failed");
+
+        // For ERC20:
+        // IERC20(underlyingToken).transfer(msg.sender, amountToWithdraw);
+
+        emit Withdraw(msg.sender, amountToWithdraw, _sharesToWithdraw);
+    }
+
+    function harvest() public onlyOwner {
+        // Call earn on the strategy to generate yield
+        IStrategy(strategy).earn();
+
+        // The strategy should deposit earned assets back into itself or send to vault.
+        // This basic vault doesn't explicitly track earnings separately,
+        // it relies on the strategy's `balanceOf()` to reflect total assets.
+        emit StrategyHarvested(0); // Placeholder for earnings amount
+    }
+
+    function depositToStrategy() public onlyOwner {
+        // This function can be used to deposit any accumulated funds in the vault
+        // back into the strategy if the strategy doesn't do it automatically.
+        // For native ETH:
+        uint256 balance = address(this).balance;
+        if (balance > 0) {
+            (bool success, ) = payable(strategy).call{value: balance}("");
+            require(success, "Strategy deposit failed");
+        }
+
+        // For ERC20:
+        // uint256 tokenBalance = IERC20(underlyingToken).balanceOf(address(this));
+        // if (tokenBalance > 0) {
+        //     IERC20(underlyingToken).transfer(strategy, tokenBalance);
+        // }
+    }
+
+    function _getVaultBalance() internal view returns (uint256) {
+        // Returns the total amount of underlying tokens held by the vault (including strategy)
+        // This is a simplified view. A real vault would track strategy balance precisely.
+        // For native ETH:
+        return address(this).balance; // This is a simplification, ideally it would be strategy balance + vault balance
+
+        // For ERC20:
+        // return IERC20(underlyingToken).balanceOf(address(this)) + IERC20(underlyingToken).balanceOf(strategy);
+    }
+
+    // Fallback function to receive native ETH
+    receive() external payable {
+        // Can be used for deposits if the deposit function is called without value,
+        // but direct deposit function with value is preferred.
+        // For now, we'll just allow it to be received.
+    }
+}

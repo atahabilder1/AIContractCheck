@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+contract FlashLoanProvider {
+    mapping(address => uint256) public liquidityProviders;
+    uint256 public totalLiquidity;
+    uint256 public totalFees;
+
+    event LiquidityAdded(address indexed provider, uint256 amount);
+    event LiquidityRemoved(address indexed provider, uint256 amount);
+    event FlashLoanExecuted(address indexed borrower, uint256 amount, uint256 fee);
+    event FeesClaimed(address indexed provider, uint256 amount);
+
+    modifier onlyLiquidityProvider() {
+        require(liquidityProviders[msg.sender] > 0, "Not a liquidity provider");
+        _;
+    }
+
+    function addLiquidity() external payable {
+        require(msg.value > 0, "Amount must be greater than zero");
+        liquidityProviders[msg.sender] += msg.value;
+        totalLiquidity += msg.value;
+        emit LiquidityAdded(msg.sender, msg.value);
+    }
+
+    function removeLiquidity(uint256 amount) external onlyLiquidityProvider {
+        require(amount > 0, "Amount must be greater than zero");
+        require(liquidityProviders[msg.sender] >= amount, "Insufficient liquidity");
+        liquidityProviders[msg.sender] -= amount;
+        totalLiquidity -= amount;
+        payable(msg.sender).transfer(amount);
+        emit LiquidityRemoved(msg.sender, amount);
+    }
+
+    function flashLoan(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        require(totalLiquidity >= amount, "Insufficient liquidity in the pool");
+        uint256 fee = (amount * 5) / 1000; // 0.5% fee
+        totalLiquidity -= amount;
+        totalFees += fee;
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Flash loan execution failed");
+        require(address(this).balance >= amount + fee, "Loan repayment failed");
+        totalLiquidity += amount;
+        emit FlashLoanExecuted(msg.sender, amount, fee);
+    }
+
+    function claimFees() external onlyLiquidityProvider {
+        uint256 fees = (totalFees * liquidityProviders[msg.sender]) / totalLiquidity;
+        require(fees > 0, "No fees to claim");
+        totalFees -= fees;
+        payable(msg.sender).transfer(fees);
+        emit FeesClaimed(msg.sender, fees);
+    }
+}

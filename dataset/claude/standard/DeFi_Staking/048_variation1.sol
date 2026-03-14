@@ -1,0 +1,79 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+contract LiquidStaking is ERC20, Ownable, ReentrancyGuard {
+    uint256 public totalStaked;
+    uint256 public totalRewards;
+
+    uint256 public constant MIN_STAKE = 0.01 ether;
+
+    event Staked(address indexed user, uint256 ethAmount, uint256 stTokenMinted);
+    event Unstaked(address indexed user, uint256 stTokenBurned, uint256 ethReturned);
+    event RewardsDistributed(uint256 amount);
+
+    constructor() ERC20("Staked ETH", "stETH") Ownable(msg.sender) {}
+
+    function stake() external payable nonReentrant {
+        require(msg.value >= MIN_STAKE, "Below minimum stake");
+
+        uint256 stTokenAmount;
+        if (totalSupply() == 0 || totalStaked == 0) {
+            stTokenAmount = msg.value;
+        } else {
+            stTokenAmount = (msg.value * totalSupply()) / totalStaked;
+        }
+
+        totalStaked += msg.value;
+        _mint(msg.sender, stTokenAmount);
+
+        emit Staked(msg.sender, msg.value, stTokenAmount);
+    }
+
+    function unstake(uint256 stTokenAmount) external nonReentrant {
+        require(stTokenAmount > 0, "Cannot unstake zero");
+        require(balanceOf(msg.sender) >= stTokenAmount, "Insufficient stToken balance");
+
+        uint256 ethAmount = (stTokenAmount * totalStaked) / totalSupply();
+        require(ethAmount > 0, "Nothing to withdraw");
+
+        totalStaked -= ethAmount;
+        _burn(msg.sender, stTokenAmount);
+
+        (bool success, ) = payable(msg.sender).call{value: ethAmount}("");
+        require(success, "ETH transfer failed");
+
+        emit Unstaked(msg.sender, stTokenAmount, ethAmount);
+    }
+
+    function distributeRewards() external payable onlyOwner {
+        require(msg.value > 0, "No rewards to distribute");
+        require(totalSupply() > 0, "No stakers");
+
+        totalStaked += msg.value;
+        totalRewards += msg.value;
+
+        emit RewardsDistributed(msg.value);
+    }
+
+    function getExchangeRate() external view returns (uint256) {
+        if (totalSupply() == 0) return 1e18;
+        return (totalStaked * 1e18) / totalSupply();
+    }
+
+    function getEthValue(uint256 stTokenAmount) external view returns (uint256) {
+        if (totalSupply() == 0) return 0;
+        return (stTokenAmount * totalStaked) / totalSupply();
+    }
+
+    receive() external payable {
+        if (msg.sender != owner()) {
+            revert("Use stake()");
+        }
+        totalStaked += msg.value;
+        totalRewards += msg.value;
+    }
+}

@@ -1,0 +1,111 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+contract CrossChainMessaging {
+    struct Message {
+        uint64 srcChain;
+        uint64 dstChain;
+        address sender;
+        bytes payload;
+        uint64 nonce;
+        uint64 timestamp;
+    }
+
+    address public immutable owner;
+    uint64 public nonce;
+
+    mapping(address => bool) public relayers;
+    mapping(bytes32 => bool) public processed;
+
+    event MessageSent(bytes32 indexed msgHash, uint64 indexed dstChain, address indexed sender, uint64 nonce, bytes payload);
+    event MessageReceived(bytes32 indexed msgHash, uint64 indexed srcChain, address indexed sender, bytes payload);
+    event RelayerUpdated(address indexed relayer, bool status);
+
+    error Unauthorized();
+    error AlreadyProcessed();
+    error InvalidPayload();
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert Unauthorized();
+        _;
+    }
+
+    modifier onlyRelayer() {
+        if (!relayers[msg.sender]) revert Unauthorized();
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+        relayers[msg.sender] = true;
+    }
+
+    function setRelayer(address relayer, bool status) external onlyOwner {
+        relayers[relayer] = status;
+        emit RelayerUpdated(relayer, status);
+    }
+
+    function sendMessage(uint64 dstChain, bytes calldata payload) external returns (bytes32 msgHash) {
+        if (payload.length == 0) revert InvalidPayload();
+
+        uint64 currentNonce;
+        unchecked {
+            currentNonce = nonce++;
+        }
+
+        msgHash = keccak256(abi.encodePacked(block.chainid, dstChain, msg.sender, currentNonce, payload));
+
+        emit MessageSent(msgHash, dstChain, msg.sender, currentNonce, payload);
+    }
+
+    function receiveMessage(
+        uint64 srcChain,
+        address sender,
+        uint64 msgNonce,
+        bytes calldata payload
+    ) external onlyRelayer returns (bytes32 msgHash) {
+        msgHash = keccak256(abi.encodePacked(srcChain, block.chainid, sender, msgNonce, payload));
+
+        if (processed[msgHash]) revert AlreadyProcessed();
+        processed[msgHash] = true;
+
+        emit MessageReceived(msgHash, srcChain, sender, payload);
+    }
+
+    function receiveMessageBatch(
+        uint64[] calldata srcChains,
+        address[] calldata senders,
+        uint64[] calldata nonces,
+        bytes[] calldata payloads
+    ) external onlyRelayer {
+        uint256 len = srcChains.length;
+        uint256 chainId = block.chainid;
+
+        for (uint256 i; i < len;) {
+            bytes32 msgHash = keccak256(abi.encodePacked(srcChains[i], chainId, senders[i], nonces[i], payloads[i]));
+
+            if (!processed[msgHash]) {
+                processed[msgHash] = true;
+                emit MessageReceived(msgHash, srcChains[i], senders[i], payloads[i]);
+            }
+
+            unchecked { ++i; }
+        }
+    }
+
+    function verifyMessage(
+        uint64 srcChain,
+        uint64 dstChain,
+        address sender,
+        uint64 msgNonce,
+        bytes calldata payload
+    ) external pure returns (bytes32) {
+        return keccak256(abi.encodePacked(srcChain, dstChain, sender, msgNonce, payload));
+    }
+
+    function isProcessed(bytes32 msgHash) external view returns (bool) {
+        return processed[msgHash];
+    }
+}
+```

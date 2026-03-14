@@ -1,0 +1,401 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+interface IPriceOracle {
+    function getPrice(address token) external view returns (uint256);
+}
+
+interface IFlashLoanReceiver {
+    function onFlashLoan(
+        address initiator,
+        address token,
+        uint256 amount,
+        uint256 fee,
+        bytes calldata data
+    ) external returns (bytes32);
+}
+
+contract LendingProtocol is ReentrancyGuard, Ownable {
+    using SafeERC20 for IERC20;
+
+    bytes32 private constant FLASH_LOAN_CALLBACK_SUCCESS = keccak256("IFlashLoanReceiver.onFlashLoan");
+
+    struct Market {
+        bool isListed;
+        uint256 collateralFactorBps; // e.g., 7500 = 75%
+        uint256 liquidationBonusBps; // e.g., 10500 = 105% (5% bonus)
+        uint256 reserveFactorBps;    // e.g., 1000 = 10%
+        uint256 totalDeposits;
+        uint256 totalBorrows;
+        uint256 totalReserves;
+        uint256 lastAccrualTimestamp;
+        uint256 borrowIndex;         // scaled by 1e18
+        // Interest rate model params (per second, scaled by 1e18)
+        uint256 baseRatePerSecond;
+        uint256 multiplierPerSecond;
+        uint256 jumpMultiplierPerSecond;
+        uint256 kinkBps; // utilization kink in bps
+    }
+
+    struct UserBalance {
+        uint256 deposits;
+        uint256 borrowBalance;
+        uint256 borrowIndex;
+    }
+
+    mapping(address => Market) public markets;
+    address[] public marketList;
+
+    // token => user => balance
+    mapping(address => mapping(address => UserBalance)) public userBalances;
+
+    // user => list of tokens they've entered as collateral
+    mapping(address => address[]) public userCollaterals;
+    mapping(address => mapping(address => bool)) public isCollateral;
+
+    IPriceOracle public oracle;
+    uint256 public flashLoanFeeBps = 9; // 0.09%
+
+    event MarketListed(address indexed token);
+    event Deposit(address indexed user, address indexed token, uint256 amount);
+    event Withdraw(address indexed user, address indexed token, uint256 amount);
+    event Borrow(address indexed user, address indexed token, uint256 amount);
+    event Repay(address indexed user, address indexed token, uint256 amount);
+    event Liquidation(
+        address indexed liquidator,
+        address indexed borrower,
+        address debtToken,
+        address collateralToken,
+        uint256 debtRepaid,
+        uint256 collateralSeized
+    );
+    event FlashLoan(address indexed receiver, address indexed token, uint256 amount, uint256 fee);
+
+    constructor(address _oracle) Ownable(msg.sender) {
+        oracle = IPriceOracle(_oracle);
+    }
+
+    // --- Admin ---
+
+    function listMarket(
+        address token,
+        uint256 collateralFactorBps,
+        uint256 liquidationBonusBps,
+        uint256 reserveFactorBps,
+        uint256 baseRatePerYear,
+        uint256 multiplierPerYear,
+        uint256 jumpMultiplierPerYear,
+        uint256 kinkBps
+    ) external onlyOwner {
+        require(!markets[token].isListed, "already listed");
+        require(collateralFactorBps <= 9000, "CF too high");
+
+        markets[token] = Market({
+            isListed: true,
+            collateralFactorBps: collateralFactorBps,
+            liquidationBonusBps: liquidationBonusBps,
+            reserveFactorBps: reserveFactorBps,
+            totalDeposits: 0,
+            totalBorrows: 0,
+            totalReserves: 0,
+            lastAccrualTimestamp: block.timestamp,
+            borrowIndex: 1e18,
+            baseRatePerSecond: baseRatePerYear / 365 days,
+            multiplierPerSecond: multiplierPerYear / 365 days,
+            jumpMultiplierPerSecond: jumpMultiplierPerYear / 365 days,
+            kinkBps: kinkBps
+        });
+        marketList.push(token);
+        emit MarketListed(token);
+    }
+
+    function setOracle(address _oracle) external onlyOwner {
+        oracle = IPriceOracle(_oracle);
+    }
+
+    // --- Interest Accrual ---
+
+    function accrueInterest(address token) public {
+        Market storage market = markets[token];
+        if (block.timestamp == market.lastAccrualTimestamp) return;
+
+        uint256 elapsed = block.timestamp - market.lastAccrualTimestamp;
+        market.lastAccrualTimestamp = block.timestamp;
+
+        if (market.totalBorrows == 0) return;
+
+        uint256 borrowRate = getBorrowRatePerSecond(token);
+        uint256 interestAccumulated = (market.totalBorrows * borrowRate * elapsed) / 1e18;
+
+        market.totalBorrows += interestAccumulated;
+        market.totalReserves += (interestAccumulated * market.reserveFactorBps) / 10000;
+        market.borrowIndex += (market.borrowIndex * borrowRate * elapsed) / 1e18;
+    }
+
+    function getUtilizationBps(address token) public view returns (uint256) {
+        Market storage m = markets[token];
+        if (m.totalDeposits == 0) return 0;
+        return (m.totalBorrows * 10000) / m.totalDeposits;
+    }
+
+    function getBorrowRatePerSecond(address token) public view returns (uint256) {
+        Market storage m = markets[token];
+        uint256 utilBps = getUtilizationBps(token);
+
+        if (utilBps <= m.kinkBps) {
+            return m.baseRatePerSecond + (utilBps * m.multiplierPerSecond) / 10000;
+        } else {
+            uint256 normalRate = m.baseRatePerSecond + (m.kinkBps * m.multiplierPerSecond) / 10000;
+            uint256 excessUtil = utilBps - m.kinkBps;
+            return normalRate + (excessUtil * m.jumpMultiplierPerSecond) / 10000;
+        }
+    }
+
+    function getSupplyRatePerSecond(address token) public view returns (uint256) {
+        Market storage m = markets[token];
+        uint256 utilBps = getUtilizationBps(token);
+        uint256 borrowRate = getBorrowRatePerSecond(token);
+        return (borrowRate * utilBps * (10000 - m.reserveFactorBps)) / (10000 * 10000);
+    }
+
+    // --- Core Operations ---
+
+    function deposit(address token, uint256 amount) external nonReentrant {
+        Market storage market = markets[token];
+        require(market.isListed, "not listed");
+        accrueInterest(token);
+
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        market.totalDeposits += amount;
+        userBalances[token][msg.sender].deposits += amount;
+
+        emit Deposit(msg.sender, token, amount);
+    }
+
+    function withdraw(address token, uint256 amount) external nonReentrant {
+        Market storage market = markets[token];
+        require(market.isListed, "not listed");
+        accrueInterest(token);
+
+        UserBalance storage bal = userBalances[token][msg.sender];
+        require(bal.deposits >= amount, "insufficient deposits");
+
+        bal.deposits -= amount;
+        market.totalDeposits -= amount;
+
+        require(_isHealthy(msg.sender), "would be undercollateralized");
+
+        IERC20(token).safeTransfer(msg.sender, amount);
+        emit Withdraw(msg.sender, token, amount);
+    }
+
+    function enterCollateral(address token) external {
+        require(markets[token].isListed, "not listed");
+        if (!isCollateral[msg.sender][token]) {
+            isCollateral[msg.sender][token] = true;
+            userCollaterals[msg.sender].push(token);
+        }
+    }
+
+    function borrow(address token, uint256 amount) external nonReentrant {
+        Market storage market = markets[token];
+        require(market.isListed, "not listed");
+        accrueInterest(token);
+
+        UserBalance storage bal = userBalances[token][msg.sender];
+
+        // Update user's borrow balance to current index
+        if (bal.borrowBalance > 0) {
+            bal.borrowBalance = (bal.borrowBalance * market.borrowIndex) / bal.borrowIndex;
+        }
+        bal.borrowBalance += amount;
+        bal.borrowIndex = market.borrowIndex;
+
+        market.totalBorrows += amount;
+
+        require(_isHealthy(msg.sender), "undercollateralized");
+        require(market.totalDeposits - market.totalBorrows >= 0, "insufficient liquidity");
+
+        IERC20(token).safeTransfer(msg.sender, amount);
+        emit Borrow(msg.sender, token, amount);
+    }
+
+    function repay(address token, uint256 amount) external nonReentrant {
+        _repay(token, msg.sender, amount);
+    }
+
+    function _repay(address token, address borrower, uint256 amount) internal {
+        Market storage market = markets[token];
+        require(market.isListed, "not listed");
+        accrueInterest(token);
+
+        UserBalance storage bal = userBalances[token][borrower];
+
+        // Update to current index
+        if (bal.borrowBalance > 0 && bal.borrowIndex > 0) {
+            bal.borrowBalance = (bal.borrowBalance * market.borrowIndex) / bal.borrowIndex;
+        }
+
+        uint256 repayAmount = amount > bal.borrowBalance ? bal.borrowBalance : amount;
+
+        IERC20(token).safeTransferFrom(msg.sender, address(this), repayAmount);
+
+        bal.borrowBalance -= repayAmount;
+        bal.borrowIndex = market.borrowIndex;
+        market.totalBorrows -= repayAmount;
+
+        emit Repay(borrower, token, repayAmount);
+    }
+
+    // --- Liquidation ---
+
+    function liquidate(
+        address borrower,
+        address debtToken,
+        address collateralToken,
+        uint256 repayAmount
+    ) external nonReentrant {
+        require(borrower != msg.sender, "cannot self-liquidate");
+        accrueInterest(debtToken);
+        accrueInterest(collateralToken);
+
+        require(!_isHealthy(borrower), "borrower is healthy");
+
+        UserBalance storage debtBal = userBalances[debtToken][borrower];
+        Market storage debtMarket = markets[debtToken];
+
+        // Update borrower's debt to current
+        if (debtBal.borrowBalance > 0 && debtBal.borrowIndex > 0) {
+            debtBal.borrowBalance = (debtBal.borrowBalance * debtMarket.borrowIndex) / debtBal.borrowIndex;
+        }
+
+        // Can repay up to 50% of the debt
+        uint256 maxRepay = debtBal.borrowBalance / 2;
+        require(repayAmount <= maxRepay, "repay too much");
+
+        // Transfer debt tokens from liquidator
+        IERC20(debtToken).safeTransferFrom(msg.sender, address(this), repayAmount);
+        debtBal.borrowBalance -= repayAmount;
+        debtBal.borrowIndex = debtMarket.borrowIndex;
+        debtMarket.totalBorrows -= repayAmount;
+
+        // Calculate collateral to seize
+        uint256 debtValue = (repayAmount * oracle.getPrice(debtToken)) / 1e18;
+        uint256 collateralPrice = oracle.getPrice(collateralToken);
+        Market storage collMarket = markets[collateralToken];
+        uint256 seizeAmount = (debtValue * collMarket.liquidationBonusBps) / (collateralPrice * 10000 / 1e18);
+
+        UserBalance storage collBal = userBalances[collateralToken][borrower];
+        require(collBal.deposits >= seizeAmount, "insufficient collateral");
+
+        collBal.deposits -= seizeAmount;
+        collMarket.totalDeposits -= seizeAmount;
+
+        IERC20(collateralToken).safeTransfer(msg.sender, seizeAmount);
+
+        emit Liquidation(msg.sender, borrower, debtToken, collateralToken, repayAmount, seizeAmount);
+    }
+
+    // --- Flash Loans ---
+
+    function flashLoan(
+        address receiver,
+        address token,
+        uint256 amount,
+        bytes calldata data
+    ) external nonReentrant {
+        require(markets[token].isListed, "not listed");
+
+        uint256 fee = (amount * flashLoanFeeBps) / 10000;
+        uint256 balanceBefore = IERC20(token).balanceOf(address(this));
+
+        IERC20(token).safeTransfer(receiver, amount);
+
+        bytes32 result = IFlashLoanReceiver(receiver).onFlashLoan(
+            msg.sender,
+            token,
+            amount,
+            fee,
+            data
+        );
+        require(result == FLASH_LOAN_CALLBACK_SUCCESS, "callback failed");
+
+        uint256 balanceAfter = IERC20(token).balanceOf(address(this));
+        require(balanceAfter >= balanceBefore + fee, "flash loan not repaid");
+
+        markets[token].totalReserves += fee;
+        emit FlashLoan(receiver, token, amount, fee);
+    }
+
+    // --- Health Check ---
+
+    function _isHealthy(address user) internal view returns (bool) {
+        uint256 totalCollateralValue = 0;
+        uint256 totalBorrowValue = 0;
+
+        address[] storage collaterals = userCollaterals[user];
+        for (uint256 i = 0; i < collaterals.length; i++) {
+            address token = collaterals[i];
+            Market storage m = markets[token];
+            UserBalance storage bal = userBalances[token][user];
+
+            uint256 price = oracle.getPrice(token);
+            totalCollateralValue += (bal.deposits * price * m.collateralFactorBps) / (1e18 * 10000);
+        }
+
+        for (uint256 i = 0; i < marketList.length; i++) {
+            address token = marketList[i];
+            Market storage m = markets[token];
+            UserBalance storage bal = userBalances[token][user];
+
+            if (bal.borrowBalance > 0) {
+                uint256 currentBorrow = bal.borrowIndex > 0
+                    ? (bal.borrowBalance * m.borrowIndex) / bal.borrowIndex
+                    : bal.borrowBalance;
+                uint256 price = oracle.getPrice(token);
+                totalBorrowValue += (currentBorrow * price) / 1e18;
+            }
+        }
+
+        return totalCollateralValue >= totalBorrowValue;
+    }
+
+    function isHealthy(address user) external view returns (bool) {
+        return _isHealthy(user);
+    }
+
+    function getAccountLiquidity(address user) external view returns (uint256 collateral, uint256 debt) {
+        address[] storage collaterals = userCollaterals[user];
+        for (uint256 i = 0; i < collaterals.length; i++) {
+            address token = collaterals[i];
+            Market storage m = markets[token];
+            UserBalance storage bal = userBalances[token][user];
+            uint256 price = oracle.getPrice(token);
+            collateral += (bal.deposits * price * m.collateralFactorBps) / (1e18 * 10000);
+        }
+
+        for (uint256 i = 0; i < marketList.length; i++) {
+            address token = marketList[i];
+            Market storage m = markets[token];
+            UserBalance storage bal = userBalances[token][user];
+            if (bal.borrowBalance > 0) {
+                uint256 currentBorrow = bal.borrowIndex > 0
+                    ? (bal.borrowBalance * m.borrowIndex) / bal.borrowIndex
+                    : bal.borrowBalance;
+                uint256 price = oracle.getPrice(token);
+                debt += (currentBorrow * price) / 1e18;
+            }
+        }
+    }
+
+    function getMarketCount() external view returns (uint256) {
+        return marketList.length;
+    }
+}
+```

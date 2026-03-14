@@ -1,0 +1,59 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract Bridge is Ownable {
+    using SafeERC20 for IERC20;
+
+    uint256 public ethTransferFee;
+    uint256 public erc20TransferFee;
+
+    event ETHTransferInitiated(address indexed sender, uint256 amount, uint256 fee);
+    event ERC20TransferInitiated(address indexed sender, address indexed token, uint256 amount, uint256 fee);
+
+    constructor(uint256 _ethTransferFee, uint256 _erc20TransferFee) {
+        ethTransferFee = _ethTransferFee;
+        erc20TransferFee = _erc20TransferFee;
+    }
+
+    function setEthTransferFee(uint256 _fee) external onlyOwner {
+        ethTransferFee = _fee;
+    }
+
+    function setErc20TransferFee(uint256 _fee) external onlyOwner {
+        erc20TransferFee = _fee;
+    }
+
+    function transferETH() external payable {
+        require(msg.value >= ethTransferFee, "Insufficient fee for ETH transfer");
+
+        uint256 amountToSend = msg.value - ethTransferFee;
+        // Simulate sending ETH to another chain
+        // In a real-world scenario, this would involve interacting with a cross-chain protocol
+
+        emit ETHTransferInitiated(msg.sender, amountToSend, ethTransferFee);
+    }
+
+    function transferERC20(IERC20 token, uint256 amount) external {
+        uint256 totalAmount = amount + erc20TransferFee;
+        token.safeTransferFrom(msg.sender, address(this), totalAmount);
+
+        uint256 amountToSend = amount;
+        // Simulate sending ERC20 tokens to another chain
+        // In a real-world scenario, this would involve interacting with a cross-chain protocol
+
+        emit ERC20TransferInitiated(msg.sender, address(token), amountToSend, erc20TransferFee);
+    }
+
+    function withdrawFees() external onlyOwner {
+        payable(owner()).transfer(address(this).balance);
+
+        for (uint256 i = 0; i < IERC20(address(0)).balanceOf(address(this)); i++) {
+            IERC20 token = IERC20(address(i));
+            token.safeTransfer(owner(), token.balanceOf(address(this)));
+        }
+    }
+}

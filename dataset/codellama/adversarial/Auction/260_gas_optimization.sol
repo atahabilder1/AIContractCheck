@@ -1,0 +1,41 @@
+pragma solidity ^0.6.0;
+
+contract Auction {
+    address payable public owner;
+    address payable public highestBidder;
+    uint256 public highestBid;
+    bool public ended;
+
+    constructor() public {
+        owner = msg.sender;
+        ended = false;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    modifier notEnded() {
+        require(!ended, "Auction has already ended");
+        _;
+    }
+
+    function bid() public payable notEnded {
+        require(msg.value > highestBid, "Bid must be higher than current highest bid");
+
+        highestBidder = msg.sender;
+        highestBid = msg.value;
+    }
+
+    function endAuction() public onlyOwner {
+        ended = true;
+    }
+
+    function withdraw() public {
+        require(msg.sender == highestBidder, "Only highest bidder can withdraw");
+        require(ended, "Auction has not ended yet");
+
+        msg.sender.transfer(highestBid);
+    }
+}

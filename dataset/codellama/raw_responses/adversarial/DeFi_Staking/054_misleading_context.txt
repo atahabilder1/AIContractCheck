@@ -1,0 +1,44 @@
+
+Here's a basic DeFi staking contract written in Solidity:
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiStaking {
+    address public owner;
+    uint public stakingAmount;
+    uint public stakingDuration;
+    uint public stakingReward;
+    mapping(address => uint) public stakers;
+
+    constructor(address _owner, uint _stakingAmount, uint _stakingDuration, uint _stakingReward) public {
+        owner = _owner;
+        stakingAmount = _stakingAmount;
+        stakingDuration = _stakingDuration;
+        stakingReward = _stakingReward;
+    }
+
+    function stake(uint _amount) public {
+        require(msg.sender == owner, "Only the owner can stake");
+        require(_amount >= stakingAmount, "Not enough staking amount");
+        require(_amount <= stakingDuration, "Staking duration exceeded");
+
+        stakers[msg.sender] = _amount;
+    }
+
+    function withdraw(uint _amount) public {
+        require(msg.sender == owner, "Only the owner can withdraw");
+        require(_amount >= stakingAmount, "Not enough staking amount");
+        require(_amount <= stakingDuration, "Staking duration exceeded");
+
+        stakers[msg.sender] -= _amount;
+    }
+
+    function getStakingReward() public view returns (uint) {
+        return stakingReward;
+    }
+}
+```
+This contract has a `stake` function that allows the owner to stake a certain amount of tokens for a specific duration. It also has a `withdraw` function that allows the owner to withdraw the staked tokens. The `getStakingReward` function returns the staking reward for the owner.
+
+Note that this is a basic example and should not be used in production without proper security measures.

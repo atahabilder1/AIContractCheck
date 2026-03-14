@@ -1,0 +1,123 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract GovernanceDAO {
+    struct Proposal {
+        string description;
+        address target;
+        bytes callData;
+        uint256 forVotes;
+        uint256 againstVotes;
+        uint256 deadline;
+        bool executed;
+        mapping(address => bool) hasVoted;
+    }
+
+    address public owner;
+    uint256 public proposalCount;
+    uint256 public votingPeriod = 3 days;
+    uint256 public quorum = 1;
+
+    mapping(uint256 => Proposal) public proposals;
+    mapping(address => uint256) public votingPower;
+    uint256 public totalMembers;
+
+    event ProposalCreated(uint256 indexed id, string description, address target);
+    event Voted(uint256 indexed proposalId, address indexed voter, bool support);
+    event ProposalExecuted(uint256 indexed id);
+    event MemberAdded(address indexed member, uint256 power);
+    event MemberRemoved(address indexed member);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier onlyMember() {
+        require(votingPower[msg.sender] > 0, "Not a member");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+        votingPower[msg.sender] = 1;
+        totalMembers = 1;
+    }
+
+    function addMember(address member, uint256 power) external onlyOwner {
+        require(power > 0, "Power must be > 0");
+        if (votingPower[member] == 0) {
+            totalMembers++;
+        }
+        votingPower[member] = power;
+        emit MemberAdded(member, power);
+    }
+
+    function removeMember(address member) external onlyOwner {
+        require(votingPower[member] > 0, "Not a member");
+        votingPower[member] = 0;
+        totalMembers--;
+        emit MemberRemoved(member);
+    }
+
+    function propose(
+        string calldata description,
+        address target,
+        bytes calldata callData
+    ) external onlyMember returns (uint256) {
+        uint256 id = proposalCount++;
+        Proposal storage p = proposals[id];
+        p.description = description;
+        p.target = target;
+        p.callData = callData;
+        p.deadline = block.timestamp + votingPeriod;
+        emit ProposalCreated(id, description, target);
+        return id;
+    }
+
+    function vote(uint256 proposalId, bool support) external onlyMember {
+        Proposal storage p = proposals[proposalId];
+        require(block.timestamp < p.deadline, "Voting ended");
+        require(!p.hasVoted[msg.sender], "Already voted");
+
+        p.hasVoted[msg.sender] = true;
+        uint256 power = votingPower[msg.sender];
+
+        if (support) {
+            p.forVotes += power;
+        } else {
+            p.againstVotes += power;
+        }
+
+        emit Voted(proposalId, msg.sender, support);
+    }
+
+    function execute(uint256 proposalId) external {
+        Proposal storage p = proposals[proposalId];
+        require(block.timestamp >= p.deadline, "Voting not ended");
+        require(!p.executed, "Already executed");
+        require(p.forVotes > p.againstVotes, "Proposal rejected");
+        require(p.forVotes >= quorum, "Quorum not reached");
+
+        p.executed = true;
+
+        if (p.target != address(0)) {
+            (bool success, ) = p.target.call(p.callData);
+            require(success, "Execution failed");
+        }
+
+        emit ProposalExecuted(proposalId);
+    }
+
+    function setVotingPeriod(uint256 newPeriod) external onlyOwner {
+        votingPeriod = newPeriod;
+    }
+
+    function setQuorum(uint256 newQuorum) external onlyOwner {
+        quorum = newQuorum;
+    }
+
+    receive() external payable {}
+}
+```

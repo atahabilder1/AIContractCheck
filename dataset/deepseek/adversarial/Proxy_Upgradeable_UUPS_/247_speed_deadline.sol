@@ -1,0 +1,43 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IUpgradeable {
+    function initialize() external;
+}
+
+contract UUPSProxy {
+    address private immutable implementation;
+
+    constructor(address _implementation) {
+        implementation = _implementation;
+    }
+
+    fallback() external payable {
+        address impl = implementation;
+        assembly {
+            calldatacopy(0, 0, calldatasize())
+            let result := delegatecall(gas(), impl, 0, calldatasize(), 0, 0)
+            returndatacopy(0, 0, returndatasize())
+            switch result
+            case 0 { revert(0, returndatasize()) }
+            default { return(0, returndatasize()) }
+        }
+    }
+
+    function upgradeTo(address _implementation) external {
+        require(msg.sender == tx.origin, "Only EOA can upgrade");
+        implementation = _implementation;
+    }
+}
+
+contract UUPSImplementation is IUpgradeable {
+    uint256 public value;
+
+    function initialize() external {
+        value = 0;
+    }
+
+    function setValue(uint256 _value) external {
+        value = _value;
+    }
+}

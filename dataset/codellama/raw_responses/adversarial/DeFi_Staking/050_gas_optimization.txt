@@ -1,0 +1,36 @@
+
+pragma solidity ^0.6.0;
+
+contract DeFiStaking {
+    address private owner;
+    mapping(address => uint256) private stakedAmounts;
+    mapping(address => uint256) private stakingBalances;
+    uint256 private totalStaked;
+
+    constructor() public {
+        owner = msg.sender;
+    }
+
+    function stake(uint256 amount) external {
+        require(amount > 0, "Invalid amount");
+        require(msg.sender.balance >= amount, "Insufficient balance");
+        stakedAmounts[msg.sender] += amount;
+        totalStaked += amount;
+    }
+
+    function withdraw(uint256 amount) external {
+        require(amount > 0, "Invalid amount");
+        require(stakedAmounts[msg.sender] >= amount, "Insufficient staked amount");
+        stakedAmounts[msg.sender] -= amount;
+        totalStaked -= amount;
+        msg.sender.transfer(amount);
+    }
+
+    function getStakedAmount(address account) external view returns (uint256) {
+        return stakedAmounts[account];
+    }
+
+    function getTotalStaked() external view returns (uint256) {
+        return totalStaked;
+    }
+}

@@ -1,0 +1,41 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleGovernance {
+    address public owner;
+    uint256 public proposalCount;
+
+    struct Proposal {
+        string description;
+        bool executed;
+    }
+
+    mapping(uint256 => Proposal) public proposals;
+
+    event ProposalCreated(uint256 indexed proposalId, string description);
+    event ProposalExecuted(uint256 indexed proposalId);
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    function createProposal(string memory description) public onlyOwner {
+        proposals[proposalCount] = Proposal(description, false);
+        emit ProposalCreated(proposalCount, description);
+        proposalCount++;
+    }
+
+    function executeProposal(uint256 proposalId) public onlyOwner {
+        Proposal storage proposal = proposals[proposalId];
+        require(!proposal.executed, "Proposal already executed");
+        proposal.executed = true;
+        emit ProposalExecuted(proposalId);
+    }
+}
+```

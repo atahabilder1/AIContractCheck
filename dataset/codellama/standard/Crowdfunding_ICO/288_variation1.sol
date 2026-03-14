@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Crowdfunding {
+  address public owner;
+  uint public totalContributions;
+  uint public totalTokensSold;
+  uint public tokenPrice;
+  uint public bondingCurve;
+
+  constructor() public {
+    owner = msg.sender;
+    totalContributions = 0;
+    totalTokensSold = 0;
+    tokenPrice = 1000000000000000000; // 1 ETH
+    bondingCurve = 10; // 10% increase in token price for every 1 ETH contributed
+  }
+
+  function contribute() public payable {
+    require(msg.value > 0, "Invalid contribution amount");
+    uint newTokenPrice = getNewTokenPrice(msg.value);
+    uint tokensToMint = msg.value / newTokenPrice;
+    totalContributions += msg.value;
+    totalTokensSold += tokensToMint;
+    mintTokens(tokensToMint);
+  }
+
+  function getNewTokenPrice(uint _contributionAmount) public view returns (uint) {
+    uint newTokenPrice = tokenPrice + (_contributionAmount * bondingCurve / 100);
+    return newTokenPrice;
+  }
+
+  function mintTokens(uint _tokensToMint) internal {
+    for (uint i = 0; i < _tokensToMint; i++) {
+      _mint(msg.sender, 1);
+    }
+  }
+
+  function _mint(address _to, uint _amount) internal {
+    require(msg.sender == owner, "Only the owner can mint tokens");
+    require(_amount > 0, "Invalid mint amount");
+    require(totalTokensSold + _amount <= totalSupply, "Insufficient tokens available");
+    _transfer(address(this), _to, _amount);
+    totalTokensSold += _amount;
+  }
+
+  function _transfer(address _from, address _to, uint _amount) internal {
+    require(_from != address(0), "Invalid from address");
+    require(_to != address(0), "Invalid to address");
+    require(_amount > 0, "Invalid transfer amount");
+    require(balanceOf[_from] >= _amount, "Insufficient balance");
+    balanceOf[_from] -= _amount;
+    balanceOf[_to] += _amount;
+  }
+}

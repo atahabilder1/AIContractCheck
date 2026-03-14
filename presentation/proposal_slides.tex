@@ -1,0 +1,213 @@
+\documentclass[aspectratio=169]{beamer}
+\usetheme{Madrid}
+\usecolortheme{default}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning}
+
+\definecolor{accent}{RGB}{0, 102, 153}
+\setbeamercolor{title}{fg=white, bg=accent}
+\setbeamercolor{frametitle}{fg=white, bg=accent}
+\setbeamercolor{structure}{fg=accent}
+
+\title[LLM Smart Contract Security]{From Prompt to Exploit:\\Security Vulnerabilities in LLM-Generated Smart Contracts}
+\subtitle{CSC 5991 --- Introduction to LLM: Project Proposal}
+\author{Anik Tahabilder \and Dung Vo}
+\institute{Wayne State University}
+\date{March 2026}
+
+\begin{document}
+
+%--- Slide 1: Title ---
+\begin{frame}
+\titlepage
+\end{frame}
+
+%--- Slide 2: Motivation ---
+\begin{frame}{Why This Matters}
+\begin{columns}
+\begin{column}{0.55\textwidth}
+\begin{itemize}
+    \item Developers today often use tools like ChatGPT and Copilot to write smart contracts in Solidity
+    \item These contracts handle real money --- sometimes billions of dollars in DeFi protocols
+    \item The catch: once you deploy a smart contract, you \textbf{can't patch it}. Bugs stay forever
+    \item So we wanted to ask a simple question: \textbf{how safe is the code that LLMs actually produce?}
+\end{itemize}
+\end{column}
+\begin{column}{0.4\textwidth}
+\centering
+\begin{tikzpicture}[scale=0.85]
+    \node[draw, rounded corners, fill=red!10, text width=3cm, align=center, font=\small] (llm) {Developer asks\\LLM for code};
+    \node[draw, rounded corners, fill=orange!15, text width=3cm, align=center, font=\small, below=0.6cm of llm] (deploy) {Code goes live\\on blockchain};
+    \node[draw, rounded corners, fill=red!25, text width=3cm, align=center, font=\small, below=0.6cm of deploy] (vuln) {\textbf{Hidden bugs?}\\Reentrancy, overflow...};
+    \draw[-{Stealth}, thick] (llm) -- (deploy);
+    \draw[-{Stealth}, thick] (deploy) -- (vuln);
+\end{tikzpicture}
+\end{column}
+\end{columns}
+\end{frame}
+
+%--- Slide 3: What We Want to Find Out ---
+\begin{frame}{What We Want to Find Out}
+\begin{enumerate}
+    \item[\textbf{RQ1.}] How common are security bugs in contracts that LLMs generate?
+    \vspace{0.3cm}
+    \item[\textbf{RQ2.}] Are some LLMs better or worse than others at writing safe code?
+    \vspace{0.3cm}
+    \item[\textbf{RQ3.}] What kinds of bugs show up the most?
+    \vspace{0.3cm}
+    \item[\textbf{RQ4.}] Can we trick LLMs into writing even more vulnerable code with sneaky prompts?
+    \vspace{0.3cm}
+    \item[\textbf{RQ5.}] Does the type of contract matter? (e.g., a simple token vs.\ a complex bridge)
+    \vspace{0.3cm}
+    \item[\textbf{RQ6.}] Are there any bug patterns that are unique to LLM-written code?
+\end{enumerate}
+\end{frame}
+
+%--- Slide 4: Our Approach ---
+\begin{frame}{Our Approach}
+\begin{columns}
+\begin{column}{0.55\textwidth}
+\begin{enumerate}
+    \item \textbf{Design prompts} --- we wrote 300 prompts covering 20 types of smart contracts (tokens, DeFi, bridges, governance, etc.)
+    \vspace{0.15cm}
+    \item \textbf{Generate contracts} --- we feed those prompts to 6 different LLMs and collect the Solidity code they produce (1,800 contracts total)
+    \vspace{0.15cm}
+    \item \textbf{Scan for vulnerabilities} --- we run three industry-standard security tools (Slither, Mythril, Semgrep) on every contract
+    \vspace{0.15cm}
+    \item \textbf{Test adversarial prompts} --- we also try prompts designed to trick the LLM into writing unsafe code, and compare
+    \vspace{0.15cm}
+    \item \textbf{Statistical analysis} --- we use non-parametric tests to compare across LLMs, categories, and prompt types
+\end{enumerate}
+\end{column}
+\begin{column}{0.42\textwidth}
+\footnotesize
+\textbf{6 LLMs we are testing:}
+\begin{itemize}
+    \item GPT-4o (OpenAI)
+    \item Claude 3.5 Sonnet (Anthropic)
+    \item Gemini 2.5 Flash-Lite (Google)
+    \item DeepSeek Coder V2
+    \item Qwen 2.5 Coder 32B
+    \item CodeLlama-34B (Meta)
+\end{itemize}
+\vspace{0.3cm}
+\textbf{3 security tools:}
+\begin{itemize}
+    \item Slither --- fast static analysis
+    \item Mythril --- symbolic execution
+    \item Semgrep --- pattern-based rules
+\end{itemize}
+\end{column}
+\end{columns}
+\end{frame}
+
+%--- Slide 5: What We Have Done So Far ---
+\begin{frame}{What We Have Done So Far}
+\begin{columns}
+\begin{column}{0.48\textwidth}
+\textbf{Work completed:}
+\begin{itemize}\small
+    \item[\checkmark] Generated all 1,800 contracts from 6 LLMs
+    \item[\checkmark] Ran Slither on everything --- 1,181 compiled successfully, found 3,753 issues
+    \item[\checkmark] Ran Semgrep on all 1,800 --- picked up 1,626 more issues
+    \item[\checkmark] Sampled 499 contracts for Mythril (deeper analysis) --- 269 issues found
+    \item[\checkmark] After removing duplicates: \textbf{5,007 total bugs}
+    \item[\checkmark] All statistical tests done
+\end{itemize}
+\end{column}
+\begin{column}{0.48\textwidth}
+\textbf{What we found (so far):}
+\begin{itemize}\small
+    \item About \textbf{3 out of 4} compilable contracts have at least one vulnerability
+    \item Roughly \textbf{28.5\%} have high-severity bugs
+    \item Some LLMs can't even produce valid code --- compilation rates range from 35\% to 90\%
+    \item There are big differences between LLMs (statistically significant)
+    \item Surprisingly, adversarial prompts did \textbf{not} make things worse
+\end{itemize}
+\end{column}
+\end{columns}
+\end{frame}
+
+%--- Slide 6: Comparing the LLMs ---
+\begin{frame}{Comparing the LLMs}
+\begin{center}
+\small
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Model} & \textbf{Compiles} & \textbf{\% w/ Bugs} & \textbf{Avg Bugs} & \textbf{Bugs/100 LOC} & \textbf{Avg LOC} \\
+\midrule
+GPT-4o         & 90.0\% & 73.0\% & 3.05 & 6.14 & 52 \\
+Claude         & 72.0\% & 84.7\% & 7.45 & 6.62 & 110 \\
+Qwen           & 79.0\% & 66.2\% & 2.75 & 6.32 & 42 \\
+DeepSeek       & 68.3\% & 73.2\% & 2.98 & 6.96 & 38 \\
+Gemini         & 49.7\% & 80.5\% & 4.52 & \textbf{7.91} & 55 \\
+CodeLlama      & 34.7\% & 49.0\% & 1.23 & 4.26 & 26 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\vspace{0.3cm}
+\begin{block}{What this tells us}
+\begin{itemize}\small
+    \item GPT-4o compiles the best, but 73\% of its output still has bugs
+    \item Claude writes the biggest contracts (110 LOC avg), so it ends up with the most total bugs
+    \item Gemini has the worst bug density --- 7.91 bugs per 100 lines of code
+    \item CodeLlama has the fewest bugs, but only 35\% of its code even compiles
+\end{itemize}
+\end{block}
+\end{frame}
+
+%--- Slide 7: Project Timeline ---
+\begin{frame}{Project Timeline}
+\begin{center}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{When} & \textbf{What we did / plan to do} & \textbf{Status} \\
+\midrule
+Jan 2026     & Designed 300 prompts across 20 contract types          & Done \\
+Jan--Feb     & Generated 1,800 contracts from 6 LLMs                  & Done \\
+Feb          & Ran Slither and Semgrep on all contracts                & Done \\
+Feb--Mar     & Ran Mythril on a stratified sample of 499 contracts    & Done \\
+Mar (week 1) & Aggregated results, removed duplicates                  & Done \\
+Mar (week 2) & Statistical analysis and adversarial comparison         & Done \\
+\midrule
+Mar (week 3) & Manually review 120 contracts for false positives       & To do \\
+Mar--Apr     & Root cause analysis --- why LLMs produce these bugs    & To do \\
+Apr          & Test prompt-based mitigation strategies                 & To do \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\vspace{0.3cm}
+\begin{block}{What's still left}
+\begin{itemize}\small
+    \item \textbf{Manually validate} a sample of 120 contracts to confirm tool findings
+    \item \textbf{Root cause analysis} --- investigate \emph{why} LLMs produce these vulnerabilities (e.g., training data bias, context window limits, lack of security-aware fine-tuning)
+    \item \textbf{Mitigation strategies} --- test whether prompt-based defenses (e.g., security checklists, few-shot secure examples) can reduce vulnerability rates
+\end{itemize}
+\end{block}
+\end{frame}
+
+%--- Slide 8: What We Hope to Contribute ---
+\begin{frame}{What We Hope to Contribute}
+\begin{enumerate}
+    \item \textbf{A large-scale study} --- 1,800 contracts across 6 LLMs and 20 categories; as far as we know, nobody has done this at this scale before
+    \vspace{0.3cm}
+    \item \textbf{A clear taxonomy of bugs} --- we map every vulnerability to a standard CWE identifier so people can compare results
+    \vspace{0.3cm}
+    \item \textbf{A surprising result} --- adversarial prompts don't actually make LLMs write worse code; the bugs seem to come from the training data itself
+    \vspace{0.3cm}
+    \item \textbf{An open dataset} --- we plan to release all contracts, prompts, and analysis scripts so anyone can build on this work
+    \vspace{0.3cm}
+    \item \textbf{Practical takeaways} --- concrete advice for developers who use LLMs for smart contract development
+\end{enumerate}
+
+\vspace{0.5cm}
+\centering
+\large Thank you! Questions?
+\end{frame}
+
+\end{document}

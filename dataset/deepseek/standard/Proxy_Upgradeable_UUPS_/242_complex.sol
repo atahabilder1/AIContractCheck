@@ -1,0 +1,98 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IVersioned {
+    function version() external pure returns (uint256);
+}
+
+interface IUpgradable {
+    function upgradeTo(address newImplementation) external;
+    function upgradeToAndCall(address newImplementation, bytes memory data) external payable;
+}
+
+contract Upgradable is IUpgradable {
+    address public owner;
+    uint256 public versionNumber;
+    address public implementation;
+    uint256 public constant MIN_DELAY = 1 days;
+    uint256 public constant MAX_DELAY = 30 days;
+    uint256 public delay;
+    mapping(address => uint256) public implementationVersion;
+
+    event Upgraded(address indexed implementation);
+    event UpgradedAndCalled(address indexed implementation, bytes data);
+    event Rollback(address indexed previousImplementation);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Upgradable: caller is not the owner");
+        _;
+    }
+
+    modifier onlyNewImplementation(address newImplementation) {
+        require(implementationVersion[newImplementation] == 0, "Upgradable: new implementation already deployed");
+        _;
+    }
+
+    constructor(address _implementation, uint256 _versionNumber, uint256 _delay) {
+        require(_delay >= MIN_DELAY && _delay <= MAX_DELAY, "Upgradable: delay must be between 1 days and 30 days");
+        owner = msg.sender;
+        implementation = _implementation;
+        versionNumber = _versionNumber;
+        delay = _delay;
+        implementationVersion[_implementation] = _versionNumber;
+    }
+
+    function upgradeTo(address newImplementation) external override onlyOwner onlyNewImplementation(newImplementation) {
+        require(address(this).balance == 0, "Upgradable: contract has Ether balance");
+        require(block.timestamp >= delay, "Upgradable: delay not yet passed");
+        implementation = newImplementation;
+        implementationVersion[newImplementation] = versionNumber + 1;
+        emit Upgraded(newImplementation);
+    }
+
+    function upgradeToAndCall(address newImplementation, bytes memory data) external payable override onlyOwner onlyNewImplementation(newImplementation) {
+        require(address(this).balance == 0, "Upgradable: contract has Ether balance");
+        require(block.timestamp >= delay, "Upgradable: delay not yet passed");
+        implementation = newImplementation;
+        implementationVersion[newImplementation] = versionNumber + 1;
+        (bool success, ) = newImplementation.delegatecall(data);
+        require(success, "Upgradable: delegate call failed");
+        emit UpgradedAndCalled(newImplementation, data);
+    }
+
+    function rollback() external onlyOwner {
+        require(address(this).balance == 0, "Upgradable: contract has Ether balance");
+        require(block.timestamp >= delay, "Upgradable: delay not yet passed");
+        address previousImplementation = implementation;
+        implementation = address(0);
+        emit Rollback(previousImplementation);
+    }
+
+    function getVersion() external view returns (uint256) {
+        return versionNumber;
+    }
+
+    function implementationVersionNumber(address impl) external view returns (uint256) {
+        return implementationVersion[impl];
+    }
+
+    fallback() external payable {
+        address impl = implementation;
+        require(impl != address(0));
+        require(msg.sender != tx.origin || implementationVersionNumber(impl) == versionNumber + 1, "Upgradable: incorrect implementation version");
+        assembly {
+            let ptr := mload(0x40)
+            calldatacopy(ptr, 0, calldatasize())
+            let result := delegatecall(gas(), impl, ptr, calldatasize(), 0, 0)
+            let size := returndatasize()
+            returndatacopy(ptr, 0, size)
+            switch result
+            case 0 {
+                revert(ptr, size)
+            }
+            default {
+                return(ptr, size)
+            }
+        }
+    }
+}

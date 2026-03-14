@@ -1,0 +1,170 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+
+    enum State {
+        AwaitingPayment,
+        PaymentReceived,
+        Disputed,
+        Released,
+        Refunded
+    }
+
+    address payable public buyer;
+    address payable public seller;
+    address public arbiter;
+    uint256 public amount;
+    uint256 public releaseTime;
+    State public currentState;
+
+    mapping(address => bool) public hasReceivedPayment; // To track partial payments
+
+    event PaymentReceived(address indexed payer, uint256 amountPaid);
+    event PartialRelease(address indexed recipient, uint256 amountReleased);
+    event FullRelease(address indexed recipient);
+    event Refunded(address indexed recipient);
+    event Disputed(address indexed disputer);
+    event ArbiterDecision(address indexed arbiter, bool releaseToSeller);
+
+    modifier onlyBuyer() {
+        require(msg.sender == buyer, "Only buyer can perform this action");
+        _;
+    }
+
+    modifier onlySeller() {
+        require(msg.sender == seller, "Only seller can perform this action");
+        _;
+    }
+
+    modifier onlyArbiter() {
+        require(msg.sender == arbiter, "Only arbiter can perform this action");
+        _;
+    }
+
+    modifier inState(State _state) {
+        require(currentState == _state, "Invalid state");
+        _;
+    }
+
+    constructor(address payable _seller, address _arbiter, uint256 _releaseTime) payable {
+        buyer = payable(msg.sender);
+        seller = _seller;
+        arbiter = _arbiter;
+        amount = msg.value;
+        releaseTime = block.timestamp + _releaseTime;
+        currentState = State.AwaitingPayment;
+    }
+
+    function pay() public payable inState(State.AwaitingPayment) {
+        require(msg.sender == buyer, "Only buyer can pay");
+        require(msg.value > 0, "Payment amount must be greater than 0");
+        // In a real-world scenario, you might want to handle partial payments more robustly
+        // For simplicity here, we assume the buyer pays the full amount at once or can make multiple payments
+        amount = msg.value; // Update amount if buyer pays in installments
+        hasReceivedPayment[buyer] = true; // Mark that the buyer has initiated payment
+        emit PaymentReceived(msg.sender, msg.value);
+        currentState = State.PaymentReceived;
+    }
+
+    function releaseToSeller(uint256 _partialAmount) public onlyBuyer inState(State.PaymentReceived) {
+        require(_partialAmount > 0, "Partial release amount must be greater than 0");
+        require(_partialAmount <= amount, "Partial release amount cannot exceed total amount");
+
+        amount -= _partialAmount;
+        payable(seller).transfer(_partialAmount);
+        emit PartialRelease(seller, _partialAmount);
+
+        if (amount == 0) {
+            currentState = State.Released;
+            emit FullRelease(seller);
+        }
+    }
+
+    function releaseFullPayment() public onlyBuyer inState(State.PaymentReceived) {
+        require(amount > 0, "No remaining amount to release");
+        uint256 remainingAmount = amount;
+        amount = 0;
+        payable(seller).transfer(remainingAmount);
+        currentState = State.Released;
+        emit FullRelease(seller);
+    }
+
+    function dispute() public inState(State.PaymentReceived) {
+        require(msg.sender == buyer || msg.sender == seller, "Only buyer or seller can dispute");
+        currentState = State.Disputed;
+        emit Disputed(msg.sender);
+    }
+
+    function resolveDispute(bool _releaseToSeller) public onlyArbiter inState(State.Disputed) {
+        if (_releaseToSeller) {
+            require(amount > 0, "No amount to release to seller");
+            uint256 amountToRelease = amount;
+            amount = 0;
+            payable(seller).transfer(amountToRelease);
+            currentState = State.Released;
+            emit ArbiterDecision(msg.sender, true);
+            emit FullRelease(seller);
+        } else {
+            require(amount > 0, "No amount to refund to buyer");
+            uint256 amountToRefund = amount;
+            amount = 0;
+            payable(buyer).transfer(amountToRefund);
+            currentState = State.Refunded;
+            emit ArbiterDecision(msg.sender, false);
+            emit Refunded(buyer);
+        }
+    }
+
+    function forceRelease() public inState(State.PaymentReceived) {
+        require(block.timestamp >= releaseTime, "Release time not reached yet");
+        require(amount > 0, "No amount to release");
+        uint256 amountToRelease = amount;
+        amount = 0;
+        payable(seller).transfer(amountToRelease);
+        currentState = State.Released;
+        emit FullRelease(seller);
+    }
+
+    function forceRefund() public inState(State.PaymentReceived) {
+        require(block.timestamp >= releaseTime, "Release time not reached yet");
+        require(amount > 0, "No amount to refund");
+        uint256 amountToRefund = amount;
+        amount = 0;
+        payable(buyer).transfer(amountToRefund);
+        currentState = State.Refunded;
+        emit Refunded(buyer);
+    }
+
+    // Fallback function to receive Ether if the contract is sent Ether directly
+    receive() external payable {
+        // You might want to add logic here if direct Ether deposits are expected
+        // For this escrow, direct deposits are not the primary mechanism.
+        revert("Direct Ether deposits are not supported. Use the pay() function.");
+    }
+
+    // Function to withdraw remaining Ether if any
+    function withdrawRemaining() public {
+        require(msg.sender == buyer || msg.sender == seller || msg.sender == arbiter, "Only buyer, seller, or arbiter can withdraw");
+        require(address(this).balance > 0, "No balance to withdraw");
+
+        // This function should ideally be called after the escrow is finalized (Released or Refunded)
+        // or in specific dispute resolution scenarios.
+        // For simplicity, let's assume it can be called if the state allows and the caller is authorized.
+        // More complex logic might be needed based on the exact state and role.
+
+        if (currentState == State.Released && msg.sender == seller) {
+            payable(seller).transfer(address(this).balance);
+        } else if (currentState == State.Refunded && msg.sender == buyer) {
+            payable(buyer).transfer(address(this).balance);
+        } else if (currentState == State.Disputed && msg.sender == arbiter) {
+            // Arbiter might be authorized to withdraw in specific dispute scenarios,
+            // but typically the funds are released/refunded to buyer/seller.
+            // This is a placeholder and might need refinement based on specific rules.
+        } else {
+            revert("Cannot withdraw in current state or unauthorized caller");
+        }
+    }
+}
+```

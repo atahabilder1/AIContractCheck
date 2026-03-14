@@ -1,0 +1,351 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address to, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+}
+
+interface IStrategy {
+    function deposit(uint256 amount) external;
+    function withdraw(uint256 amount) external;
+    function harvest() external returns (uint256);
+    function balanceOf() external view returns (uint256);
+    function estimatedTotalAssets() external view returns (uint256);
+    function want() external view returns (address);
+    function apr() external view returns (uint256);
+}
+
+contract YieldAggregator {
+    string public name;
+    string public symbol;
+    uint8 public constant decimals = 18;
+    uint256 public totalSupply;
+
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+
+    IERC20 public immutable token;
+    address public owner;
+    address public guardian;
+
+    struct StrategyInfo {
+        bool active;
+        uint256 debtRatio;
+        uint256 totalDebt;
+        uint256 totalGain;
+        uint256 totalLoss;
+        uint256 lastReport;
+    }
+
+    address[] public strategies;
+    mapping(address => StrategyInfo) public strategyInfo;
+
+    uint256 public totalDebt;
+    uint256 public totalDebtRatio;
+    uint256 public constant MAX_BPS = 10000;
+    uint256 public depositLimit;
+    uint256 public performanceFee = 1000; // 10%
+    uint256 public managementFee = 200;   // 2%
+    address public feeRecipient;
+
+    bool public emergencyShutdown;
+
+    event Deposit(address indexed user, uint256 amount, uint256 shares);
+    event Withdraw(address indexed user, uint256 amount, uint256 shares);
+    event StrategyAdded(address indexed strategy, uint256 debtRatio);
+    event StrategyRevoked(address indexed strategy);
+    event StrategyReported(address indexed strategy, uint256 gain, uint256 loss, uint256 totalDebtAdded);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "!owner");
+        _;
+    }
+
+    modifier onlyAuthorized() {
+        require(msg.sender == owner || msg.sender == guardian, "!authorized");
+        _;
+    }
+
+    modifier notShutdown() {
+        require(!emergencyShutdown, "shutdown");
+        _;
+    }
+
+    constructor(address _token, string memory _name, string memory _symbol) {
+        token = IERC20(_token);
+        name = _name;
+        symbol = _symbol;
+        owner = msg.sender;
+        feeRecipient = msg.sender;
+        depositLimit = type(uint256).max;
+    }
+
+    function setGuardian(address _guardian) external onlyOwner {
+        guardian = _guardian;
+    }
+
+    function setDepositLimit(uint256 _limit) external onlyOwner {
+        depositLimit = _limit;
+    }
+
+    function setPerformanceFee(uint256 _fee) external onlyOwner {
+        require(_fee <= 5000, "fee too high");
+        performanceFee = _fee;
+    }
+
+    function setManagementFee(uint256 _fee) external onlyOwner {
+        require(_fee <= 1000, "fee too high");
+        managementFee = _fee;
+    }
+
+    function setFeeRecipient(address _recipient) external onlyOwner {
+        require(_recipient != address(0), "zero address");
+        feeRecipient = _recipient;
+    }
+
+    function setEmergencyShutdown(bool _active) external onlyAuthorized {
+        emergencyShutdown = _active;
+    }
+
+    function totalAssets() public view returns (uint256) {
+        return token.balanceOf(address(this)) + totalDebt;
+    }
+
+    function pricePerShare() public view returns (uint256) {
+        if (totalSupply == 0) return 10 ** decimals;
+        return (totalAssets() * (10 ** decimals)) / totalSupply;
+    }
+
+    function availableDepositLimit() public view returns (uint256) {
+        uint256 _totalAssets = totalAssets();
+        if (_totalAssets >= depositLimit) return 0;
+        return depositLimit - _totalAssets;
+    }
+
+    function deposit(uint256 _amount) external notShutdown returns (uint256) {
+        require(_amount > 0, "zero amount");
+        require(_amount <= availableDepositLimit(), "exceeds limit");
+
+        uint256 shares;
+        if (totalSupply == 0) {
+            shares = _amount;
+        } else {
+            shares = (_amount * totalSupply) / totalAssets();
+        }
+        require(shares > 0, "zero shares");
+
+        token.transferFrom(msg.sender, address(this), _amount);
+        _mint(msg.sender, shares);
+
+        emit Deposit(msg.sender, _amount, shares);
+        return shares;
+    }
+
+    function withdraw(uint256 _shares) external returns (uint256) {
+        require(_shares > 0, "zero shares");
+        require(_shares <= balanceOf[msg.sender], "insufficient shares");
+
+        uint256 value = (_shares * totalAssets()) / totalSupply;
+        _burn(msg.sender, _shares);
+
+        uint256 vaultBalance = token.balanceOf(address(this));
+        if (value > vaultBalance) {
+            uint256 deficit = value - vaultBalance;
+            _withdrawFromStrategies(deficit);
+            uint256 newBalance = token.balanceOf(address(this));
+            if (newBalance < value) {
+                value = newBalance;
+            }
+        }
+
+        token.transfer(msg.sender, value);
+        emit Withdraw(msg.sender, value, _shares);
+        return value;
+    }
+
+    function _withdrawFromStrategies(uint256 _amount) internal {
+        uint256 remaining = _amount;
+        for (uint256 i = 0; i < strategies.length && remaining > 0; i++) {
+            address strategy = strategies[i];
+            StrategyInfo storage info = strategyInfo[strategy];
+            if (!info.active) continue;
+
+            uint256 strategyBalance = IStrategy(strategy).estimatedTotalAssets();
+            uint256 toWithdraw = remaining > strategyBalance ? strategyBalance : remaining;
+
+            if (toWithdraw > 0) {
+                IStrategy(strategy).withdraw(toWithdraw);
+                uint256 withdrawn = toWithdraw;
+                info.totalDebt -= withdrawn;
+                totalDebt -= withdrawn;
+                remaining -= withdrawn;
+            }
+        }
+    }
+
+    function addStrategy(address _strategy, uint256 _debtRatio) external onlyOwner notShutdown {
+        require(!strategyInfo[_strategy].active, "already added");
+        require(IStrategy(_strategy).want() == address(token), "wrong token");
+        require(totalDebtRatio + _debtRatio <= MAX_BPS, "ratio overflow");
+
+        strategyInfo[_strategy] = StrategyInfo({
+            active: true,
+            debtRatio: _debtRatio,
+            totalDebt: 0,
+            totalGain: 0,
+            totalLoss: 0,
+            lastReport: block.timestamp
+        });
+
+        strategies.push(_strategy);
+        totalDebtRatio += _debtRatio;
+
+        emit StrategyAdded(_strategy, _debtRatio);
+    }
+
+    function updateStrategyDebtRatio(address _strategy, uint256 _debtRatio) external onlyOwner {
+        require(strategyInfo[_strategy].active, "!active");
+        totalDebtRatio = totalDebtRatio - strategyInfo[_strategy].debtRatio + _debtRatio;
+        require(totalDebtRatio <= MAX_BPS, "ratio overflow");
+        strategyInfo[_strategy].debtRatio = _debtRatio;
+    }
+
+    function revokeStrategy(address _strategy) external onlyAuthorized {
+        StrategyInfo storage info = strategyInfo[_strategy];
+        require(info.active, "!active");
+        totalDebtRatio -= info.debtRatio;
+        info.debtRatio = 0;
+        info.active = false;
+        emit StrategyRevoked(_strategy);
+    }
+
+    function allocate() external onlyAuthorized notShutdown {
+        uint256 _totalAssets = totalAssets();
+
+        for (uint256 i = 0; i < strategies.length; i++) {
+            address strategy = strategies[i];
+            StrategyInfo storage info = strategyInfo[strategy];
+            if (!info.active) continue;
+
+            uint256 targetDebt = (_totalAssets * info.debtRatio) / MAX_BPS;
+            uint256 currentDebt = info.totalDebt;
+
+            if (targetDebt > currentDebt) {
+                uint256 toDeposit = targetDebt - currentDebt;
+                uint256 available = token.balanceOf(address(this));
+                if (toDeposit > available) toDeposit = available;
+
+                if (toDeposit > 0) {
+                    token.approve(strategy, toDeposit);
+                    IStrategy(strategy).deposit(toDeposit);
+                    info.totalDebt += toDeposit;
+                    totalDebt += toDeposit;
+                }
+            } else if (targetDebt < currentDebt) {
+                uint256 toWithdraw = currentDebt - targetDebt;
+                IStrategy(strategy).withdraw(toWithdraw);
+                info.totalDebt -= toWithdraw;
+                totalDebt -= toWithdraw;
+            }
+        }
+    }
+
+    function harvest(address _strategy) external onlyAuthorized {
+        StrategyInfo storage info = strategyInfo[_strategy];
+        require(info.active || info.totalDebt > 0, "!strategy");
+
+        uint256 gain = IStrategy(_strategy).harvest();
+
+        if (gain > 0) {
+            uint256 duration = block.timestamp - info.lastReport;
+            uint256 mgmtFee = (info.totalDebt * managementFee * duration) / (MAX_BPS * 365 days);
+            uint256 perfFee = (gain * performanceFee) / MAX_BPS;
+            uint256 totalFee = mgmtFee + perfFee;
+
+            if (totalFee > 0 && totalSupply > 0) {
+                uint256 feeShares = (totalFee * totalSupply) / (totalAssets() - totalFee);
+                if (feeShares > 0) {
+                    _mint(feeRecipient, feeShares);
+                }
+            }
+
+            info.totalGain += gain;
+            info.totalDebt += gain;
+            totalDebt += gain;
+        }
+
+        info.lastReport = block.timestamp;
+        emit StrategyReported(_strategy, gain, 0, gain);
+    }
+
+    function reportLoss(address _strategy, uint256 _loss) external {
+        require(msg.sender == _strategy, "!strategy");
+        StrategyInfo storage info = strategyInfo[_strategy];
+
+        info.totalLoss += _loss;
+        info.totalDebt -= _loss;
+        totalDebt -= _loss;
+    }
+
+    function strategiesLength() external view returns (uint256) {
+        return strategies.length;
+    }
+
+    // ERC20 functions
+    function transfer(address _to, uint256 _amount) external returns (bool) {
+        _transfer(msg.sender, _to, _amount);
+        return true;
+    }
+
+    function approve(address _spender, uint256 _amount) external returns (bool) {
+        allowance[msg.sender][_spender] = _amount;
+        emit Approval(msg.sender, _spender, _amount);
+        return true;
+    }
+
+    function transferFrom(address _from, address _to, uint256 _amount) external returns (bool) {
+        uint256 allowed = allowance[_from][msg.sender];
+        if (allowed != type(uint256).max) {
+            allowance[_from][msg.sender] = allowed - _amount;
+        }
+        _transfer(_from, _to, _amount);
+        return true;
+    }
+
+    function _transfer(address _from, address _to, uint256 _amount) internal {
+        require(_to != address(0), "zero address");
+        balanceOf[_from] -= _amount;
+        balanceOf[_to] += _amount;
+        emit Transfer(_from, _to, _amount);
+    }
+
+    function _mint(address _to, uint256 _amount) internal {
+        totalSupply += _amount;
+        balanceOf[_to] += _amount;
+        emit Transfer(address(0), _to, _amount);
+    }
+
+    function _burn(address _from, uint256 _amount) internal {
+        balanceOf[_from] -= _amount;
+        totalSupply -= _amount;
+        emit Transfer(_from, address(0), _amount);
+    }
+
+    function sweepToken(address _token) external onlyOwner {
+        require(_token != address(token), "!want");
+        uint256 bal = IERC20(_token).balanceOf(address(this));
+        IERC20(_token).transfer(owner, bal);
+    }
+
+    function transferOwnership(address _newOwner) external onlyOwner {
+        require(_newOwner != address(0), "zero address");
+        owner = _newOwner;
+    }
+}

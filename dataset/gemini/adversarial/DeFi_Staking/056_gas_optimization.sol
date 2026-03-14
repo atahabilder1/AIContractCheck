@@ -1,0 +1,145 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract GasOptimizedStaking is Ownable {
+    using SafeMath for uint256;
+
+    IERC20 public immutable stakingToken;
+    uint256 public rewardRate; // rewards per second
+    uint256 public constant DURATION = 1 days; // duration for reward distribution
+    uint256 public lastUpdateTime;
+    uint256 public rewardPerTokenStored;
+
+    mapping(address => uint256) public userStakedAmount;
+    mapping(address => uint256) public userRewardPerTokenPaid;
+    mapping(address => uint256) public userRewardBalance;
+
+    event Staked(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
+    event RewardPaid(address indexed user, uint256 reward);
+
+    constructor(address _stakingTokenAddress, uint256 _rewardRate) {
+        stakingToken = IERC20(_stakingTokenAddress);
+        rewardRate = _rewardRate;
+        lastUpdateTime = block.timestamp;
+    }
+
+    function _updateRewardPerToken() internal {
+        if (block.timestamp <= lastUpdateTime) {
+            return;
+        }
+
+        uint256 stakingBalance = stakingToken.balanceOf(address(this));
+        if (stakingBalance == 0) {
+            lastUpdateTime = block.timestamp;
+            return;
+        }
+
+        // Calculate rewards earned since last update, scaled by DURATION
+        // This avoids large multiplications and potential overflows with very high reward rates
+        uint256 timeElapsed = block.timestamp.sub(lastUpdateTime);
+        uint256 rewards = timeElapsed.mul(rewardRate).div(stakingBalance);
+
+        rewardPerTokenStored = rewardPerTokenStored.add(rewards);
+        lastUpdateTime = block.timestamp;
+    }
+
+    function stake(uint256 _amount) public {
+        require(_amount > 0, "Amount must be greater than zero");
+        uint256 balanceBefore = stakingToken.balanceOf(msg.sender);
+        require(balanceBefore >= _amount, "Insufficient balance");
+
+        _updateRewardPerToken();
+        userRewardBalance[msg.sender] = earned(msg.sender); // Update user's pending rewards
+
+        stakingToken.transferFrom(msg.sender, address(this), _amount);
+        userStakedAmount[msg.sender] = userStakedAmount[msg.sender].add(_amount);
+        userRewardPerTokenPaid[msg.sender] = rewardPerTokenStored; // Record the reward rate at the time of staking
+
+        emit Staked(msg.sender, _amount);
+    }
+
+    function withdraw(uint256 _amount) public {
+        require(_amount > 0, "Amount must be greater than zero");
+        uint256 staked = userStakedAmount[msg.sender];
+        require(staked >= _amount, "Insufficient staked amount");
+
+        _updateRewardPerToken();
+        uint256 earnedReward = earned(msg.sender);
+        require(earnedReward > 0, "No reward to claim");
+
+        // Claim rewards first
+        userRewardBalance[msg.sender] = 0; // Reset earned rewards
+        uint256 totalWithdraw = _amount.add(earnedReward);
+
+        // Check if the contract has enough tokens to pay out
+        require(stakingToken.balanceOf(address(this)) >= totalWithdraw, "Insufficient contract balance");
+
+        userStakedAmount[msg.sender] = staked.sub(_amount);
+        userRewardPerTokenPaid[msg.sender] = rewardPerTokenStored; // Update for remaining stake
+
+        stakingToken.transfer(msg.sender, totalWithdraw);
+
+        emit RewardPaid(msg.sender, earnedReward);
+        emit Withdrawn(msg.sender, _amount);
+    }
+
+    function claimRewards() public {
+        uint256 earnedReward = earned(msg.sender);
+        require(earnedReward > 0, "No reward to claim");
+
+        userRewardBalance[msg.sender] = 0; // Reset earned rewards
+        userRewardPerTokenPaid[msg.sender] = rewardPerTokenStored; // Update for current state
+
+        stakingToken.transfer(msg.sender, earnedReward);
+
+        emit RewardPaid(msg.sender, earnedReward);
+    }
+
+    function earned(address _user) public view returns (uint256) {
+        uint256 staked = userStakedAmount[_user];
+        if (staked == 0) {
+            return 0;
+        }
+
+        // Calculate pending rewards based on the difference in rewardPerTokenStored
+        uint256 rewardPerTokenDelta = rewardPerTokenStored.sub(userRewardPerTokenPaid[_user]);
+        uint256 pendingRewards = staked.mul(rewardPerTokenDelta).div(1e18); // Assuming rewardRate is scaled by 1e18
+
+        return userRewardBalance[_user].add(pendingRewards);
+    }
+
+    function getStakedAmount(address _user) public view returns (uint256) {
+        return userStakedAmount[_user];
+    }
+
+    function setRewardRate(uint256 _rewardRate) public onlyOwner {
+        // Update rewards for all users before changing the rate
+        _updateRewardPerToken();
+        rewardRate = _rewardRate;
+        lastUpdateTime = block.timestamp;
+    }
+
+    // Function to add funds to the staking contract (for rewards)
+    function addRewards() public onlyOwner {
+        // Transfer tokens from owner to this contract
+        // The amount to transfer should be handled externally or with a separate function
+        // This function is a placeholder to indicate where rewards are added.
+        // The actual transfer should be done by the owner calling stakingToken.transfer(address(this), amount)
+    }
+
+    // Emergency withdrawal for owner
+    function emergencyWithdraw() public onlyOwner {
+        uint256 balance = stakingToken.balanceOf(address(this));
+        require(balance > 0, "No balance to withdraw");
+        stakingToken.transfer(owner(), balance);
+    }
+
+    // Fallback function to receive Ether (if applicable, though not for ERC20 staking)
+    receive() external payable {}
+    fallback() external payable {}
+}

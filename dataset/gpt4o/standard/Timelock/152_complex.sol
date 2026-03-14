@@ -1,0 +1,104 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+
+contract TimelockController is AccessControl {
+    using EnumerableSet for EnumerableSet.Bytes32Set;
+
+    bytes32 public constant TIMELOCK_ADMIN_ROLE = keccak256("TIMELOCK_ADMIN_ROLE");
+    bytes32 public constant PROPOSER_ROLE = keccak256("PROPOSER_ROLE");
+    bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
+
+    uint256 public minDelay;
+
+    struct Operation {
+        uint256 timestamp;
+        address target;
+        uint256 value;
+        bytes data;
+        bytes32 predecessor;
+    }
+
+    mapping(bytes32 => Operation) private operations;
+    EnumerableSet.Bytes32Set private operationIds;
+
+    event CallScheduled(bytes32 indexed id, uint256 delay, bytes32 indexed predecessor);
+    event CallExecuted(bytes32 indexed id);
+
+    modifier onlyRole(bytes32 role) {
+        require(hasRole(role, msg.sender), "AccessControl: account is missing role");
+        _;
+    }
+
+    constructor(uint256 _minDelay) {
+        _setupRole(TIMELOCK_ADMIN_ROLE, msg.sender);
+        _setupRole(PROPOSER_ROLE, msg.sender);
+        _setupRole(EXECUTOR_ROLE, msg.sender);
+
+        minDelay = _minDelay;
+    }
+
+    function hashOperation(
+        address target,
+        uint256 value,
+        bytes calldata data,
+        bytes32 predecessor
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encode(target, value, data, predecessor));
+    }
+
+    function schedule(
+        address target,
+        uint256 value,
+        bytes calldata data,
+        bytes32 predecessor,
+        uint256 delay
+    ) external onlyRole(PROPOSER_ROLE) {
+        require(delay >= minDelay, "TimelockController: insufficient delay");
+
+        bytes32 id = hashOperation(target, value, data, predecessor);
+        require(!operationIds.contains(id), "TimelockController: operation already scheduled");
+
+        operations[id] = Operation(block.timestamp + delay, target, value, data, predecessor);
+        operationIds.add(id);
+
+        emit CallScheduled(id, delay, predecessor);
+    }
+
+    function execute(
+        address target,
+        uint256 value,
+        bytes calldata data,
+        bytes32 predecessor
+    ) external onlyRole(EXECUTOR_ROLE) {
+        bytes32 id = hashOperation(target, value, data, predecessor);
+        require(operationIds.contains(id), "TimelockController: operation not scheduled");
+        Operation storage op = operations[id];
+        require(op.timestamp <= block.timestamp, "TimelockController: operation locked");
+        require(predecessor == bytes32(0) || operationIds.contains(predecessor), "TimelockController: missing predecessor");
+
+        operationIds.remove(id);
+        delete operations[id];
+
+        (bool success, ) = target.call{value: value}(data);
+        require(success, "TimelockController: call failed");
+
+        emit CallExecuted(id);
+    }
+
+    function isOperationPending(bytes32 id) external view returns (bool) {
+        return operationIds.contains(id) && operations[id].timestamp > block.timestamp;
+    }
+
+    function isOperationReady(bytes32 id) external view returns (bool) {
+        return operationIds.contains(id) && operations[id].timestamp <= block.timestamp;
+    }
+
+    function isOperationDone(bytes32 id) external view returns (bool) {
+        return !operationIds.contains(id);
+    }
+
+    receive() external payable {}
+}

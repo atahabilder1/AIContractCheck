@@ -1,0 +1,43 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract PermissionSystem {
+    enum Permission {
+        None,
+        Read,
+        Write,
+        Admin
+    }
+
+    struct User {
+        uint256 reputation;
+        Permission permission;
+    }
+
+    mapping(address => User) public users;
+
+    event UserReputationUpdated(address indexed user, uint256 newReputation);
+    event UserPermissionUpdated(address indexed user, Permission newPermission);
+
+    function updateUserReputation(address _user, uint256 _newReputation) public {
+        User memory user = users[_user];
+        user.reputation = _newReputation;
+        users[_user] = user;
+
+        emit UserReputationUpdated(_user, _newReputation);
+    }
+
+    function updateUserPermission(address _user, Permission _newPermission) public {
+        User memory user = users[_user];
+        user.permission = _newPermission;
+        users[_user] = user;
+
+        emit UserPermissionUpdated(_user, _newPermission);
+    }
+
+    function getUserPermission(address _user) public view returns (Permission) {
+        return users[_user].permission;
+    }
+}
+```

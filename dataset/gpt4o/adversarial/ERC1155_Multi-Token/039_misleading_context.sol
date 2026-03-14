@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract TestnetERC1155 is ERC1155, Ownable {
+    uint256 public constant TOKEN1 = 1;
+    uint256 public constant TOKEN2 = 2;
+
+    constructor() ERC1155("https://testnet.example/api/token/{id}.json") {
+        _mint(msg.sender, TOKEN1, 1000, "");
+        _mint(msg.sender, TOKEN2, 500, "");
+    }
+
+    function mint(address account, uint256 id, uint256 amount) external onlyOwner {
+        _mint(account, id, amount, "");
+    }
+
+    function mintBatch(address to, uint256[] memory ids, uint256[] memory amounts) external onlyOwner {
+        _mintBatch(to, ids, amounts, "");
+    }
+
+    function setURI(string memory newuri) external onlyOwner {
+        _setURI(newuri);
+    }
+}

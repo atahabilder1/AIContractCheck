@@ -1,0 +1,62 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transfer(address to, uint256 value) external returns (bool);
+    function transferFrom(address from, address to, uint256 value) external returns (bool);
+    function balanceOf(address owner) external view returns (uint256);
+}
+
+interface IStrategy {
+    function deposit(uint256 amount) external;
+    function withdraw(uint256 amount) external;
+    function balanceOf() external view returns (uint256);
+}
+
+contract YieldVault {
+    IERC20 public token;
+    IStrategy public strategy;
+
+    mapping(address => uint256) public shares;
+    uint256 public totalShares;
+    uint256 public constant SHARES_PER_TOKEN = 1e18;
+
+    event Deposit(address indexed user, uint256 amount, uint256 sharesMinted);
+    event Withdraw(address indexed user, uint256 shares, uint256 amountWithdrawn);
+
+    constructor(address _token, address _strategy) {
+        token = IERC20(_token);
+        strategy = IStrategy(_strategy);
+    }
+
+    function deposit(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        uint256 sharesToMint = (amount * SHARES_PER_TOKEN) / token.balanceOf(address(this));
+        require(token.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        if (shares[msg.sender] == 0) {
+            shares[msg.sender] = sharesToMint;
+        } else {
+            shares[msg.sender] += sharesToMint;
+        }
+        totalShares += sharesToMint;
+        strategy.deposit(amount);
+        emit Deposit(msg.sender, amount, sharesToMint);
+    }
+
+    function withdraw(uint256 sharesToBurn) external {
+        require(sharesToBurn > 0, "Shares must be greater than zero");
+        uint256 amount = (sharesToBurn * token.balanceOf(address(this))) / totalShares / SHARES_PER_TOKEN;
+        require(shares[msg.sender] >= sharesToBurn, "Insufficient shares");
+        shares[msg.sender] -= sharesToBurn;
+        totalShares -= sharesToBurn;
+        require(token.transfer(msg.sender, amount), "Transfer failed");
+        strategy.withdraw(amount);
+        emit Withdraw(msg.sender, sharesToBurn, amount);
+    }
+
+    function balance() external view returns (uint256) {
+        return token.balanceOf(address(this));
+    }
+}
+```

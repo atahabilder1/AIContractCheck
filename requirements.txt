@@ -1,26 +1,27 @@
+# Core Security Analysis Tools
+slither-analyzer==0.11.5
+mythril==0.24.8
+semgrep==1.154.0
+
+# Solidity Compiler Management
+solc-select==1.2.0
+py-solc-x==1.1.1
+
 # LLM API Clients
-openai>=1.0.0
-anthropic>=0.18.0
-google-generativeai>=0.3.0
-
-# Local LLM Support
-transformers>=4.36.0
-torch>=2.0.0
-accelerate>=0.25.0
-
-# Security Analysis Tools
-slither-analyzer>=0.10.0
-mythril>=0.24.0
+openai==2.24.0
+anthropic==0.84.0
+google-generativeai==0.8.6
 
 # Data Processing & Analysis
-pandas>=2.0.0
-numpy>=1.24.0
-scipy>=1.10.0
+pandas==2.2.1
+numpy==1.26.4
+scipy==1.12.0
 
 # Visualization
-matplotlib>=3.7.0
-seaborn>=0.12.0
+matplotlib==3.8.3
+seaborn==0.13.2
 
 # Utilities
 python-dotenv>=1.0.0
-tqdm>=4.65.0
+tqdm==4.66.2
+web3==6.15.1

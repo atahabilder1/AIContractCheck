@@ -1,0 +1,61 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address public buyer;
+    address public seller;
+    uint256 public amount;
+    bool public released;
+    bool public refunded;
+
+    event Deposit(address indexed buyer, address indexed seller, uint256 amount);
+    event Release(address indexed seller, uint256 amount);
+    event Refund(address indexed buyer, uint256 amount);
+
+    modifier onlyBuyer() {
+        require(msg.sender == buyer, "Only buyer can perform this action");
+        _;
+    }
+
+    modifier onlySeller() {
+        require(msg.sender == seller, "Only seller can perform this action");
+        _;
+    }
+
+    modifier notReleasedOrRefunded() {
+        require(!released && !refunded, "Funds have already been released or refunded");
+        _;
+    }
+
+    constructor(address _buyer, address _seller, uint256 _amount) {
+        buyer = _buyer;
+        seller = _seller;
+        amount = _amount;
+    }
+
+    function deposit() public payable onlyBuyer notReleasedOrRefunded {
+        require(msg.value == amount, "Incorrect deposit amount");
+        emit Deposit(buyer, seller, amount);
+    }
+
+    function release() public onlySeller notReleasedOrRefunded {
+        require(msg.sender == seller, "Only seller can initiate release");
+        released = true;
+        payable(seller).transfer(amount);
+        emit Release(seller, amount);
+    }
+
+    function refund() public onlyBuyer notReleasedOrRefunded {
+        require(msg.sender == buyer, "Only buyer can initiate refund");
+        refunded = true;
+        payable(buyer).transfer(amount);
+        emit Refund(buyer, amount);
+    }
+
+    // Fallback function to receive Ether if someone sends it directly
+    receive() external payable {
+        // Optionally, you could add logic here to handle unexpected Ether,
+        // but for a simple escrow, it's often better to disallow direct sends.
+        // For this example, we'll just allow it but it won't be part of the escrow.
+    }
+}

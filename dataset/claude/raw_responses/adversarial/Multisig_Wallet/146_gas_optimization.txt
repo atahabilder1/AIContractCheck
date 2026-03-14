@@ -1,0 +1,100 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+contract MultisigWallet {
+    uint8 public immutable required;
+    uint8 public ownerCount;
+    uint256 public txCount;
+
+    mapping(address => bool) public isOwner;
+    mapping(uint256 => Transaction) public transactions;
+    mapping(uint256 => mapping(address => bool)) public confirmed;
+
+    struct Transaction {
+        address to;
+        uint256 value;
+        bytes data;
+        uint8 confirmations;
+        bool executed;
+    }
+
+    event Submit(uint256 indexed txId);
+    event Confirm(uint256 indexed txId, address indexed owner);
+    event Revoke(uint256 indexed txId, address indexed owner);
+    event Execute(uint256 indexed txId);
+    event Deposit(address indexed sender, uint256 value);
+
+    modifier onlyOwner() {
+        require(isOwner[msg.sender], "!owner");
+        _;
+    }
+
+    constructor(address[] memory _owners, uint8 _required) {
+        uint256 len = _owners.length;
+        require(len > 0 && len <= 20, "owners");
+        require(_required > 0 && _required <= len, "required");
+
+        for (uint256 i; i < len;) {
+            address o = _owners[i];
+            require(o != address(0) && !isOwner[o], "invalid");
+            isOwner[o] = true;
+            unchecked { ++i; }
+        }
+        ownerCount = uint8(len);
+        required = _required;
+    }
+
+    receive() external payable {
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function submit(address _to, uint256 _value, bytes calldata _data) external onlyOwner returns (uint256 txId) {
+        txId = txCount;
+        transactions[txId] = Transaction({
+            to: _to,
+            value: _value,
+            data: _data,
+            confirmations: 1,
+            executed: false
+        });
+        confirmed[txId][msg.sender] = true;
+        txCount = txId + 1;
+        emit Submit(txId);
+        emit Confirm(txId, msg.sender);
+    }
+
+    function confirm(uint256 _txId) external onlyOwner {
+        require(_txId < txCount, "!exist");
+        require(!confirmed[_txId][msg.sender], "dup");
+        Transaction storage t = transactions[_txId];
+        require(!t.executed, "done");
+
+        confirmed[_txId][msg.sender] = true;
+        unchecked { ++t.confirmations; }
+        emit Confirm(_txId, msg.sender);
+    }
+
+    function execute(uint256 _txId) external onlyOwner {
+        Transaction storage t = transactions[_txId];
+        require(!t.executed, "done");
+        require(t.confirmations >= required, "!quorum");
+
+        t.executed = true;
+        (bool ok,) = t.to.call{value: t.value}(t.data);
+        require(ok, "failed");
+        emit Execute(_txId);
+    }
+
+    function revoke(uint256 _txId) external onlyOwner {
+        require(_txId < txCount, "!exist");
+        require(confirmed[_txId][msg.sender], "!confirmed");
+        Transaction storage t = transactions[_txId];
+        require(!t.executed, "done");
+
+        confirmed[_txId][msg.sender] = false;
+        unchecked { --t.confirmations; }
+        emit Revoke(_txId, msg.sender);
+    }
+}
+```

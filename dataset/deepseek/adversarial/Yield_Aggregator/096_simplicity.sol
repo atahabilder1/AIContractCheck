@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
+
+interface IYieldSource {
+    function deposit(uint256 amount) external;
+    function withdraw(uint256 amount) external;
+    function balanceOf() external view returns (uint256);
+}
+
+contract YieldAggregator {
+    IERC20 public token;
+    IYieldSource public yieldSource;
+
+    constructor(address _token, address _yieldSource) {
+        token = IERC20(_token);
+        yieldSource = IYieldSource(_yieldSource);
+    }
+
+    function deposit(uint256 amount) external {
+        token.transferFrom(msg.sender, address(this), amount);
+        yieldSource.deposit(amount);
+    }
+
+    function withdraw(uint256 amount) external {
+        require(yieldSource.balanceOf() >= amount, "Insufficient balance");
+        yieldSource.withdraw(amount);
+        token.transfer(msg.sender, amount);
+    }
+
+    function getBalance() external view returns (uint256) {
+        return yieldSource.balanceOf();
+    }
+}

@@ -1,0 +1,94 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract LendingProtocol {
+    struct Collateral {
+        uint256 amount;
+        uint256 value; // in wei
+    }
+
+    struct Loan {
+        uint256 amount;
+        uint256 interestRate; // in basis points
+        uint256 lastAccrued;
+    }
+
+    struct Asset {
+        uint256 totalSupply;
+        uint256 totalBorrow;
+        uint256 reserveFactor;
+    }
+
+    address public admin;
+    mapping(address => mapping(address => Collateral)) public collaterals; // user => token => Collateral
+    mapping(address => mapping(address => Loan)) public loans; // user => token => Loan
+    mapping(address => Asset) public assets; // token => Asset
+
+    event DepositCollateral(address indexed user, address indexed token, uint256 amount);
+    event WithdrawCollateral(address indexed user, address indexed token, uint256 amount);
+    event Borrow(address indexed user, address indexed token, uint256 amount);
+    event Repay(address indexed user, address indexed token, uint256 amount);
+    event FlashLoan(address indexed borrower, address token, uint256 amount, uint256 fee);
+
+    constructor() {
+        admin = msg.sender;
+    }
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not admin");
+        _;
+    }
+
+    function depositCollateral(address token, uint256 amount) external {
+        // Transfer collateral to the contract
+        // Update the user's collateral balance
+        emit DepositCollateral(msg.sender, token, amount);
+    }
+
+    function withdrawCollateral(address token, uint256 amount) external {
+        // Check if user has enough collateral
+        // Transfer collateral back to user
+        emit WithdrawCollateral(msg.sender, token, amount);
+    }
+
+    function borrow(address token, uint256 amount) external {
+        // Check if user has enough collateral
+        // Calculate interest
+        // Transfer the borrowed amount to user
+        emit Borrow(msg.sender, token, amount);
+    }
+
+    function repay(address token, uint256 amount) external {
+        // Transfer repayment from user to contract
+        // Update user's loan balance
+        emit Repay(msg.sender, token, amount);
+    }
+
+    function flashLoan(address token, uint256 amount) external {
+        uint256 fee = (amount * 9) / 10000; // 0.09% fee
+        // Transfer amount to borrower
+        // Expect the borrower to repay amount + fee in the same transaction
+        emit FlashLoan(msg.sender, token, amount, fee);
+    }
+
+    function calculateInterestRate(address token) public view returns (uint256) {
+        Asset memory asset = assets[token];
+        uint256 utilization = (asset.totalBorrow * 1e18) / asset.totalSupply;
+        if (utilization < 50e16) {
+            return 10e16; // 10% interest rate
+        } else if (utilization < 90e16) {
+            return 20e16; // 20% interest rate
+        } else {
+            return 30e16; // 30% interest rate
+        }
+    }
+
+    function liquidate(address borrower, address token) external {
+        // Check if borrower is eligible for liquidation
+        // Transfer borrower's collateral to liquidator with bonus
+    }
+
+    function setReserveFactor(address token, uint256 reserveFactor) external onlyAdmin {
+        assets[token].reserveFactor = reserveFactor;
+    }
+}

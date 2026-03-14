@@ -1,0 +1,91 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+contract GasOptimizedEscrow {
+    address public owner;
+    mapping(uint => EscrowItem) public escrows;
+    uint public nextEscrowId;
+
+    struct EscrowItem {
+        address payable sender;
+        address payable recipient;
+        uint amount;
+        bool released;
+        bool cancelled;
+    }
+
+    event Deposited(uint escrowId, address sender, address recipient, uint amount);
+    event Released(uint escrowId, address recipient, uint amount);
+    event Cancelled(uint escrowId, address sender);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier onlySender(uint _escrowId) {
+        require(escrows[_escrowId].sender == msg.sender, "Not sender");
+        _;
+    }
+
+    modifier onlyRecipient(uint _escrowId) {
+        require(escrows[_escrowId].recipient == msg.sender, "Not recipient");
+        _;
+    }
+
+    modifier notReleased(uint _escrowId) {
+        require(!escrows[_escrowId].released, "Already released");
+        _;
+    }
+
+    modifier notCancelled(uint _escrowId) {
+        require(!escrows[_escrowId].cancelled, "Already cancelled");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function deposit(address payable _recipient) external payable {
+        require(msg.value > 0, "Deposit amount must be greater than 0");
+        uint escrowId = nextEscrowId++;
+        escrows[escrowId] = EscrowItem({
+            sender: payable(msg.sender),
+            recipient: _recipient,
+            amount: msg.value,
+            released: false,
+            cancelled: false
+        });
+        emit Deposited(escrowId, msg.sender, _recipient, msg.value);
+    }
+
+    function release(uint _escrowId) external onlyRecipient(_escrowId) notReleased(_escrowId) notCancelled(_escrowId) {
+        EscrowItem storage item = escrows[_escrowId];
+        uint amount = item.amount;
+        item.released = true;
+        (bool success, ) = item.recipient.call{value: amount}("");
+        require(success, "Transfer failed");
+        emit Released(_escrowId, item.recipient, amount);
+    }
+
+    function cancel(uint _escrowId) external onlySender(_escrowId) notReleased(_escrowId) notCancelled(_escrowId) {
+        EscrowItem storage item = escrows[_escrowId];
+        item.cancelled = true;
+        uint amount = item.amount;
+        // It's more gas efficient to send Ether back than to require the sender to withdraw.
+        (bool success, ) = item.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+        emit Cancelled(_escrowId, item.sender);
+    }
+
+    // Fallback function to receive Ether directly if needed (e.g., for owner to collect fees if implemented later)
+    // Not strictly necessary for core escrow functionality but can be useful.
+    receive() external payable {}
+
+    // Function to allow owner to withdraw any accidental sends to the contract
+    function withdrawEther(uint _amount) external onlyOwner {
+        (bool success, ) = owner.call{value: _amount}("");
+        require(success, "Withdrawal failed");
+    }
+}

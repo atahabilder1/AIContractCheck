@@ -1,0 +1,185 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+interface IStrategy {
+    function want() external view returns (address);
+    function deposit() external;
+    function withdraw(uint256 amount) external;
+    function balanceOf() external view returns (uint256);
+    function harvest() external;
+    function retireStrategy() external;
+    function emergencyWithdraw() external;
+}
+
+contract YieldAggregatorVault is ERC20, Ownable, ReentrancyGuard {
+    using SafeERC20for IERC20;
+
+    IERC20 public immutable want;
+    IStrategy public strategy;
+
+    uint256 public depositFee;
+    uint256 public withdrawalFee;
+    uint256 public constant MAX_FEE = 500; // 5%
+    uint256 public constant FEE_DENOMINATOR = 10000;
+
+    address public treasury;
+
+    event Deposit(address indexed user, uint256 amount, uint256 shares);
+    event Withdraw(address indexed user, uint256 amount, uint256 shares);
+    event StrategyUpdated(address indexed oldStrategy, address indexed newStrategy);
+    event FeesUpdated(uint256 depositFee, uint256 withdrawalFee);
+    event TreasuryUpdated(address indexed treasury);
+    event Harvest(address indexed caller);
+
+    constructor(
+        address _want,
+        string memory _name,
+        string memory _symbol,
+        address _treasury,
+        uint256 _depositFee,
+        uint256 _withdrawalFee
+    ) ERC20(_name, _symbol) Ownable(msg.sender) {
+        require(_want != address(0), "Invalid want");
+        require(_treasury != address(0), "Invalid treasury");
+        require(_depositFee <= MAX_FEE, "Deposit fee too high");
+        require(_withdrawalFee <= MAX_FEE, "Withdrawal fee too high");
+
+        want = IERC20(_want);
+        treasury = _treasury;
+        depositFee = _depositFee;
+        withdrawalFee = _withdrawalFee;
+    }
+
+    function balance() public view returns (uint256) {
+        uint256 vaultBalance = want.balanceOf(address(this));
+        uint256 strategyBalance = address(strategy) != address(0)
+            ? strategy.balanceOf()
+            : 0;
+        return vaultBalance + strategyBalance;
+    }
+
+    function pricePerShare() public view returns (uint256) {
+        uint256 supply = totalSupply();
+        if (supply == 0) return 1e18;
+        return (balance() * 1e18) / supply;
+    }
+
+    function deposit(uint256 _amount) external nonReentrant {
+        require(_amount > 0, "Deposit must be > 0");
+
+        uint256 poolBefore = balance();
+        want.safeTransferFrom(msg.sender, address(this), _amount);
+        uint256 deposited = balance() - poolBefore;
+
+        uint256 fee = 0;
+        if (depositFee > 0) {
+            fee = (deposited * depositFee) / FEE_DENOMINATOR;
+            want.safeTransfer(treasury, fee);
+            deposited -= fee;
+        }
+
+        uint256 shares = 0;
+        if (totalSupply() == 0) {
+            shares = deposited;
+        } else {
+            shares = (deposited * totalSupply()) / poolBefore;
+        }
+
+        _mint(msg.sender, shares);
+        _earn();
+
+        emit Deposit(msg.sender, deposited, shares);
+    }
+
+    function withdraw(uint256 _shares) external nonReentrant {
+        require(_shares > 0, "Shares must be > 0");
+        require(balanceOf(msg.sender) >= _shares, "Insufficient shares");
+
+        uint256 amount = (_shares * balance()) / totalSupply();
+        _burn(msg.sender, _shares);
+
+        uint256 vaultBalance = want.balanceOf(address(this));
+        if (vaultBalance < amount) {
+            uint256 toWithdraw = amount - vaultBalance;
+            if (address(strategy) != address(0)) {
+                strategy.withdraw(toWithdraw);
+            }
+            uint256 newBalance = want.balanceOf(address(this));
+            if (newBalance < amount) {
+                amount = newBalance;
+            }
+        }
+
+        uint256 fee = 0;
+        if (withdrawalFee > 0) {
+            fee = (amount * withdrawalFee) / FEE_DENOMINATOR;
+            want.safeTransfer(treasury, fee);
+            amount -= fee;
+        }
+
+        want.safeTransfer(msg.sender, amount);
+
+        emit Withdraw(msg.sender, amount, _shares);
+    }
+
+    function harvest() external {
+        require(address(strategy) != address(0), "No strategy");
+        strategy.harvest();
+        _earn();
+        emit Harvest(msg.sender);
+    }
+
+    function _earn() internal {
+        uint256 available = want.balanceOf(address(this));
+        if (available > 0 && address(strategy) != address(0)) {
+            want.safeTransfer(address(strategy), available);
+            strategy.deposit();
+        }
+    }
+
+    function setStrategy(address _strategy) external onlyOwner {
+        require(_strategy != address(0), "Invalid strategy");
+        require(IStrategy(_strategy).want() == address(want), "Wrong want token");
+
+        address oldStrategy = address(strategy);
+
+        if (oldStrategy != address(0)) {
+            strategy.retireStrategy();
+            uint256 bal = want.balanceOf(address(this));
+            require(bal >= balance() || bal > 0, "Strategy migration failed");
+        }
+
+        strategy = IStrategy(_strategy);
+        _earn();
+
+        emit StrategyUpdated(oldStrategy, _strategy);
+    }
+
+    function setFees(uint256 _depositFee, uint256 _withdrawalFee) external onlyOwner {
+        require(_depositFee <= MAX_FEE, "Deposit fee too high");
+        require(_withdrawalFee <= MAX_FEE, "Withdrawal fee too high");
+        depositFee = _depositFee;
+        withdrawalFee = _withdrawalFee;
+        emit FeesUpdated(_depositFee, _withdrawalFee);
+    }
+
+    function setTreasury(address _treasury) external onlyOwner {
+        require(_treasury != address(0), "Invalid treasury");
+        treasury = _treasury;
+        emit TreasuryUpdated(_treasury);
+    }
+
+    function inCaseTokensGetStuck(address _token) external onlyOwner {
+        require(_token != address(want), "Cannot withdraw want token");
+        uint256 amount = IERC20(_token).balanceOf(address(this));
+        IERC20(_token).safeTransfer(owner(), amount);
+    }
+}
+```

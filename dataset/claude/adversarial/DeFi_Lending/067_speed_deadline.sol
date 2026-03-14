@@ -1,0 +1,195 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+contract DeFiLending is ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
+    struct Market {
+        uint256 totalDeposits;
+        uint256 totalBorrows;
+        uint256 lastUpdateTime;
+        uint256 borrowIndex;
+        uint256 baseRate;
+        uint256 collateralFactor; // e.g. 75e16 = 75%
+    }
+
+    struct UserAccount {
+        uint256 deposited;
+        uint256 borrowed;
+        uint256 borrowIndex;
+    }
+
+    address public owner;
+    uint256 public constant PRECISION = 1e18;
+    uint256 public constant SECONDS_PER_YEAR = 365 days;
+    uint256 public liquidationIncentive = 108e16; // 8% bonus
+
+    mapping(address => Market) public markets;
+    mapping(address => mapping(address => UserAccount)) public accounts; // token => user => account
+    mapping(address => bool) public listedTokens;
+    address[] public tokenList;
+
+    // Simple price oracle (owner-set)
+    mapping(address => uint256) public prices; // token => price in USD (18 decimals)
+
+    event Deposit(address indexed user, address indexed token, uint256 amount);
+    event Withdraw(address indexed user, address indexed token, uint256 amount);
+    event Borrow(address indexed user, address indexed token, uint256 amount);
+    event Repay(address indexed user, address indexed token, uint256 amount);
+    event Liquidate(address indexed liquidator, address indexed borrower, address debtToken, address collateralToken, uint256 repayAmount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "not owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function listToken(address token, uint256 baseRate, uint256 collateralFactor, uint256 price) external onlyOwner {
+        require(!listedTokens[token], "already listed");
+        listedTokens[token] = true;
+        tokenList.push(token);
+        markets[token] = Market({
+            totalDeposits: 0,
+            totalBorrows: 0,
+            lastUpdateTime: block.timestamp,
+            borrowIndex: PRECISION,
+            baseRate: baseRate,
+            collateralFactor: collateralFactor
+        });
+        prices[token] = price;
+    }
+
+    function setPrice(address token, uint256 price) external onlyOwner {
+        prices[token] = price;
+    }
+
+    function _accrueInterest(address token) internal {
+        Market storage market = markets[token];
+        uint256 elapsed = block.timestamp - market.lastUpdateTime;
+        if (elapsed == 0 || market.totalBorrows == 0) {
+            market.lastUpdateTime = block.timestamp;
+            return;
+        }
+        uint256 utilization = market.totalBorrows * PRECISION / (market.totalDeposits + 1);
+        uint256 borrowRate = market.baseRate + utilization * 20e16 / PRECISION; // base + 20% * util
+        uint256 interest = market.totalBorrows * borrowRate * elapsed / (PRECISION * SECONDS_PER_YEAR);
+        market.totalBorrows += interest;
+        market.borrowIndex += market.borrowIndex * borrowRate * elapsed / (PRECISION * SECONDS_PER_YEAR);
+        market.lastUpdateTime = block.timestamp;
+    }
+
+    function deposit(address token, uint256 amount) external nonReentrant {
+        require(listedTokens[token], "not listed");
+        _accrueInterest(token);
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        accounts[token][msg.sender].deposited += amount;
+        markets[token].totalDeposits += amount;
+        emit Deposit(msg.sender, token, amount);
+    }
+
+    function withdraw(address token, uint256 amount) external nonReentrant {
+        require(listedTokens[token], "not listed");
+        _accrueInterest(token);
+        UserAccount storage acc = accounts[token][msg.sender];
+        require(acc.deposited >= amount, "insufficient deposit");
+        acc.deposited -= amount;
+        markets[token].totalDeposits -= amount;
+        require(_isHealthy(msg.sender), "undercollateralized");
+        IERC20(token).safeTransfer(msg.sender, amount);
+        emit Withdraw(msg.sender, token, amount);
+    }
+
+    function borrow(address token, uint256 amount) external nonReentrant {
+        require(listedTokens[token], "not listed");
+        _accrueInterest(token);
+        require(markets[token].totalDeposits - markets[token].totalBorrows >= amount, "insufficient liquidity");
+        UserAccount storage acc = accounts[token][msg.sender];
+        if (acc.borrowed == 0) {
+            acc.borrowIndex = markets[token].borrowIndex;
+        } else {
+            acc.borrowed = _currentBorrow(token, msg.sender);
+            acc.borrowIndex = markets[token].borrowIndex;
+        }
+        acc.borrowed += amount;
+        markets[token].totalBorrows += amount;
+        require(_isHealthy(msg.sender), "undercollateralized");
+        IERC20(token).safeTransfer(msg.sender, amount);
+        emit Borrow(msg.sender, token, amount);
+    }
+
+    function repay(address token, uint256 amount) external nonReentrant {
+        require(listedTokens[token], "not listed");
+        _accrueInterest(token);
+        UserAccount storage acc = accounts[token][msg.sender];
+        uint256 owed = _currentBorrow(token, msg.sender);
+        uint256 repayAmount = amount > owed ? owed : amount;
+        IERC20(token).safeTransferFrom(msg.sender, address(this), repayAmount);
+        acc.borrowed = owed - repayAmount;
+        acc.borrowIndex = markets[token].borrowIndex;
+        markets[token].totalBorrows -= repayAmount;
+        emit Repay(msg.sender, token, repayAmount);
+    }
+
+    function liquidate(address borrower, address debtToken, address collateralToken, uint256 repayAmount) external nonReentrant {
+        require(!_isHealthy(borrower), "borrower is healthy");
+        _accrueInterest(debtToken);
+        _accrueInterest(collateralToken);
+
+        uint256 owed = _currentBorrow(debtToken, borrower);
+        require(repayAmount <= owed / 2, "max 50% close");
+
+        IERC20(debtToken).safeTransferFrom(msg.sender, address(this), repayAmount);
+
+        UserAccount storage debtAcc = accounts[debtToken][borrower];
+        debtAcc.borrowed = owed - repayAmount;
+        debtAcc.borrowIndex = markets[debtToken].borrowIndex;
+        markets[debtToken].totalBorrows -= repayAmount;
+
+        uint256 seizeValue = repayAmount * prices[debtToken] * liquidationIncentive / (prices[collateralToken] * PRECISION);
+        UserAccount storage collAcc = accounts[collateralToken][borrower];
+        require(collAcc.deposited >= seizeValue, "insufficient collateral");
+        collAcc.deposited -= seizeValue;
+        markets[collateralToken].totalDeposits -= seizeValue;
+
+        IERC20(collateralToken).safeTransfer(msg.sender, seizeValue);
+        emit Liquidate(msg.sender, borrower, debtToken, collateralToken, repayAmount);
+    }
+
+    function _currentBorrow(address token, address user) internal view returns (uint256) {
+        UserAccount storage acc = accounts[token][user];
+        if (acc.borrowed == 0) return 0;
+        return acc.borrowed * markets[token].borrowIndex / acc.borrowIndex;
+    }
+
+    function _isHealthy(address user) internal view returns (bool) {
+        uint256 totalCollateralValue;
+        uint256 totalBorrowValue;
+        for (uint256 i = 0; i < tokenList.length; i++) {
+            address token = tokenList[i];
+            uint256 dep = accounts[token][user].deposited;
+            uint256 bor = _currentBorrow(token, user);
+            if (dep > 0) {
+                totalCollateralValue += dep * prices[token] * markets[token].collateralFactor / PRECISION;
+            }
+            if (bor > 0) {
+                totalBorrowValue += bor * prices[token];
+            }
+        }
+        return totalCollateralValue >= totalBorrowValue;
+    }
+
+    function getAccountHealth(address user) external view returns (uint256 collateral, uint256 debt) {
+        for (uint256 i = 0; i < tokenList.length; i++) {
+            address token = tokenList[i];
+            collateral += accounts[token][user].deposited * prices[token] * markets[token].collateralFactor / PRECISION;
+            debt += _currentBorrow(token, user) * prices[token];
+        }
+    }
+}

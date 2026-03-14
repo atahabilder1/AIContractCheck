@@ -1,0 +1,58 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/governance/Governor.sol";
+import "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol";
+import "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
+import "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
+import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
+
+contract GovernanceToken is ERC20, Ownable {
+    constructor() ERC20("GovernanceToken", "GTK") {
+        _mint(msg.sender, 1000000 * 10**uint(decimals()));
+    }
+}
+
+contract DAO is Governor, GovernorSettings, GovernorVotes, GovernorVotesQuorumFraction, GovernorCountingSimple, Ownable {
+    GovernanceToken public token;
+
+    constructor(
+        GovernanceToken _token,
+        uint256 initialVotingDelay,
+        uint256 initialVotingPeriod,
+        uint256 initialProposalThreshold,
+        uint256 quorumFraction_
+    ) Governor("GovernorDAO") GovernorSettings(initialVotingDelay, initialVotingPeriod, initialProposalThreshold) GovernorVotes(_token) GovernorVotesQuorumFraction(quorumFraction_) {
+        token = _token;
+    }
+
+    function votingPower(uint256 blockNumber, address account) public view override(IGovernor, GovernorVotes) returns (uint256) {
+        return super.votingPower(blockNumber, account);
+    }
+
+    function propose(address[] memory targets, uint256[] memory values, bytes[] memory calldatas, string memory description) public override(Governor, IGovernor) returns (uint256) {
+        return super.propose(targets, values, calldatas, description);
+    }
+
+    function execute(uint256 proposalId) public payable override(Governor, IGovernor) {
+        super.execute(proposalId);
+    }
+
+    function cancel(address[] memory targets, uint256[] memory values, bytes[] memory calldatas, bytes32 descriptionHash) public override(Governor, IGovernor) returns (uint256) {
+        return super.cancel(targets, values, calldatas, descriptionHash);
+    }
+
+    function vote(uint256 proposalId, uint8 support) public override(Governor, IGovernor) {
+        super.vote(proposalId, support);
+    }
+
+    function getVotes(address account, uint256 blockNumber) public view override(GovernorVotes, IGovernorVotes) returns (uint256) {
+        return super.getVotes(account, blockNumber);
+    }
+
+    function state(uint256 proposalId) public view override(Governor, GovernorSettings, GovernorVotes, GovernorVotesQuorumFraction, GovernorCountingSimple) returns (ProposalState) {
+        return super.state(proposalId);
+    }
+}

@@ -1,0 +1,36 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract TokenBridge {
+    address public admin;
+    mapping(address => uint256) public lockedTokens;
+
+    event Lock(address indexed sender, uint256 amount);
+    event Mint(address indexed recipient, uint256 amount);
+
+    constructor() {
+        admin = msg.sender;
+    }
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin can call this function");
+        _;
+    }
+
+    function lockTokens(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        lockedTokens[msg.sender] += amount;
+        emit Lock(msg.sender, amount);
+    }
+
+    function mintTokens(address recipient, uint256 amount) external onlyAdmin {
+        require(amount > 0, "Amount must be greater than zero");
+        emit Mint(recipient, amount);
+    }
+
+    function getLockedTokens(address user) external view returns (uint256) {
+        return lockedTokens[user];
+    }
+}
+```

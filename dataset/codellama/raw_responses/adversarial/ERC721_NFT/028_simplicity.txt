@@ -1,0 +1,21 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MyNFT is ERC721 {
+    constructor() ERC721("MyNFT", "MNT") {}
+
+    function mint(address to, uint256 tokenId) public {
+        _mint(to, tokenId);
+    }
+
+    function burn(uint256 tokenId) public {
+        _burn(tokenId);
+    }
+
+    function ownerOf(uint256 tokenId) public view returns (address) {
+        return _ownerOf(tokenId);
+    }
+}
+```
+Note: This code is a minimal example and does not include any error handling or other features. It is intended to demonstrate the basic functionality of an ERC721 NFT contract.

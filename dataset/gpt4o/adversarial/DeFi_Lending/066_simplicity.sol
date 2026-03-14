@@ -1,0 +1,57 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleLending {
+    mapping(address => uint256) public deposits;
+    mapping(address => uint256) public borrowings;
+    uint256 public totalDeposits;
+    uint256 public totalBorrowings;
+    uint256 public interestRate = 5; // 5% interest rate
+
+    event Deposit(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
+    event Borrow(address indexed user, uint256 amount);
+    event Repay(address indexed user, uint256 amount);
+
+    function deposit() external payable {
+        require(msg.value > 0, "Deposit amount must be greater than zero");
+        deposits[msg.sender] += msg.value;
+        totalDeposits += msg.value;
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function withdraw(uint256 _amount) external {
+        require(deposits[msg.sender] >= _amount, "Insufficient balance");
+        deposits[msg.sender] -= _amount;
+        totalDeposits -= _amount;
+        payable(msg.sender).transfer(_amount);
+        emit Withdraw(msg.sender, _amount);
+    }
+
+    function borrow(uint256 _amount) external {
+        require(_amount > 0, "Borrow amount must be greater than zero");
+        require(totalDeposits >= totalBorrowings + _amount, "Not enough liquidity");
+        borrowings[msg.sender] += _amount;
+        totalBorrowings += _amount;
+        payable(msg.sender).transfer(_amount);
+        emit Borrow(msg.sender, _amount);
+    }
+
+    function repay() external payable {
+        require(msg.value > 0, "Repay amount must be greater than zero");
+        uint256 interest = (borrowings[msg.sender] * interestRate) / 100;
+        require(msg.value >= borrowings[msg.sender] + interest, "Insufficient repay amount");
+
+        borrowings[msg.sender] = 0;
+        totalBorrowings -= msg.value - interest;
+        emit Repay(msg.sender, msg.value);
+    }
+
+    function getBalance() external view returns (uint256) {
+        return deposits[msg.sender];
+    }
+
+    function getBorrowing() external view returns (uint256) {
+        return borrowings[msg.sender];
+    }
+}

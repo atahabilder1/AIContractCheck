@@ -1,0 +1,249 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract DeFiLending {
+    address public owner;
+    uint256 public interestRatePerBlock; // Interest rate per block (in basis points, e.g., 1 = 0.01%)
+    uint256 public collateralFactor; // Collateral factor in basis points (e.g., 7500 = 75%)
+    uint256 public liquidationThreshold; // Liquidation threshold in basis points (e.g., 8500 = 85%)
+    uint256 public liquidationBonus; // Bonus for liquidators in basis points (e.g., 500 = 5%)
+    uint256 public totalDeposits;
+    uint256 public totalBorrows;
+    uint256 public lastAccrualBlock;
+    uint256 public borrowIndex;
+
+    struct UserAccount {
+        uint256 deposited;
+        uint256 borrowed;
+        uint256 borrowIndex;
+        uint256 collateral;
+    }
+
+    mapping(address => UserAccount) public accounts;
+
+    event Deposit(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
+    event DepositCollateral(address indexed user, uint256 amount);
+    event WithdrawCollateral(address indexed user, uint256 amount);
+    event Borrow(address indexed user, uint256 amount);
+    event Repay(address indexed user, uint256 amount);
+    event Liquidate(address indexed liquidator, address indexed borrower, uint256 repayAmount, uint256 collateralSeized);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    constructor(
+        uint256 _interestRatePerBlock,
+        uint256 _collateralFactor,
+        uint256 _liquidationThreshold,
+        uint256 _liquidationBonus
+    ) {
+        owner = msg.sender;
+        interestRatePerBlock = _interestRatePerBlock;
+        collateralFactor = _collateralFactor;
+        liquidationThreshold = _liquidationThreshold;
+        liquidationBonus = _liquidationBonus;
+        borrowIndex = 1e18;
+        lastAccrualBlock = block.number;
+    }
+
+    function accrueInterest() public {
+        uint256 blockDelta = block.number - lastAccrualBlock;
+        if (blockDelta == 0) return;
+
+        if (totalBorrows > 0) {
+            uint256 interestAccumulated = (totalBorrows * interestRatePerBlock * blockDelta) / 10000;
+            totalBorrows += interestAccumulated;
+            borrowIndex += (borrowIndex * interestRatePerBlock * blockDelta) / 10000;
+        }
+
+        lastAccrualBlock = block.number;
+    }
+
+    function deposit() external payable {
+        require(msg.value > 0, "Amount must be > 0");
+        accrueInterest();
+
+        accounts[msg.sender].deposited += msg.value;
+        totalDeposits += msg.value;
+
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function withdraw(uint256 amount) external {
+        accrueInterest();
+        UserAccount storage account = accounts[msg.sender];
+
+        require(account.deposited >= amount, "Insufficient deposits");
+        require(address(this).balance >= amount, "Insufficient liquidity");
+
+        account.deposited -= amount;
+        totalDeposits -= amount;
+
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+
+        emit Withdraw(msg.sender, amount);
+    }
+
+    function depositCollateral() external payable {
+        require(msg.value > 0, "Amount must be > 0");
+
+        accounts[msg.sender].collateral += msg.value;
+
+        emit DepositCollateral(msg.sender, msg.value);
+    }
+
+    function withdrawCollateral(uint256 amount) external {
+        accrueInterest();
+        UserAccount storage account = accounts[msg.sender];
+
+        require(account.collateral >= amount, "Insufficient collateral");
+
+        uint256 newCollateral = account.collateral - amount;
+        uint256 borrowedWithInterest = currentBorrowBalance(msg.sender);
+
+        if (borrowedWithInterest > 0) {
+            uint256 minCollateral = (borrowedWithInterest * 10000) / collateralFactor;
+            require(newCollateral >= minCollateral, "Would undercollateralize loan");
+        }
+
+        account.collateral -= amount;
+
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+
+        emit WithdrawCollateral(msg.sender, amount);
+    }
+
+    function borrow(uint256 amount) external {
+        accrueInterest();
+        UserAccount storage account = accounts[msg.sender];
+
+        require(address(this).balance >= amount, "Insufficient liquidity");
+
+        uint256 borrowedWithInterest = currentBorrowBalance(msg.sender);
+        uint256 totalBorrow = borrowedWithInterest + amount;
+        uint256 maxBorrow = (account.collateral * collateralFactor) / 10000;
+        require(totalBorrow <= maxBorrow, "Exceeds borrow limit");
+
+        if (account.borrowed == 0) {
+            account.borrowIndex = borrowIndex;
+        }
+
+        account.borrowed = totalBorrow;
+        account.borrowIndex = borrowIndex;
+        totalBorrows += amount;
+
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+
+        emit Borrow(msg.sender, amount);
+    }
+
+    function repay() external payable {
+        require(msg.value > 0, "Amount must be > 0");
+        accrueInterest();
+
+        UserAccount storage account = accounts[msg.sender];
+        uint256 owed = currentBorrowBalance(msg.sender);
+        require(owed > 0, "No outstanding borrow");
+
+        uint256 repayAmount = msg.value > owed ? owed : msg.value;
+
+        account.borrowed = owed - repayAmount;
+        account.borrowIndex = borrowIndex;
+
+        if (totalBorrows >= repayAmount) {
+            totalBorrows -= repayAmount;
+        } else {
+            totalBorrows = 0;
+        }
+
+        if (msg.value > repayAmount) {
+            uint256 refund = msg.value - repayAmount;
+            (bool success, ) = msg.sender.call{value: refund}("");
+            require(success, "Refund failed");
+        }
+
+        emit Repay(msg.sender, repayAmount);
+    }
+
+    function liquidate(address borrower) external payable {
+        require(msg.value > 0, "Amount must be > 0");
+        require(borrower != msg.sender, "Cannot self-liquidate");
+        accrueInterest();
+
+        UserAccount storage borrowerAccount = accounts[borrower];
+        uint256 owed = currentBorrowBalance(borrower);
+        require(owed > 0, "No outstanding borrow");
+
+        uint256 collateralRequired = (owed * 10000) / liquidationThreshold;
+        require(borrowerAccount.collateral < collateralRequired, "Account not liquidatable");
+
+        uint256 maxRepay = owed / 2;
+        uint256 repayAmount = msg.value > maxRepay ? maxRepay : msg.value;
+
+        uint256 collateralSeized = (repayAmount * (10000 + liquidationBonus)) / 10000;
+        if (collateralSeized > borrowerAccount.collateral) {
+            collateralSeized = borrowerAccount.collateral;
+        }
+
+        borrowerAccount.borrowed = owed - repayAmount;
+        borrowerAccount.borrowIndex = borrowIndex;
+        borrowerAccount.collateral -= collateralSeized;
+
+        if (totalBorrows >= repayAmount) {
+            totalBorrows -= repayAmount;
+        } else {
+            totalBorrows = 0;
+        }
+
+        (bool success, ) = msg.sender.call{value: collateralSeized}("");
+        require(success, "Collateral transfer failed");
+
+        if (msg.value > repayAmount) {
+            uint256 refund = msg.value - repayAmount;
+            (bool refundSuccess, ) = msg.sender.call{value: refund}("");
+            require(refundSuccess, "Refund failed");
+        }
+
+        emit Liquidate(msg.sender, borrower, repayAmount, collateralSeized);
+    }
+
+    function currentBorrowBalance(address user) public view returns (uint256) {
+        UserAccount storage account = accounts[user];
+        if (account.borrowed == 0) return 0;
+        return (account.borrowed * borrowIndex) / account.borrowIndex;
+    }
+
+    function getHealthFactor(address user) external view returns (uint256) {
+        uint256 owed = currentBorrowBalance(user);
+        if (owed == 0) return type(uint256).max;
+
+        uint256 collateralValue = (accounts[user].collateral * liquidationThreshold) / 10000;
+        return (collateralValue * 1e18) / owed;
+    }
+
+    function setInterestRate(uint256 _rate) external onlyOwner {
+        accrueInterest();
+        interestRatePerBlock = _rate;
+    }
+
+    function getAccountSummary(address user) external view returns (
+        uint256 deposited,
+        uint256 collateral,
+        uint256 borrowed,
+        uint256 borrowLimit
+    ) {
+        UserAccount storage account = accounts[user];
+        deposited = account.deposited;
+        collateral = account.collateral;
+        borrowed = currentBorrowBalance(user);
+        borrowLimit = (collateral * collateralFactor) / 10000;
+    }
+
+    receive() external payable {}
+}

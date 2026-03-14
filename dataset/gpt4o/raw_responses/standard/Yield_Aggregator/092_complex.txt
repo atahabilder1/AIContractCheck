@@ -1,0 +1,108 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IStrategy {
+    function deposit(uint256 amount) external;
+    function withdraw(uint256 amount) external returns (uint256);
+    function harvest() external;
+    function balanceOf() external view returns (uint256);
+}
+
+contract MultiStrategyYieldVault {
+    struct StrategyInfo {
+        IStrategy strategy;
+        uint256 allocation;
+    }
+
+    StrategyInfo[] public strategies;
+    uint256 public totalAllocation;
+    address public governance;
+    uint256 public performanceFee = 200; // 2%
+    uint256 public constant MAX_FEE = 10000; // 100%
+    mapping(address => uint256) public balances;
+    uint256 public totalDeposits;
+
+    event Deposit(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
+    event Harvest(address indexed strategy, uint256 harvestedAmount);
+    event EmergencyWithdrawal(address indexed strategy, uint256 amount);
+
+    modifier onlyGovernance() {
+        require(msg.sender == governance, "Not governance");
+        _;
+    }
+
+    constructor(address _governance) {
+        governance = _governance;
+    }
+
+    function addStrategy(IStrategy _strategy, uint256 _allocation) external onlyGovernance {
+        strategies.push(StrategyInfo({
+            strategy: _strategy,
+            allocation: _allocation
+        }));
+        totalAllocation += _allocation;
+    }
+
+    function setPerformanceFee(uint256 _performanceFee) external onlyGovernance {
+        require(_performanceFee <= MAX_FEE, "Fee too high");
+        performanceFee = _performanceFee;
+    }
+
+    function deposit(uint256 _amount) external {
+        require(_amount > 0, "Invalid amount");
+        balances[msg.sender] += _amount;
+        totalDeposits += _amount;
+        _allocateFunds(_amount);
+        emit Deposit(msg.sender, _amount);
+    }
+
+    function withdraw(uint256 _amount) external {
+        require(balances[msg.sender] >= _amount, "Insufficient balance");
+        balances[msg.sender] -= _amount;
+        totalDeposits -= _amount;
+        uint256 withdrawn = _withdrawFunds(_amount);
+        emit Withdraw(msg.sender, withdrawn);
+    }
+
+    function harvest() external {
+        for (uint256 i = 0; i < strategies.length; i++) {
+            StrategyInfo storage stratInfo = strategies[i];
+            uint256 beforeBalance = stratInfo.strategy.balanceOf();
+            stratInfo.strategy.harvest();
+            uint256 harvested = stratInfo.strategy.balanceOf() - beforeBalance;
+
+            if (harvested > 0) {
+                uint256 fee = (harvested * performanceFee) / MAX_FEE;
+                emit Harvest(address(stratInfo.strategy), harvested);
+            }
+        }
+    }
+
+    function emergencyWithdraw() external onlyGovernance {
+        for (uint256 i = 0; i < strategies.length; i++) {
+            StrategyInfo storage stratInfo = strategies[i];
+            uint256 withdrawn = stratInfo.strategy.withdraw(stratInfo.strategy.balanceOf());
+            emit EmergencyWithdrawal(address(stratInfo.strategy), withdrawn);
+        }
+    }
+
+    function _allocateFunds(uint256 _amount) internal {
+        for (uint256 i = 0; i < strategies.length; i++) {
+            StrategyInfo storage stratInfo = strategies[i];
+            uint256 allocationAmount = (_amount * stratInfo.allocation) / totalAllocation;
+            stratInfo.strategy.deposit(allocationAmount);
+        }
+    }
+
+    function _withdrawFunds(uint256 _amount) internal returns (uint256 totalWithdrawn) {
+        for (uint256 i = 0; i < strategies.length; i++) {
+            StrategyInfo storage stratInfo = strategies[i];
+            uint256 strategyBalance = stratInfo.strategy.balanceOf();
+            uint256 withdrawAmount = (_amount * strategyBalance) / totalDeposits;
+            totalWithdrawn += stratInfo.strategy.withdraw(withdrawAmount);
+        }
+    }
+}
+```

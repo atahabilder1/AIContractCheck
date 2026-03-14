@@ -1,0 +1,57 @@
+pragma solidity ^0.6.0;
+
+contract Crowdfunding {
+    address public admin;
+    uint public fundingGoal;
+    uint public deadline;
+    mapping (address => uint) public contributions;
+    bool public isPaused;
+
+    constructor (uint _fundingGoal, uint _deadline) public {
+        admin = msg.sender;
+        fundingGoal = _fundingGoal;
+        deadline = _deadline;
+        isPaused = false;
+    }
+
+    function contribute() public payable {
+        require(msg.value > 0, "Invalid contribution amount");
+        contributions[msg.sender] += msg.value;
+    }
+
+    function withdraw() public {
+        require(msg.sender == admin, "Only the admin can withdraw");
+        require(isPaused == false, "Cannot withdraw while paused");
+        require(block.timestamp >= deadline, "Cannot withdraw before deadline");
+        require(address(this).balance >= fundingGoal, "Cannot withdraw before funding goal is met");
+        admin.transfer(address(this).balance);
+    }
+
+    function emergencyWithdraw() public {
+        require(msg.sender == admin, "Only the admin can withdraw");
+        require(isPaused == false, "Cannot withdraw while paused");
+        require(block.timestamp >= deadline, "Cannot withdraw before deadline");
+        require(address(this).balance >= fundingGoal, "Cannot withdraw before funding goal is met");
+        admin.transfer(address(this).balance);
+    }
+
+    function pause() public {
+        require(msg.sender == admin, "Only the admin can pause");
+        isPaused = true;
+    }
+
+    function unpause() public {
+        require(msg.sender == admin, "Only the admin can unpause");
+        isPaused = false;
+    }
+}
+```
+This contract has the following functions:
+
+* `contribute()`: Allows users to contribute Ether to the crowdfunding campaign.
+* `withdraw()`: Allows the admin to withdraw the collected Ether.
+* `emergencyWithdraw()`: Allows the admin to withdraw the collected Ether in case of an emergency.
+* `pause()`: Allows the admin to pause the crowdfunding campaign.
+* `unpause()`: Allows the admin to unpause the crowdfunding campaign.
+
+Note that the `emergencyWithdraw()` function is only available if the `isPaused` variable is set to `false`, and the `pause()` and `unpause()` functions are only available if the `isPaused` variable is set to `true`. This is to prevent the admin from withdrawing the collected Ether during the crowdfunding campaign.

@@ -1,0 +1,31 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract YieldAggregator {
+    address public owner;
+    uint256 public totalSupply;
+    mapping(address => uint256) public balances;
+
+    constructor() public {
+        owner = msg.sender;
+        totalSupply = 0;
+    }
+
+    function add(uint256 _amount) public {
+        require(msg.sender == owner, "Only the owner can add yield");
+        balances[msg.sender] += _amount;
+        totalSupply += _amount;
+    }
+
+    function remove(uint256 _amount) public {
+        require(msg.sender == owner, "Only the owner can remove yield");
+        require(balances[msg.sender] >= _amount, "Insufficient balance");
+        balances[msg.sender] -= _amount;
+        totalSupply -= _amount;
+    }
+}
+```
+This is a minimal viable Yield Aggregator contract in Solidity with only the core functionality. It allows the owner to add and remove yield, and tracks the total supply of yield and the balance of each address.
+
+Note: This contract is for demonstration purposes only and does not include any security features such as access control or input validation. In a production environment, it is important to include these features to prevent potential security vulnerabilities.

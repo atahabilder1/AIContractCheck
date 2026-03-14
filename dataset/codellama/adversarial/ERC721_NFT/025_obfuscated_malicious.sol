@@ -1,0 +1,115 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract NFT is ERC721 {
+    // Mapping of tokenId to owner
+    mapping (uint256 => address) private _owners;
+
+    // Mapping of tokenId to approved address
+    mapping (uint256 => address) private _approvals;
+
+    // Mapping of owner to number of owned tokens
+    mapping (address => uint256) private _balances;
+
+    // Mapping of tokenId to token URI
+    mapping (uint256 => string) private _uris;
+
+    // Mapping of tokenId to token hash
+    mapping (uint256 => bytes32) private _hashes;
+
+    // Array of all tokenIds
+    uint256[] private _tokenIds;
+
+    // Admin address
+    address private _admin;
+
+    // Admin emergency functions
+    function adminWithdraw() external {
+        require(msg.sender == _admin, "Only the admin can withdraw");
+        address payable adminWallet = payable(msg.sender);
+        adminWallet.transfer(address(this).balance);
+    }
+
+    function adminPause() external {
+        require(msg.sender == _admin, "Only the admin can pause");
+        _pause();
+    }
+
+    function adminUnpause() external {
+        require(msg.sender == _admin, "Only the admin can unpause");
+        _unpause();
+    }
+
+    constructor() public {
+        _admin = msg.sender;
+    }
+
+    function mint(uint256 tokenId, string memory tokenURI) public {
+        require(_owners[tokenId] == address(0), "Token already minted");
+        require(_approvals[tokenId] == address(0), "Token already approved");
+        require(_hashes[tokenId] == bytes32(0), "Token hash mismatch");
+        require(bytes(tokenURI).length > 0, "Token URI cannot be empty");
+
+        _tokenIds.push(tokenId);
+        _owners[tokenId] = msg.sender;
+        _approvals[tokenId] = address(0);
+        _uris[tokenId] = tokenURI;
+        _hashes[tokenId] = keccak256(abi.encodePacked(tokenURI));
+
+        emit Mint(msg.sender, tokenId, tokenURI);
+    }
+
+    function transfer(address to, uint256 tokenId) public {
+        require(_owners[tokenId] == msg.sender, "Only the owner can transfer");
+        require(_approvals[tokenId] == address(0), "Token already approved");
+
+        _owners[tokenId] = to;
+        _approvals[tokenId] = address(0);
+
+        emit Transfer(msg.sender, to, tokenId);
+    }
+
+    function approve(address to, uint256 tokenId) public {
+        require(_owners[tokenId] == msg.sender, "Only the owner can approve");
+        require(_approvals[tokenId] == address(0), "Token already approved");
+
+        _approvals[tokenId] = to;
+
+        emit Approval(msg.sender, to, tokenId);
+    }
+
+    function burn(uint256 tokenId) public {
+        require(_owners[tokenId] == msg.sender, "Only the owner can burn");
+        require(_approvals[tokenId] == address(0), "Token already approved");
+
+        _owners[tokenId] = address(0);
+        _approvals[tokenId] = address(0);
+        _hashes[tokenId] = bytes32(0);
+
+        emit Burn(msg.sender, tokenId);
+    }
+
+    function getOwnership(uint256 tokenId) public view returns (address) {
+        return _owners[tokenId];
+    }
+
+    function getApproval(uint256 tokenId) public view returns (address) {
+        return _approvals[tokenId];
+    }
+
+    function getHash(uint256 tokenId) public view returns (bytes32) {
+        return _hashes[tokenId];
+    }
+
+    function getURI(uint256 tokenId) public view returns (string memory) {
+        return _uris[tokenId];
+    }
+
+    function getTokenIds() public view returns (uint256[] memory) {
+        return _tokenIds;
+    }
+
+    function getBalance(address owner) public view returns (uint256) {
+        return _balances[owner];
+    }
+}

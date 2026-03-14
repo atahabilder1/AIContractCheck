@@ -1,0 +1,51 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    // Chain ID of the source chain
+    uint public sourceChainId;
+    // Chain ID of the destination chain
+    uint public destinationChainId;
+
+    // Mapping of source chain IDs to their corresponding contract addresses
+    mapping(uint => address) public sourceChainIdToContractAddress;
+    // Mapping of destination chain IDs to their corresponding contract addresses
+    mapping(uint => address) public destinationChainIdToContractAddress;
+
+    // Event for when a new chain is added
+    event NewChainAdded(uint chainId, address contractAddress);
+
+    // Modifier to restrict access to the owner of the contract
+    modifier onlyOwner {
+        require(msg.sender == address(this), "Only the owner can call this function");
+        _;
+    }
+
+    constructor(uint _sourceChainId, uint _destinationChainId) public {
+        sourceChainId = _sourceChainId;
+        destinationChainId = _destinationChainId;
+    }
+
+    // Function to add a new chain to the bridge
+    function addChain(uint _chainId, address _contractAddress) public onlyOwner {
+        require(_chainId != sourceChainId && _chainId != destinationChainId, "Cannot add the source or destination chain");
+        require(_contractAddress != address(0), "Invalid contract address");
+        sourceChainIdToContractAddress[_chainId] = _contractAddress;
+        destinationChainIdToContractAddress[_chainId] = _contractAddress;
+        emit NewChainAdded(_chainId, _contractAddress);
+    }
+
+    // Function to remove a chain from the bridge
+    function removeChain(uint _chainId) public onlyOwner {
+        require(_chainId != sourceChainId && _chainId != destinationChainId, "Cannot remove the source or destination chain");
+        delete sourceChainIdToContractAddress[_chainId];
+        delete destinationChainIdToContractAddress[_chainId];
+    }
+
+    // Function to retrieve the contract address of a chain
+    function getChainContractAddress(uint _chainId) public view returns (address) {
+        return sourceChainIdToContractAddress[_chainId];
+    }
+}
+```

@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IUpgradable {
+    function initialize(address owner) external;
+    function upgrade(address newImplementation) external;
+}
+
+contract Upgradable is IUpgradable {
+    address public owner;
+    address public implementation;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    function initialize(address _owner) external override {
+        require(owner == address(0), "Already initialized");
+        owner = _owner;
+    }
+
+    function upgrade(address newImplementation) external override onlyOwner {
+        implementation = newImplementation;
+    }
+
+    fallback() external {
+        require(implementation != address(0), "Implementation not set");
+        (bool success, ) = implementation.delegatecall(msg.data);
+        require(success, "Delegate call failed");
+    }
+}

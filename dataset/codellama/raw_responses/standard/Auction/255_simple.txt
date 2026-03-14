@@ -1,0 +1,36 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract EnglishAuction {
+  address payable public owner;
+  uint public startingPrice;
+  uint public biddingTime;
+  uint public highestBid;
+  address payable public highestBidder;
+  mapping(address => uint) public bids;
+
+  constructor(uint _startingPrice, uint _biddingTime) public {
+    owner = msg.sender;
+    startingPrice = _startingPrice;
+    biddingTime = _biddingTime;
+    highestBid = startingPrice;
+  }
+
+  function bid() public payable {
+    require(msg.value >= bids[msg.sender] + startingPrice, "Not enough funds");
+    bids[msg.sender] = msg.value;
+    if (msg.value > highestBid) {
+      highestBid = msg.value;
+      highestBidder = msg.sender;
+    }
+  }
+
+  function withdraw() public {
+    require(msg.sender == owner, "Only the owner can withdraw");
+    address payable winner = highestBidder;
+    winner.transfer(highestBid);
+    selfdestruct(address(this));
+  }
+}
+```

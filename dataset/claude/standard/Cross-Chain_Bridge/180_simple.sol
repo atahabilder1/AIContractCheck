@@ -1,0 +1,97 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+contract TokenBridge is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
+    uint256 public nonce;
+    mapping(bytes32 => bool) public processedTransfers;
+    mapping(address => bool) public supportedTokens;
+
+    event TokensLocked(
+        address indexed token,
+        address indexed sender,
+        address indexed recipient,
+        uint256 amount,
+        uint256 destinationChainId,
+        uint256 nonce
+    );
+
+    event TokensUnlocked(
+        address indexed token,
+        address indexed recipient,
+        uint256 amount,
+        bytes32 transferId
+    );
+
+    event TokenAdded(address indexed token);
+    event TokenRemoved(address indexed token);
+
+    constructor() Ownable(msg.sender) {}
+
+    function addSupportedToken(address token) external onlyOwner {
+        require(token != address(0), "Invalid token address");
+        supportedTokens[token] = true;
+        emit TokenAdded(token);
+    }
+
+    function removeSupportedToken(address token) external onlyOwner {
+        supportedTokens[token] = false;
+        emit TokenRemoved(token);
+    }
+
+    function lockTokens(
+        address token,
+        address recipient,
+        uint256 amount,
+        uint256 destinationChainId
+    ) external nonReentrant {
+        require(supportedTokens[token], "Token not supported");
+        require(amount > 0, "Amount must be greater than 0");
+        require(recipient != address(0), "Invalid recipient");
+        require(destinationChainId != block.chainid, "Cannot bridge to same chain");
+
+        uint256 currentNonce = nonce;
+        nonce++;
+
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+
+        emit TokensLocked(
+            token,
+            msg.sender,
+            recipient,
+            amount,
+            destinationChainId,
+            currentNonce
+        );
+    }
+
+    function unlockTokens(
+        address token,
+        address recipient,
+        uint256 amount,
+        uint256 sourceChainId,
+        uint256 sourceNonce
+    ) external onlyOwner nonReentrant {
+        bytes32 transferId = keccak256(
+            abi.encodePacked(token, recipient, amount, sourceChainId, sourceNonce)
+        );
+        require(!processedTransfers[transferId], "Transfer already processed");
+        require(supportedTokens[token], "Token not supported");
+
+        processedTransfers[transferId] = true;
+
+        IERC20(token).safeTransfer(recipient, amount);
+
+        emit TokensUnlocked(token, recipient, amount, transferId);
+    }
+
+    function getLockedBalance(address token) external view returns (uint256) {
+        return IERC20(token).balanceOf(address(this));
+    }
+}

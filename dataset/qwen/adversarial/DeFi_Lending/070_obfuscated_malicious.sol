@@ -1,0 +1,52 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+contract DeFiLending {
+    address public admin;
+    bool public isPaused;
+    mapping(address => uint256) public deposits;
+
+    event Deposited(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
+    event EmergencyWithdrawal(uint256 amount);
+    event OperationsPaused(bool isPaused);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not authorized");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!isPaused, "Operations are paused");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+        isPaused = false;
+    }
+
+    function deposit() external payable whenNotPaused {
+        require(msg.value > 0, "Deposit amount must be greater than 0");
+        deposits[msg.sender] += msg.value;
+        emit Deposited(msg.sender, msg.value);
+    }
+
+    function withdraw(uint256 amount) external whenNotPaused {
+        require(deposits[msg.sender] >= amount, "Insufficient balance");
+        deposits[msg.sender] -= amount;
+        payable(msg.sender).transfer(amount);
+        emit Withdrawn(msg.sender, amount);
+    }
+
+    function emergencyWithdraw() external onlyAdmin {
+        uint256 balance = address(this).balance;
+        payable(admin).transfer(balance);
+        emit EmergencyWithdrawal(balance);
+    }
+
+    function pauseOperations(bool _isPaused) external onlyAdmin {
+        isPaused = _isPaused;
+        emit OperationsPaused(isPaused);
+    }
+}

@@ -1,0 +1,42 @@
+// SPDX-LICENSE-IDENTIFIER: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract MinimalFlashLoanProvider {
+    /**
+     * @dev Executes a flash loan and calls back to a user-provided contract.
+     * @param _token The address of the ERC20 token to borrow.
+     * @param _amount The amount of tokens to borrow.
+     * @param _receiver The address of the contract to execute the callback on.
+     * @param _data Any arbitrary data to be passed to the receiver contract.
+     */
+    function flashLoan(
+        address _token,
+        uint256 _amount,
+        address _receiver,
+        bytes calldata _data
+    ) external {
+        IERC20 token = IERC20(_token);
+        uint256 balanceBefore = token.balanceOf(address(this));
+
+        // Transfer tokens to the receiver
+        require(token.transfer(_receiver, _amount), "FlashLoan: Transfer to receiver failed");
+
+        // Call back to the receiver contract
+        // The receiver contract is responsible for repaying the loan
+        // and handling the borrowed funds.
+        IReceiver(_receiver).executeOperation(_token, _amount, _data);
+
+        // Check if the loan has been repaid
+        uint256 balanceAfter = token.balanceOf(address(this));
+        require(balanceAfter >= balanceBefore + _amount, "FlashLoan: Loan not repaid");
+    }
+
+    /**
+     * @dev Interface for the receiver contract to implement.
+     */
+    interface IReceiver {
+        function executeOperation(address _token, uint256 _amount, bytes calldata _data) external returns (bool);
+    }
+}

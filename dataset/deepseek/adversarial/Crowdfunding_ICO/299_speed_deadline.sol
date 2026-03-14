@@ -1,0 +1,71 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrowdfundingICO {
+    address public owner;
+    uint256 public fundingGoal;
+    uint256 public totalRaised;
+    uint256 public startTime;
+    uint256 public endTime;
+    uint256 public tokenPrice;
+    uint256 public tokenSold;
+
+    mapping(address => uint256) public contributions;
+
+    event ContributionReceived(address indexed contributor, uint256 amount);
+    event GoalReached(uint256 amountRaised);
+    event Refunded(address indexed contributor, uint256 amount);
+
+    constructor(uint256 _fundingGoal, uint256 _tokenPrice, uint256 _duration) {
+        require(_fundingGoal > 0, "Funding goal must be greater than 0");
+        require(_tokenPrice > 0, "Token price must be greater than 0");
+        require(_duration > 0, "Duration must be greater than 0");
+
+        owner = msg.sender;
+        fundingGoal = _fundingGoal;
+        tokenPrice = _tokenPrice;
+        startTime = block.timestamp;
+        endTime = startTime + _duration;
+    }
+
+    function contribute() public payable {
+        require(block.timestamp >= startTime && block.timestamp <= endTime, "Contribution period is over");
+        require(msg.value > 0, "Contribution amount must be greater than 0");
+
+        contributions[msg.sender] += msg.value;
+        totalRaised += msg.value;
+        tokenSold += msg.value / tokenPrice;
+
+        emit ContributionReceived(msg.sender, msg.value);
+    }
+
+    function checkGoalReached() public view returns (bool) {
+        return totalRaised >= fundingGoal;
+    }
+
+    function claimTokens() public {
+        require(block.timestamp > endTime, "Claiming tokens is not allowed yet");
+        require(checkGoalReached(), "Funding goal has not been reached");
+
+        uint256 amount = contributions[msg.sender];
+        require(amount > 0, "No tokens to claim");
+
+        contributions[msg.sender] = 0;
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+    }
+
+    function refund() public {
+        require(block.timestamp > endTime, "Refund period is not over");
+        require(!checkGoalReached(), "Funding goal has been reached");
+
+        uint256 amount = contributions[msg.sender];
+        require(amount > 0, "No contribution to refund");
+
+        contributions[msg.sender] = 0;
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Refund transfer failed");
+
+        emit Refunded(msg.sender, amount);
+    }
+}

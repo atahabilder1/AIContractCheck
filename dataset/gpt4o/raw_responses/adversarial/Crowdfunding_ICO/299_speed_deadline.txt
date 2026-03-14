@@ -1,0 +1,81 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrowdfundingICO {
+    address public owner;
+    uint256 public goal;
+    uint256 public deadline;
+    uint256 public amountRaised;
+    uint256 public tokenPrice;
+    mapping(address => uint256) public contributions;
+    bool public goalReached;
+    bool public icoClosed;
+    ERC20Token public token;
+
+    event FundTransfer(address backer, uint256 amount, bool isContribution);
+    event GoalReached(address recipient, uint256 totalAmountRaised);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    constructor(
+        uint256 _goal,
+        uint256 _duration,
+        uint256 _tokenPrice,
+        address _tokenAddress
+    ) {
+        owner = msg.sender;
+        goal = _goal;
+        deadline = block.timestamp + _duration;
+        tokenPrice = _tokenPrice;
+        token = ERC20Token(_tokenAddress);
+    }
+
+    function contribute() public payable {
+        require(!icoClosed, "ICO is closed");
+        require(block.timestamp <= deadline, "Deadline has passed");
+        uint256 amount = msg.value;
+        contributions[msg.sender] += amount;
+        amountRaised += amount;
+        uint256 tokensToTransfer = amount / tokenPrice;
+        token.transfer(msg.sender, tokensToTransfer);
+        emit FundTransfer(msg.sender, amount, true);
+        if (amountRaised >= goal) {
+            goalReached = true;
+            emit GoalReached(owner, amountRaised);
+        }
+    }
+
+    function withdrawFunds() public onlyOwner {
+        require(icoClosed, "ICO is not closed yet");
+        require(goalReached, "Goal not reached");
+        payable(owner).transfer(amountRaised);
+    }
+
+    function checkGoalReached() public {
+        if (amountRaised >= goal && !goalReached) {
+            goalReached = true;
+            emit GoalReached(owner, amountRaised);
+        }
+        icoClosed = block.timestamp > deadline;
+    }
+
+    function claimRefund() public {
+        require(!goalReached, "Goal was reached, no refunds");
+        require(block.timestamp > deadline, "ICO not yet ended");
+        uint256 amount = contributions[msg.sender];
+        contributions[msg.sender] = 0;
+        if (amount > 0) {
+            payable(msg.sender).transfer(amount);
+            emit FundTransfer(msg.sender, amount, false);
+        }
+    }
+}
+
+interface ERC20Token {
+    function transfer(address _to, uint256 _value) external returns (bool);
+}
+```

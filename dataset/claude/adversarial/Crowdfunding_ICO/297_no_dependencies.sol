@@ -1,0 +1,224 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrowdfundingICO {
+    address public owner;
+    string public projectName;
+    uint256 public fundingGoal;
+    uint256 public deadline;
+    uint256 public totalRaised;
+    uint256 public tokenPrice;
+    uint256 public totalTokensSold;
+    uint256 public tokenTotalSupply;
+    uint8 public constant TOKEN_DECIMALS = 18;
+    string public tokenName;
+    string public tokenSymbol;
+
+    bool public goalReached;
+    bool public campaignClosed;
+    bool public fundsWithdrawn;
+
+    enum State { Active, Successful, Failed, Closed }
+
+    mapping(address => uint256) public contributions;
+    mapping(address => uint256) public tokenBalances;
+    mapping(address => mapping(address => uint256)) public tokenAllowances;
+    address[] public contributors;
+    mapping(address => bool) public isContributor;
+
+    uint256 public minContribution;
+    uint256 public maxContribution;
+
+    event ContributionMade(address indexed contributor, uint256 amount, uint256 tokensIssued);
+    event GoalReached(uint256 totalAmount);
+    event FundsWithdrawn(address indexed owner, uint256 amount);
+    event RefundIssued(address indexed contributor, uint256 amount);
+    event CampaignClosed(bool successful);
+    event TokenTransfer(address indexed from, address indexed to, uint256 value);
+    event TokenApproval(address indexed owner, address indexed spender, uint256 value);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this");
+        _;
+    }
+
+    modifier campaignActive() {
+        require(!campaignClosed, "Campaign is closed");
+        require(block.timestamp <= deadline, "Campaign deadline passed");
+        _;
+    }
+
+    modifier campaignEnded() {
+        require(campaignClosed || block.timestamp > deadline, "Campaign still active");
+        _;
+    }
+
+    constructor(
+        string memory _projectName,
+        uint256 _fundingGoalInWei,
+        uint256 _durationInDays,
+        uint256 _tokenPriceInWei,
+        uint256 _tokenTotalSupply,
+        string memory _tokenName,
+        string memory _tokenSymbol,
+        uint256 _minContribution,
+        uint256 _maxContribution
+    ) {
+        require(_fundingGoalInWei > 0, "Goal must be > 0");
+        require(_durationInDays > 0, "Duration must be > 0");
+        require(_tokenPriceInWei > 0, "Token price must be > 0");
+        require(_tokenTotalSupply > 0, "Supply must be > 0");
+        require(_maxContribution >= _minContribution, "Max must be >= min");
+
+        owner = msg.sender;
+        projectName = _projectName;
+        fundingGoal = _fundingGoalInWei;
+        deadline = block.timestamp + (_durationInDays * 1 days);
+        tokenPrice = _tokenPriceInWei;
+        tokenTotalSupply = _tokenTotalSupply * (10 ** TOKEN_DECIMALS);
+        tokenName = _tokenName;
+        tokenSymbol = _tokenSymbol;
+        minContribution = _minContribution;
+        maxContribution = _maxContribution;
+
+        tokenBalances[address(this)] = tokenTotalSupply;
+    }
+
+    function contribute() external payable campaignActive {
+        require(msg.value >= minContribution, "Below minimum contribution");
+        require(
+            maxContribution == 0 || contributions[msg.sender] + msg.value <= maxContribution,
+            "Exceeds maximum contribution"
+        );
+
+        uint256 tokensToIssue = (msg.value * (10 ** TOKEN_DECIMALS)) / tokenPrice;
+        require(tokensToIssue > 0, "Contribution too small for tokens");
+        require(tokenBalances[address(this)] >= tokensToIssue, "Not enough tokens remaining");
+
+        if (!isContributor[msg.sender]) {
+            contributors.push(msg.sender);
+            isContributor[msg.sender] = true;
+        }
+
+        contributions[msg.sender] += msg.value;
+        totalRaised += msg.value;
+
+        tokenBalances[address(this)] -= tokensToIssue;
+        tokenBalances[msg.sender] += tokensToIssue;
+        totalTokensSold += tokensToIssue;
+
+        emit ContributionMade(msg.sender, msg.value, tokensToIssue);
+        emit TokenTransfer(address(this), msg.sender, tokensToIssue);
+
+        if (totalRaised >= fundingGoal && !goalReached) {
+            goalReached = true;
+            emit GoalReached(totalRaised);
+        }
+    }
+
+    function closeCampaign() external onlyOwner {
+        require(!campaignClosed, "Already closed");
+        campaignClosed = true;
+        emit CampaignClosed(totalRaised >= fundingGoal);
+    }
+
+    function withdrawFunds() external onlyOwner campaignEnded {
+        require(totalRaised >= fundingGoal, "Goal not reached");
+        require(!fundsWithdrawn, "Funds already withdrawn");
+
+        fundsWithdrawn = true;
+        uint256 amount = address(this).balance;
+
+        (bool success, ) = payable(owner).call{value: amount}("");
+        require(success, "Withdrawal failed");
+
+        emit FundsWithdrawn(owner, amount);
+    }
+
+    function claimRefund() external campaignEnded {
+        require(totalRaised < fundingGoal, "Goal was reached, no refunds");
+        uint256 contributed = contributions[msg.sender];
+        require(contributed > 0, "No contribution to refund");
+
+        uint256 tokensHeld = tokenBalances[msg.sender];
+        contributions[msg.sender] = 0;
+        tokenBalances[msg.sender] = 0;
+        tokenBalances[address(this)] += tokensHeld;
+        totalTokensSold -= tokensHeld;
+
+        (bool success, ) = payable(msg.sender).call{value: contributed}("");
+        require(success, "Refund failed");
+
+        emit RefundIssued(msg.sender, contributed);
+        emit TokenTransfer(msg.sender, address(this), tokensHeld);
+    }
+
+    function transferToken(address _to, uint256 _amount) external returns (bool) {
+        require(_to != address(0), "Cannot transfer to zero address");
+        require(tokenBalances[msg.sender] >= _amount, "Insufficient token balance");
+
+        tokenBalances[msg.sender] -= _amount;
+        tokenBalances[_to] += _amount;
+
+        emit TokenTransfer(msg.sender, _to, _amount);
+        return true;
+    }
+
+    function approveToken(address _spender, uint256 _amount) external returns (bool) {
+        require(_spender != address(0), "Cannot approve zero address");
+        tokenAllowances[msg.sender][_spender] = _amount;
+        emit TokenApproval(msg.sender, _spender, _amount);
+        return true;
+    }
+
+    function transferTokenFrom(address _from, address _to, uint256 _amount) external returns (bool) {
+        require(_to != address(0), "Cannot transfer to zero address");
+        require(tokenBalances[_from] >= _amount, "Insufficient balance");
+        require(tokenAllowances[_from][msg.sender] >= _amount, "Insufficient allowance");
+
+        tokenBalances[_from] -= _amount;
+        tokenBalances[_to] += _amount;
+        tokenAllowances[_from][msg.sender] -= _amount;
+
+        emit TokenTransfer(_from, _to, _amount);
+        return true;
+    }
+
+    function getState() public view returns (State) {
+        if (campaignClosed && fundsWithdrawn) return State.Closed;
+        if (campaignClosed || block.timestamp > deadline) {
+            return totalRaised >= fundingGoal ? State.Successful : State.Failed;
+        }
+        return State.Active;
+    }
+
+    function getTimeRemaining() external view returns (uint256) {
+        if (block.timestamp >= deadline) return 0;
+        return deadline - block.timestamp;
+    }
+
+    function getTokensRemaining() external view returns (uint256) {
+        return tokenBalances[address(this)];
+    }
+
+    function getContributorCount() external view returns (uint256) {
+        return contributors.length;
+    }
+
+    function getContributorInfo(address _contributor)
+        external
+        view
+        returns (uint256 contributed, uint256 tokens)
+    {
+        return (contributions[_contributor], tokenBalances[_contributor]);
+    }
+
+    function extendDeadline(uint256 _additionalDays) external onlyOwner campaignActive {
+        require(_additionalDays > 0, "Must extend by at least 1 day");
+        deadline += _additionalDays * 1 days;
+    }
+
+    receive() external payable {
+        revert("Use contribute() to participate");
+    }
+}

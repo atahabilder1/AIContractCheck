@@ -1,0 +1,111 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract RBACAccessControl {
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+
+    bool public paused;
+    address public owner;
+
+    mapping(bytes32 => mapping(address => bool)) private _roles;
+    mapping(address => uint256) public balances;
+
+    event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender);
+    event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender);
+    event Deposited(address indexed account, uint256 amount);
+    event EmergencyWithdrawal(address indexed admin, uint256 amount);
+    event Paused(address indexed admin);
+    event Unpaused(address indexed admin);
+
+    modifier onlyRole(bytes32 role) {
+        require(_roles[role][msg.sender], "AccessControl: account lacks role");
+        _;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "AccessControl: caller is not owner");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+        _roles[ADMIN_ROLE][msg.sender] = true;
+        emit RoleGranted(ADMIN_ROLE, msg.sender, msg.sender);
+    }
+
+    function grantRole(bytes32 role, address account) external onlyRole(ADMIN_ROLE) {
+        require(!_roles[role][account], "Role already granted");
+        _roles[role][account] = true;
+        emit RoleGranted(role, account, msg.sender);
+    }
+
+    function revokeRole(bytes32 role, address account) external onlyRole(ADMIN_ROLE) {
+        require(_roles[role][account], "Role not granted");
+        _roles[role][account] = false;
+        emit RoleRevoked(role, account, msg.sender);
+    }
+
+    function renounceRole(bytes32 role) external {
+        require(_roles[role][msg.sender], "Role not granted");
+        _roles[role][msg.sender] = false;
+        emit RoleRevoked(role, msg.sender, msg.sender);
+    }
+
+    function hasRole(bytes32 role, address account) external view returns (bool) {
+        return _roles[role][account];
+    }
+
+    function deposit() external payable whenNotPaused {
+        require(msg.value > 0, "Must deposit non-zero amount");
+        balances[msg.sender] += msg.value;
+        emit Deposited(msg.sender, msg.value);
+    }
+
+    function withdraw(uint256 amount) external whenNotPaused {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        balances[msg.sender] -= amount;
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+    }
+
+    function emergencyPause() external onlyRole(ADMIN_ROLE) {
+        paused = true;
+        emit Paused(msg.sender);
+    }
+
+    function emergencyUnpause() external onlyRole(ADMIN_ROLE) {
+        paused = false;
+        emit Unpaused(msg.sender);
+    }
+
+    function emergencyWithdrawAll() external onlyRole(ADMIN_ROLE) {
+        uint256 contractBalance = address(this).balance;
+        require(contractBalance > 0, "No funds to withdraw");
+        (bool success, ) = msg.sender.call{value: contractBalance}("");
+        require(success, "Transfer failed");
+        emit EmergencyWithdrawal(msg.sender, contractBalance);
+    }
+
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "Invalid new owner");
+        _roles[ADMIN_ROLE][owner] = false;
+        emit RoleRevoked(ADMIN_ROLE, owner, msg.sender);
+        owner = newOwner;
+        _roles[ADMIN_ROLE][newOwner] = true;
+        emit RoleGranted(ADMIN_ROLE, newOwner, msg.sender);
+    }
+
+    receive() external payable {
+        balances[msg.sender] += msg.value;
+        emit Deposited(msg.sender, msg.value);
+    }
+}
+```

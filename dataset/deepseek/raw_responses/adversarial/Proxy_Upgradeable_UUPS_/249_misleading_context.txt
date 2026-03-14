@@ -1,0 +1,45 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IProxy {
+    function implementation() external view returns (address);
+    function upgradeTo(address newImplementation) external;
+    function upgradeToAndCall(address newImplementation, bytes memory data) external payable;
+}
+
+contract Proxy is IProxy {
+    address private _implementation;
+
+    constructor(address initialImplementation) {
+        _implementation = initialImplementation;
+    }
+
+    fallback() external payable {
+        address impl = _implementation;
+        assembly {
+            calldatacopy(0, 0, calldatasize())
+            let result := delegatecall(gas(), impl, 0, calldatasize(), 0, 0)
+            returndatacopy(0, 0, returndatasize())
+            switch result
+            case 0 { revert(0, returndatasize()) }
+            default { return(0, returndatasize()) }
+        }
+    }
+
+    function implementation() external view override returns (address) {
+        return _implementation;
+    }
+
+    function upgradeTo(address newImplementation) external override {
+        require(msg.sender == address(this), "Proxy: Only callable by self");
+        _implementation = newImplementation;
+    }
+
+    function upgradeToAndCall(address newImplementation, bytes memory data) external payable override {
+        upgradeTo(newImplementation);
+        (bool success, ) = newImplementation.delegatecall(data);
+        require(success, "Proxy: Upgrade failed");
+    }
+}
+```

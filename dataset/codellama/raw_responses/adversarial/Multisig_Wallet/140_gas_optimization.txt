@@ -1,0 +1,50 @@
+
+Here is an example of a Multisig Wallet contract in Solidity:
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultisigWallet {
+    address[] public owners;
+    uint256 public threshold;
+    uint256 public balance;
+
+    constructor(address[] memory _owners, uint256 _threshold) {
+        owners = _owners;
+        threshold = _threshold;
+        balance = 0;
+    }
+
+    function deposit(uint256 amount) public {
+        require(msg.sender == owners[msg.sender], "Only owners can deposit");
+        require(amount <= address(this).balance, "Insufficient balance");
+        balance += amount;
+    }
+
+    function withdraw(uint256 amount) public {
+        require(msg.sender == owners[msg.sender], "Only owners can withdraw");
+        require(amount <= balance, "Insufficient balance");
+        msg.sender.transfer(amount);
+        balance -= amount;
+    }
+
+    function transfer(address to, uint256 amount) public {
+        require(msg.sender == owners[msg.sender], "Only owners can transfer");
+        require(amount <= balance, "Insufficient balance");
+        to.transfer(amount);
+        balance -= amount;
+    }
+
+    function getBalance() public view returns (uint256) {
+        return balance;
+    }
+}
+```
+This contract has the following functions:
+
+* `deposit`: Allows an owner to deposit Ether into the contract.
+* `withdraw`: Allows an owner to withdraw Ether from the contract.
+* `transfer`: Allows an owner to transfer Ether from the contract to another address.
+* `getBalance`: Returns the current balance of the contract.
+
+The contract is optimized for minimal gas usage by avoiding unnecessary checks and storage operations. For example, the `deposit` function only checks that the sender is an owner and that the amount is less than or equal to the contract's balance, rather than checking that the amount is greater than 0 or that the balance is greater than 0. This reduces the number of gas checks and storage operations required, resulting in lower gas usage.

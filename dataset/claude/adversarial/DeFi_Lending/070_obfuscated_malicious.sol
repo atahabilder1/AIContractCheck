@@ -1,0 +1,247 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract DeFiLending {
+    address public admin;
+    bool public paused;
+
+    struct Pool {
+        uint256 totalDeposits;
+        uint256 totalBorrows;
+        uint256 interestRate; // basis points per block
+    }
+
+    struct UserAccount {
+        uint256 deposited;
+        uint256 borrowed;
+        uint256 borrowBlock;
+    }
+
+    mapping(address => Pool) public pools;
+    mapping(address => mapping(address => UserAccount)) public accounts; // token => user => account
+    mapping(address => bool) public supportedTokens;
+    address[] public tokenList;
+
+    uint256 public constant COLLATERAL_FACTOR = 7500; // 75% in basis points
+    uint256 public constant LIQUIDATION_THRESHOLD = 8500; // 85%
+    uint256 public constant LIQUIDATION_BONUS = 500; // 5%
+    uint256 public constant BASIS_POINTS = 10000;
+
+    event Deposit(address indexed token, address indexed user, uint256 amount);
+    event Withdraw(address indexed token, address indexed user, uint256 amount);
+    event Borrow(address indexed token, address indexed user, uint256 amount);
+    event Repay(address indexed token, address indexed user, uint256 amount);
+    event Liquidation(address indexed token, address indexed borrower, address indexed liquidator, uint256 amount);
+    event EmergencyWithdraw(address indexed token, uint256 amount);
+    event Paused(bool status);
+    event TokenAdded(address indexed token, uint256 interestRate);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not admin");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+    }
+
+    function addToken(address _token, uint256 _interestRate) external onlyAdmin {
+        require(!supportedTokens[_token], "Token already supported");
+        supportedTokens[_token] = true;
+        pools[_token].interestRate = _interestRate;
+        tokenList.push(_token);
+        emit TokenAdded(_token, _interestRate);
+    }
+
+    function deposit(address _token, uint256 _amount) external whenNotPaused {
+        require(supportedTokens[_token], "Token not supported");
+        require(_amount > 0, "Zero amount");
+
+        IERC20(_token).transferFrom(msg.sender, address(this), _amount);
+
+        accounts[_token][msg.sender].deposited += _amount;
+        pools[_token].totalDeposits += _amount;
+
+        emit Deposit(_token, msg.sender, _amount);
+    }
+
+    function withdraw(address _token, uint256 _amount) external whenNotPaused {
+        UserAccount storage account = accounts[_token][msg.sender];
+        require(account.deposited >= _amount, "Insufficient deposit");
+
+        account.deposited -= _amount;
+        pools[_token].totalDeposits -= _amount;
+
+        require(_isHealthy(msg.sender), "Would make position unhealthy");
+
+        IERC20(_token).transfer(msg.sender, _amount);
+
+        emit Withdraw(_token, msg.sender, _amount);
+    }
+
+    function borrow(address _token, uint256 _amount) external whenNotPaused {
+        require(supportedTokens[_token], "Token not supported");
+        Pool storage pool = pools[_token];
+        require(pool.totalDeposits - pool.totalBorrows >= _amount, "Insufficient liquidity");
+
+        UserAccount storage account = accounts[_token][msg.sender];
+        account.borrowed += _amount;
+        account.borrowBlock = block.number;
+        pool.totalBorrows += _amount;
+
+        require(_isHealthy(msg.sender), "Undercollateralized");
+
+        IERC20(_token).transfer(msg.sender, _amount);
+
+        emit Borrow(_token, msg.sender, _amount);
+    }
+
+    function repay(address _token, uint256 _amount) external whenNotPaused {
+        UserAccount storage account = accounts[_token][msg.sender];
+        uint256 owed = _borrowBalance(_token, msg.sender);
+        uint256 repayAmount = _amount > owed ? owed : _amount;
+
+        IERC20(_token).transferFrom(msg.sender, address(this), repayAmount);
+
+        account.borrowed = owed - repayAmount;
+        account.borrowBlock = block.number;
+        pools[_token].totalBorrows = pools[_token].totalBorrows > repayAmount
+            ? pools[_token].totalBorrows - repayAmount
+            : 0;
+
+        emit Repay(_token, msg.sender, repayAmount);
+    }
+
+    function liquidate(address _token, address _borrower, uint256 _repayAmount) external whenNotPaused {
+        require(!_isHealthyForLiquidation(_borrower), "Position is healthy");
+
+        UserAccount storage borrowerAccount = accounts[_token][_borrower];
+        uint256 owed = _borrowBalance(_token, _borrower);
+        require(_repayAmount <= owed / 2, "Repay exceeds 50% of debt");
+
+        IERC20(_token).transferFrom(msg.sender, address(this), _repayAmount);
+
+        uint256 seizeAmount = _repayAmount * (BASIS_POINTS + LIQUIDATION_BONUS) / BASIS_POINTS;
+        require(borrowerAccount.deposited >= seizeAmount, "Insufficient collateral to seize");
+
+        borrowerAccount.borrowed = owed - _repayAmount;
+        borrowerAccount.borrowBlock = block.number;
+        borrowerAccount.deposited -= seizeAmount;
+        pools[_token].totalBorrows -= _repayAmount;
+        pools[_token].totalDeposits -= seizeAmount;
+
+        IERC20(_token).transfer(msg.sender, seizeAmount);
+
+        emit Liquidation(_token, _borrower, msg.sender, _repayAmount);
+    }
+
+    // --- Admin Emergency Functions ---
+
+    function pause() external onlyAdmin {
+        paused = true;
+        emit Paused(true);
+    }
+
+    function unpause() external onlyAdmin {
+        paused = false;
+        emit Paused(false);
+    }
+
+    function emergencyWithdraw(address _token) external onlyAdmin {
+        uint256 balance = IERC20(_token).balanceOf(address(this));
+        require(balance > 0, "No balance");
+        IERC20(_token).transfer(admin, balance);
+        emit EmergencyWithdraw(_token, balance);
+    }
+
+    function emergencyWithdrawAll() external onlyAdmin {
+        for (uint256 i = 0; i < tokenList.length; i++) {
+            address token = tokenList[i];
+            uint256 balance = IERC20(token).balanceOf(address(this));
+            if (balance > 0) {
+                IERC20(token).transfer(admin, balance);
+                emit EmergencyWithdraw(token, balance);
+            }
+        }
+    }
+
+    function emergencyWithdrawETH() external onlyAdmin {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No ETH");
+        payable(admin).transfer(balance);
+    }
+
+    function transferAdmin(address _newAdmin) external onlyAdmin {
+        require(_newAdmin != address(0), "Zero address");
+        admin = _newAdmin;
+    }
+
+    // --- View Functions ---
+
+    function borrowBalance(address _token, address _user) external view returns (uint256) {
+        return _borrowBalance(_token, _user);
+    }
+
+    function getUtilizationRate(address _token) external view returns (uint256) {
+        Pool storage pool = pools[_token];
+        if (pool.totalDeposits == 0) return 0;
+        return pool.totalBorrows * BASIS_POINTS / pool.totalDeposits;
+    }
+
+    function getTokenCount() external view returns (uint256) {
+        return tokenList.length;
+    }
+
+    // --- Internal Functions ---
+
+    function _borrowBalance(address _token, address _user) internal view returns (uint256) {
+        UserAccount storage account = accounts[_token][_user];
+        if (account.borrowed == 0) return 0;
+
+        uint256 blocksDelta = block.number - account.borrowBlock;
+        uint256 interest = account.borrowed * pools[_token].interestRate * blocksDelta / BASIS_POINTS;
+        return account.borrowed + interest;
+    }
+
+    function _isHealthy(address _user) internal view returns (bool) {
+        uint256 totalCollateralValue = 0;
+        uint256 totalBorrowValue = 0;
+
+        for (uint256 i = 0; i < tokenList.length; i++) {
+            address token = tokenList[i];
+            totalCollateralValue += accounts[token][_user].deposited * COLLATERAL_FACTOR / BASIS_POINTS;
+            totalBorrowValue += _borrowBalance(token, _user);
+        }
+
+        return totalCollateralValue >= totalBorrowValue;
+    }
+
+    function _isHealthyForLiquidation(address _user) internal view returns (bool) {
+        uint256 totalCollateralValue = 0;
+        uint256 totalBorrowValue = 0;
+
+        for (uint256 i = 0; i < tokenList.length; i++) {
+            address token = tokenList[i];
+            totalCollateralValue += accounts[token][_user].deposited * LIQUIDATION_THRESHOLD / BASIS_POINTS;
+            totalBorrowValue += _borrowBalance(token, _user);
+        }
+
+        return totalCollateralValue >= totalBorrowValue;
+    }
+
+    receive() external payable {}
+}
+
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address to, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+}

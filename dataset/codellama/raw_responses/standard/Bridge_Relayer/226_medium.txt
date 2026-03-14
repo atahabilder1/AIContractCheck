@@ -1,0 +1,59 @@
+```
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    address public relayer;
+    address public feeRecipient;
+    uint public feePercentage;
+    uint public messageCount;
+
+    struct Message {
+        bytes32 message;
+        address signer;
+    }
+
+    mapping(uint => Message) public messages;
+
+    event MessageReceived(uint messageId, bytes32 message, address signer);
+
+    constructor(address _relayer, address _feeRecipient, uint _feePercentage) public {
+        relayer = _relayer;
+        feeRecipient = _feeRecipient;
+        feePercentage = _feePercentage;
+    }
+
+    function sendMessage(bytes32 message) external {
+        require(msg.sender == relayer, "Only the relayer can send messages");
+
+        uint messageId = messageCount++;
+        messages[messageId] = Message(message, msg.sender);
+
+        uint fee = (message.length * feePercentage) / 100;
+        feeRecipient.transfer(fee);
+
+        emit MessageReceived(messageId, message, msg.sender);
+    }
+
+    function verifyMessage(uint messageId, bytes32 message, address signer) external view returns (bool) {
+        require(messages[messageId].message == message, "Invalid message");
+        require(messages[messageId].signer == signer, "Invalid signer");
+
+        return true;
+    }
+
+    function rotateRelayer(address newRelayer) external {
+        require(msg.sender == relayer, "Only the current relayer can rotate");
+
+        relayer = newRelayer;
+    }
+
+    function collectFees(uint amount) external {
+        require(msg.sender == feeRecipient, "Only the fee recipient can collect fees");
+
+        uint fee = (amount * feePercentage) / 100;
+        feeRecipient.transfer(fee);
+    }
+}
+```

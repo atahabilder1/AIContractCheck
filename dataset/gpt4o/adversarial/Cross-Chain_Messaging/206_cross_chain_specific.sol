@@ -1,0 +1,17 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainMessenger {
+    event MessageSent(address indexed from, uint256 indexed targetChainId, address indexed to, bytes message);
+    event MessageReceived(uint256 indexed sourceChainId, address indexed from, address indexed to, bytes message);
+
+    function sendMessage(uint256 targetChainId, address to, bytes calldata message) external {
+        emit MessageSent(msg.sender, targetChainId, to, message);
+    }
+
+    function receiveMessage(uint256 sourceChainId, address from, address to, bytes calldata message) external {
+        // Minimal validation for speed and throughput
+        require(to != address(0), "Invalid target address");
+        emit MessageReceived(sourceChainId, from, to, message);
+    }
+}

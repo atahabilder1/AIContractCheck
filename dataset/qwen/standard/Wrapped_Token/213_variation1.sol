@@ -1,0 +1,54 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract WrappedRebasingToken is ERC20, ReentrancyGuard {
+    IERC20 public immutable underlyingToken;
+    uint256 public constant UNDERLYING_UNIT = 1e18; // Assuming 18 decimals for the underlying token
+    uint256 public lastUnderlyingBalance;
+    uint256 public lastWrappedSupply;
+
+    constructor(address _underlyingToken) ERC20("Wrapped Rebasing Token", "WRT") {
+        underlyingToken = IERC20(_underlyingToken);
+        lastUnderlyingBalance = underlyingToken.balanceOf(address(this));
+        lastWrappedSupply = totalSupply();
+    }
+
+    function deposit(uint256 amount) external nonReentrant {
+        require(amount > 0, "Amount must be greater than 0");
+        uint256 underlyingBefore = underlyingToken.balanceOf(address(this));
+        underlyingToken.transferFrom(msg.sender, address(this), amount);
+        uint256 underlyingAfter = underlyingToken.balanceOf(address(this));
+        uint256 actualAmount = underlyingAfter - underlyingBefore;
+        _mint(msg.sender, getWrappedAmount(actualAmount));
+        _updateBalances();
+    }
+
+    function withdraw(uint256 amount) external nonReentrant {
+        require(amount > 0, "Amount must be greater than 0");
+        uint256 underlyingAmount = getUnderlyingAmount(amount);
+        _burn(msg.sender, amount);
+        underlyingToken.transfer(msg.sender, underlyingAmount);
+        _updateBalances();
+    }
+
+    function getWrappedAmount(uint256 underlyingAmount) public view returns (uint256) {
+        if (lastWrappedSupply == 0) return underlyingAmount;
+        uint256 currentUnderlyingBalance = underlyingToken.balanceOf(address(this));
+        return (underlyingAmount * lastWrappedSupply) / currentUnderlyingBalance;
+    }
+
+    function getUnderlyingAmount(uint256 wrappedAmount) public view returns (uint256) {
+        if (lastWrappedSupply == 0) return wrappedAmount;
+        uint256 currentUnderlyingBalance = underlyingToken.balanceOf(address(this));
+        return (wrappedAmount * currentUnderlyingBalance) / lastWrappedSupply;
+    }
+
+    function _updateBalances() internal {
+        lastUnderlyingBalance = underlyingToken.balanceOf(address(this));
+        lastWrappedSupply = totalSupply();
+    }
+}

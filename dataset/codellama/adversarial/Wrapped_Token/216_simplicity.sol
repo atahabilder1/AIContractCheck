@@ -1,0 +1,31 @@
+pragma solidity ^0.8.0;
+
+contract WrappedToken {
+    string public name;
+    string public symbol;
+    uint public totalSupply;
+    mapping(address => uint) public balances;
+
+    event Transfer(address indexed from, address indexed to, uint value);
+
+    constructor(string memory _name, string memory _symbol, uint _totalSupply) public {
+        name = _name;
+        symbol = _symbol;
+        totalSupply = _totalSupply;
+        balances[msg.sender] = _totalSupply;
+    }
+
+    function transfer(address to, uint value) public {
+        require(balances[msg.sender] >= value, "Insufficient balance");
+        balances[msg.sender] -= value;
+        balances[to] += value;
+        emit Transfer(msg.sender, to, value);
+    }
+}
+
+SPDX-License-Identifier: MIT
+```
+
+This is a simple Solidity contract that creates a wrapped token with a name, symbol, and total supply. It has a single function `transfer` that allows users to transfer tokens to another address. The function checks that the sender has enough balance to perform the transfer and updates the balances accordingly.
+
+Note that this is a basic example and should not be used in production without additional security measures and error handling.

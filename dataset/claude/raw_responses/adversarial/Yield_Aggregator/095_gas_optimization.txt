@@ -1,0 +1,210 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address to, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+}
+
+interface IStrategy {
+    function deposit(uint256 amount) external;
+    function withdraw(uint256 amount) external;
+    function balanceOf() external view returns (uint256);
+    function harvest() external returns (uint256);
+    function want() external view returns (address);
+}
+
+contract YieldAggregator {
+    IERC20 public immutable token;
+    address public governance;
+    address public pendingGovernance;
+
+    struct StrategyInfo {
+        uint256 debtRatio;
+        uint256 totalDebt;
+        uint256 lastReport;
+        bool active;
+    }
+
+    mapping(address => StrategyInfo) public strategies;
+    address[] public withdrawalQueue;
+
+    uint256 public totalDebt;
+    uint256 public totalDebtRatio;
+    uint256 constant MAX_BPS = 10_000;
+
+    mapping(address => uint256) public shares;
+    uint256 public totalShares;
+
+    event Deposit(address indexed user, uint256 amount, uint256 sharesMinted);
+    event Withdraw(address indexed user, uint256 amount, uint256 sharesBurned);
+    event StrategyAdded(address indexed strategy, uint256 debtRatio);
+    event StrategyRevoked(address indexed strategy);
+    event Harvested(address indexed strategy, uint256 profit, uint256 loss);
+
+    modifier onlyGovernance() {
+        require(msg.sender == governance);
+        _;
+    }
+
+    constructor(address _token) {
+        token = IERC20(_token);
+        governance = msg.sender;
+    }
+
+    function totalAssets() public view returns (uint256) {
+        return token.balanceOf(address(this)) + totalDebt;
+    }
+
+    function pricePerShare() external view returns (uint256) {
+        uint256 supply = totalShares;
+        if (supply == 0) return 1e18;
+        return (totalAssets() * 1e18) / supply;
+    }
+
+    function deposit(uint256 amount) external returns (uint256) {
+        uint256 pool = totalAssets();
+        token.transferFrom(msg.sender, address(this), amount);
+
+        uint256 newShares;
+        if (totalShares == 0) {
+            newShares = amount;
+        } else {
+            newShares = (amount * totalShares) / pool;
+        }
+
+        shares[msg.sender] += newShares;
+        totalShares += newShares;
+
+        emit Deposit(msg.sender, amount, newShares);
+        return newShares;
+    }
+
+    function withdraw(uint256 shareAmount) external returns (uint256) {
+        require(shareAmount <= shares[msg.sender]);
+
+        uint256 value = (shareAmount * totalAssets()) / totalShares;
+        shares[msg.sender] -= shareAmount;
+        totalShares -= shareAmount;
+
+        uint256 vaultBalance = token.balanceOf(address(this));
+        if (value > vaultBalance) {
+            uint256 deficit = value - vaultBalance;
+            _withdrawFromStrategies(deficit);
+            uint256 available = token.balanceOf(address(this));
+            if (value > available) value = available;
+        }
+
+        token.transfer(msg.sender, value);
+        emit Withdraw(msg.sender, value, shareAmount);
+        return value;
+    }
+
+    function _withdrawFromStrategies(uint256 amount) internal {
+        uint256 remaining = amount;
+        uint256 len = withdrawalQueue.length;
+        for (uint256 i; i < len;) {
+            address strat = withdrawalQueue[i];
+            uint256 stratBal = IStrategy(strat).balanceOf();
+            uint256 toWithdraw = remaining > stratBal ? stratBal : remaining;
+            if (toWithdraw > 0) {
+                IStrategy(strat).withdraw(toWithdraw);
+                strategies[strat].totalDebt -= toWithdraw;
+                totalDebt -= toWithdraw;
+                remaining -= toWithdraw;
+            }
+            if (remaining == 0) break;
+            unchecked { ++i; }
+        }
+    }
+
+    function addStrategy(address strategy, uint256 debtRatio) external onlyGovernance {
+        require(!strategies[strategy].active);
+        require(IStrategy(strategy).want() == address(token));
+        require(totalDebtRatio + debtRatio <= MAX_BPS);
+
+        strategies[strategy] = StrategyInfo({
+            debtRatio: debtRatio,
+            totalDebt: 0,
+            lastReport: block.timestamp,
+            active: true
+        });
+
+        totalDebtRatio += debtRatio;
+        withdrawalQueue.push(strategy);
+        emit StrategyAdded(strategy, debtRatio);
+    }
+
+    function revokeStrategy(address strategy) external onlyGovernance {
+        StrategyInfo storage info = strategies[strategy];
+        require(info.active);
+        totalDebtRatio -= info.debtRatio;
+        info.debtRatio = 0;
+        info.active = false;
+        emit StrategyRevoked(strategy);
+    }
+
+    function updateDebtRatio(address strategy, uint256 newRatio) external onlyGovernance {
+        StrategyInfo storage info = strategies[strategy];
+        require(info.active);
+        totalDebtRatio = totalDebtRatio - info.debtRatio + newRatio;
+        require(totalDebtRatio <= MAX_BPS);
+        info.debtRatio = newRatio;
+    }
+
+    function harvest(address strategy) external {
+        StrategyInfo storage info = strategies[strategy];
+        require(info.active);
+
+        uint256 profit = IStrategy(strategy).harvest();
+
+        uint256 assets = totalAssets();
+        uint256 targetDebt = (assets * info.debtRatio) / MAX_BPS;
+        uint256 currentDebt = info.totalDebt;
+
+        if (targetDebt > currentDebt) {
+            uint256 toDeposit = targetDebt - currentDebt;
+            uint256 available = token.balanceOf(address(this));
+            if (toDeposit > available) toDeposit = available;
+            if (toDeposit > 0) {
+                token.approve(strategy, toDeposit);
+                IStrategy(strategy).deposit(toDeposit);
+                info.totalDebt += toDeposit;
+                totalDebt += toDeposit;
+            }
+        } else if (currentDebt > targetDebt) {
+            uint256 toWithdraw = currentDebt - targetDebt;
+            IStrategy(strategy).withdraw(toWithdraw);
+            info.totalDebt -= toWithdraw;
+            totalDebt -= toWithdraw;
+        }
+
+        info.lastReport = block.timestamp;
+        emit Harvested(strategy, profit, 0);
+    }
+
+    function setWithdrawalQueue(address[] calldata queue) external onlyGovernance {
+        withdrawalQueue = queue;
+    }
+
+    function setPendingGovernance(address _gov) external onlyGovernance {
+        pendingGovernance = _gov;
+    }
+
+    function acceptGovernance() external {
+        require(msg.sender == pendingGovernance);
+        governance = msg.sender;
+        pendingGovernance = address(0);
+    }
+
+    function sweepToken(address _token) external onlyGovernance {
+        require(_token != address(token));
+        IERC20(_token).transfer(governance, IERC20(_token).balanceOf(address(this)));
+    }
+}
+```

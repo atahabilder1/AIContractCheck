@@ -1,0 +1,75 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20FlashMint.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract WrappedToken is ERC20, IERC20Permit, IERC20FlashMint, EIP712, ReentrancyGuard {
+    using ECDSA for bytes32;
+
+    IERC20 public underlyingToken;
+
+    mapping(address => uint256) private _nonces;
+    bytes32 private constant _PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+
+    constructor(IERC20 _underlyingToken) ERC20("Wrapped Token", "WTKN") EIP712("Wrapped Token", "1") {
+        underlyingToken = _underlyingToken;
+    }
+
+    function deposit(uint256 amount) external nonReentrant {
+        require(underlyingToken.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        _mint(msg.sender, amount);
+    }
+
+    function withdraw(uint256 amount) external nonReentrant {
+        _burn(msg.sender, amount);
+        require(underlyingToken.transfer(msg.sender, amount), "Transfer failed");
+    }
+
+    function permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external override {
+        require(block.timestamp <= deadline, "Permit expired");
+
+        bytes32 structHash = keccak256(abi.encode(_PERMIT_TYPEHASH, owner, spender, value, _useNonce(owner), deadline));
+        bytes32 hash = _hashTypedDataV4(structHash);
+        address signer = hash.recover(v, r, s);
+        require(signer == owner, "Invalid signature");
+
+        _approve(owner, spender, value);
+    }
+
+    function nonces(address owner) public view override returns (uint256) {
+        return _nonces[owner];
+    }
+
+    function DOMAIN_SEPARATOR() external view override returns (bytes32) {
+        return _domainSeparatorV4();
+    }
+
+    function flashMint(uint256 amount) external override nonReentrant {
+        uint256 fee = amount * 5 / 1000; // 0.5% fee
+        _mint(msg.sender, amount);
+        require(msg.sender.call{value: amount}(""), "Flash mint failed");
+
+        uint256 totalRepayment = amount + fee;
+        require(balanceOf(msg.sender) >= totalRepayment, "Insufficient repayment");
+        _burn(msg.sender, totalRepayment);
+    }
+
+    function _useNonce(address owner) internal returns (uint256 current) {
+        current = _nonces[owner];
+        _nonces[owner]++;
+    }
+}

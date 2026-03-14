@@ -1,0 +1,42 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleLending {
+    address public owner;
+    mapping(address => uint256) public deposits;
+    mapping(address => uint256) public loans;
+
+    event DepositMade(address indexed user, uint256 amount);
+    event LoanTaken(address indexed user, uint256 amount);
+    event LoanRepaid(address indexed user, uint256 amount);
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    function deposit() external payable {
+        require(msg.value > 0, "Deposit amount must be greater than 0");
+        deposits[msg.sender] += msg.value;
+        emit DepositMade(msg.sender, msg.value);
+    }
+
+    function takeLoan(uint256 amount) external {
+        require(deposits[msg.sender] >= amount, "Insufficient deposit");
+        loans[msg.sender] += amount;
+        deposits[msg.sender] -= amount;
+        payable(msg.sender).transfer(amount);
+        emit LoanTaken(msg.sender, amount);
+    }
+
+    function repayLoan(uint256 amount) external payable {
+        require(loans[msg.sender] >= amount, "Repayment amount exceeds loan");
+        loans[msg.sender] -= amount;
+        deposits[msg.sender] += amount;
+        emit LoanRepaid(msg.sender, amount);
+    }
+}

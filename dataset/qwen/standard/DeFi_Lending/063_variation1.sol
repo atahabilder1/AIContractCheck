@@ -1,0 +1,92 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract PeerToPeerLending {
+    struct Loan {
+        address payable lender;
+        address payable borrower;
+        uint256 amount;
+        uint256 interestRate; // in basis points (100 basis points = 1%)
+        uint256 duration; // in seconds
+        uint256 deadline; // timestamp
+        bool active;
+        bool repaid;
+        address collateralToken;
+        uint256 collateralAmount;
+    }
+
+    uint256 public loanId;
+    mapping(uint256 => Loan) public loans;
+    mapping(address => uint256[]) public userLoans;
+
+    event LoanCreated(uint256 indexed loanId, address lender, address borrower, uint256 amount, uint256 interestRate, uint256 duration, address collateralToken, uint256 collateralAmount);
+    event LoanRepaid(uint256 indexed loanId);
+    event CollateralClaimed(uint256 indexed loanId);
+
+    function createLoan(uint256 _amount, uint256 _interestRate, uint256 _duration, address _collateralToken, uint256 _collateralAmount) public {
+        require(_amount > 0, "Loan amount must be greater than zero");
+        require(_duration > 0, "Loan duration must be greater than zero");
+        require(IERC20(_collateralToken).transferFrom(msg.sender, address(this), _collateralAmount), "Collateral transfer failed");
+
+        uint256 _deadline = block.timestamp + _duration;
+        loans[loanId] = Loan({
+            lender: payable(msg.sender),
+            borrower: payable(address(0)),
+            amount: _amount,
+            interestRate: _interestRate,
+            duration: _duration,
+            deadline: _deadline,
+            active: false,
+            repaid: false,
+            collateralToken: _collateralToken,
+            collateralAmount: _collateralAmount
+        });
+
+        userLoans[msg.sender].push(loanId);
+        emit LoanCreated(loanId, msg.sender, address(0), _amount, _interestRate, _duration, _collateralToken, _collateralAmount);
+        loanId++;
+    }
+
+    function acceptLoan(uint256 _loanId) public payable {
+        Loan storage loan = loans[_loanId];
+        require(loan.borrower == address(0), "Loan already accepted");
+        require(msg.sender != loan.lender, "Lender cannot be the borrower");
+        require(msg.value == loan.amount, "Incorrect loan amount");
+
+        loan.borrower = payable(msg.sender);
+        loan.active = true;
+        userLoans[msg.sender].push(_loanId);
+    }
+
+    function repayLoan(uint256 _loanId) public payable {
+        Loan storage loan = loans[_loanId];
+        require(loan.borrower == msg.sender, "Only the borrower can repay the loan");
+        require(loan.active, "Loan is not active");
+
+        uint256 totalAmount = loan.amount + (loan.amount * loan.interestRate / 10000);
+        require(msg.value == totalAmount, "Incorrect repayment amount");
+
+        loan.lender.transfer(totalAmount);
+        loan.repaid = true;
+        loan.active = false;
+        IERC20(loan.collateralToken).transfer(loan.borrower, loan.collateralAmount);
+
+        emit LoanRepaid(_loanId);
+    }
+
+    function claimCollateral(uint256 _loanId) public {
+        Loan storage loan = loans[_loanId];
+        require(loan.lender == msg.sender, "Only the lender can claim collateral");
+        require(loan.active && block.timestamp > loan.deadline, "Loan is still active or not expired");
+
+        IERC20(loan.collateralToken).transfer(loan.lender, loan.collateralAmount);
+        loan.active = false;
+
+        emit CollateralClaimed(_loanId);
+    }
+}
+
+interface IERC20 {
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+}

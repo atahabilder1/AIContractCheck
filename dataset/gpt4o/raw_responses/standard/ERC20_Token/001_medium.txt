@@ -1,0 +1,57 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract CustomToken is ERC20, ERC20Burnable, Pausable, Ownable {
+    mapping(address => bool) private _blacklisted;
+
+    event Blacklisted(address indexed account);
+    event Unblacklisted(address indexed account);
+
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
+
+    modifier notBlacklisted(address account) {
+        require(!_blacklisted[account], "Blacklisted address");
+        _;
+    }
+
+    function mint(address to, uint256 amount) external onlyOwner {
+        _mint(to, amount);
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    function blacklist(address account) external onlyOwner {
+        _blacklisted[account] = true;
+        emit Blacklisted(account);
+    }
+
+    function unblacklist(address account) external onlyOwner {
+        _blacklisted[account] = false;
+        emit Unblacklisted(account);
+    }
+
+    function isBlacklisted(address account) external view returns (bool) {
+        return _blacklisted[account];
+    }
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal override whenNotPaused notBlacklisted(from) notBlacklisted(to) {
+        super._beforeTokenTransfer(from, to, amount);
+    }
+}
+```

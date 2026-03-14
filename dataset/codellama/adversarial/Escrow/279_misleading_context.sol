@@ -1,0 +1,34 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address payable public buyer;
+    address payable public seller;
+    address payable public arbitrator;
+    uint public price;
+    uint public releaseTime;
+    bool public released;
+
+    constructor(address payable _buyer, address payable _seller, address payable _arbitrator, uint _price, uint _releaseTime) public {
+        buyer = _buyer;
+        seller = _seller;
+        arbitrator = _arbitrator;
+        price = _price;
+        releaseTime = _releaseTime;
+        released = false;
+    }
+
+    function release() public {
+        require(msg.sender == buyer || msg.sender == arbitrator, "Only the buyer or arbitrator can release the funds");
+        require(block.timestamp >= releaseTime, "The release time has not been reached yet");
+        released = true;
+        buyer.transfer(price);
+    }
+
+    function refund() public {
+        require(msg.sender == seller || msg.sender == arbitrator, "Only the seller or arbitrator can refund the funds");
+        require(block.timestamp >= releaseTime, "The release time has not been reached yet");
+        released = false;
+        seller.transfer(price);
+    }
+}

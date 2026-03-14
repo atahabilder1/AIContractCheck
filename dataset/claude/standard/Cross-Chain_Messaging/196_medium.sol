@@ -1,0 +1,292 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+contract CrossChainMessaging {
+    struct Message {
+        uint256 sourceChainId;
+        uint256 destinationChainId;
+        address sender;
+        address recipient;
+        bytes payload;
+        uint256 nonce;
+        uint256 gasLimit;
+        uint256 timestamp;
+        bytes32 messageHash;
+    }
+
+    struct ChainConfig {
+        bool isSupported;
+        uint256 minGasLimit;
+        uint256 maxGasLimit;
+        uint256 defaultGasLimit;
+        address relayer;
+    }
+
+    address public owner;
+    uint256 public chainId;
+
+    mapping(uint256 => ChainConfig) public chainConfigs;
+    mapping(uint256 => uint256) public outboundNonces;
+    mapping(uint256 => uint256) public inboundNonces;
+    mapping(bytes32 => bool) public processedMessages;
+    mapping(bytes32 => Message) public messages;
+    mapping(address => bool) public authorizedRelayers;
+
+    event MessageSent(
+        bytes32 indexed messageHash,
+        uint256 indexed destinationChainId,
+        address indexed sender,
+        address recipient,
+        uint256 nonce,
+        uint256 gasLimit,
+        bytes payload
+    );
+
+    event MessageReceived(
+        bytes32 indexed messageHash,
+        uint256 indexed sourceChainId,
+        address indexed sender,
+        address recipient,
+        uint256 nonce
+    );
+
+    event MessageExecuted(
+        bytes32 indexed messageHash,
+        bool success,
+        bytes returnData
+    );
+
+    event ChainConfigured(
+        uint256 indexed chainId_,
+        uint256 minGasLimit,
+        uint256 maxGasLimit,
+        uint256 defaultGasLimit,
+        address relayer
+    );
+
+    event RelayerAuthorized(address indexed relayer, bool authorized);
+
+    error UnauthorizedCaller();
+    error UnsupportedChain(uint256 chainId_);
+    error InvalidGasLimit(uint256 provided, uint256 min, uint256 max);
+    error MessageAlreadyProcessed(bytes32 messageHash);
+    error InvalidMessageOrder(uint256 expected, uint256 received);
+    error InvalidSourceChain(uint256 sourceChainId);
+    error MessageExecutionFailed(bytes32 messageHash);
+    error InvalidRecipient();
+    error InvalidRelayer();
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert UnauthorizedCaller();
+        _;
+    }
+
+    modifier onlyAuthorizedRelayer() {
+        if (!authorizedRelayers[msg.sender]) revert UnauthorizedCaller();
+        _;
+    }
+
+    constructor(uint256 _chainId) {
+        owner = msg.sender;
+        chainId = _chainId;
+        authorizedRelayers[msg.sender] = true;
+    }
+
+    function configureChain(
+        uint256 _chainId,
+        uint256 _minGasLimit,
+        uint256 _maxGasLimit,
+        uint256 _defaultGasLimit,
+        address _relayer
+    ) external onlyOwner {
+        require(_minGasLimit <= _defaultGasLimit && _defaultGasLimit <= _maxGasLimit, "Invalid gas config");
+        require(_relayer != address(0), "Invalid relayer");
+
+        chainConfigs[_chainId] = ChainConfig({
+            isSupported: true,
+            minGasLimit: _minGasLimit,
+            maxGasLimit: _maxGasLimit,
+            defaultGasLimit: _defaultGasLimit,
+            relayer: _relayer
+        });
+
+        authorizedRelayers[_relayer] = true;
+
+        emit ChainConfigured(_chainId, _minGasLimit, _maxGasLimit, _defaultGasLimit, _relayer);
+    }
+
+    function setRelayerAuthorization(address _relayer, bool _authorized) external onlyOwner {
+        if (_relayer == address(0)) revert InvalidRelayer();
+        authorizedRelayers[_relayer] = _authorized;
+        emit RelayerAuthorized(_relayer, _authorized);
+    }
+
+    function sendMessage(
+        uint256 _destinationChainId,
+        address _recipient,
+        bytes calldata _payload,
+        uint256 _gasLimit
+    ) external returns (bytes32) {
+        if (_recipient == address(0)) revert InvalidRecipient();
+
+        ChainConfig storage config = chainConfigs[_destinationChainId];
+        if (!config.isSupported) revert UnsupportedChain(_destinationChainId);
+
+        uint256 gasLimit = _gasLimit == 0 ? config.defaultGasLimit : _gasLimit;
+        if (gasLimit < config.minGasLimit || gasLimit > config.maxGasLimit) {
+            revert InvalidGasLimit(gasLimit, config.minGasLimit, config.maxGasLimit);
+        }
+
+        uint256 nonce = outboundNonces[_destinationChainId]++;
+
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(
+                chainId,
+                _destinationChainId,
+                msg.sender,
+                _recipient,
+                nonce,
+                gasLimit,
+                keccak256(_payload),
+                block.timestamp
+            )
+        );
+
+        messages[messageHash] = Message({
+            sourceChainId: chainId,
+            destinationChainId: _destinationChainId,
+            sender: msg.sender,
+            recipient: _recipient,
+            payload: _payload,
+            nonce: nonce,
+            gasLimit: gasLimit,
+            timestamp: block.timestamp,
+            messageHash: messageHash
+        });
+
+        emit MessageSent(
+            messageHash,
+            _destinationChainId,
+            msg.sender,
+            _recipient,
+            nonce,
+            gasLimit,
+            _payload
+        );
+
+        return messageHash;
+    }
+
+    function receiveMessage(
+        uint256 _sourceChainId,
+        address _sender,
+        address _recipient,
+        bytes calldata _payload,
+        uint256 _nonce,
+        uint256 _gasLimit,
+        uint256 _timestamp,
+        bytes32 _messageHash
+    ) external onlyAuthorizedRelayer {
+        if (!chainConfigs[_sourceChainId].isSupported) {
+            revert InvalidSourceChain(_sourceChainId);
+        }
+
+        if (processedMessages[_messageHash]) {
+            revert MessageAlreadyProcessed(_messageHash);
+        }
+
+        uint256 expectedNonce = inboundNonces[_sourceChainId];
+        if (_nonce != expectedNonce) {
+            revert InvalidMessageOrder(expectedNonce, _nonce);
+        }
+
+        bytes32 computedHash = keccak256(
+            abi.encodePacked(
+                _sourceChainId,
+                chainId,
+                _sender,
+                _recipient,
+                _nonce,
+                _gasLimit,
+                keccak256(_payload),
+                _timestamp
+            )
+        );
+        require(computedHash == _messageHash, "Hash mismatch");
+
+        processedMessages[_messageHash] = true;
+        inboundNonces[_sourceChainId] = _nonce + 1;
+
+        messages[_messageHash] = Message({
+            sourceChainId: _sourceChainId,
+            destinationChainId: chainId,
+            sender: _sender,
+            recipient: _recipient,
+            payload: _payload,
+            nonce: _nonce,
+            gasLimit: _gasLimit,
+            timestamp: _timestamp,
+            messageHash: _messageHash
+        });
+
+        emit MessageReceived(_messageHash, _sourceChainId, _sender, _recipient, _nonce);
+
+        if (_recipient.code.length > 0) {
+            (bool success, bytes memory returnData) = _recipient.call{gas: _gasLimit}(
+                abi.encodeWithSignature(
+                    "onCrossChainMessage(uint256,address,bytes)",
+                    _sourceChainId,
+                    _sender,
+                    _payload
+                )
+            );
+
+            emit MessageExecuted(_messageHash, success, returnData);
+        }
+    }
+
+    function retryMessage(bytes32 _messageHash, uint256 _gasLimit) external onlyAuthorizedRelayer {
+        Message storage msg_ = messages[_messageHash];
+        require(msg_.recipient != address(0), "Message not found");
+        require(msg_.destinationChainId == chainId, "Wrong chain");
+
+        ChainConfig storage config = chainConfigs[msg_.sourceChainId];
+        uint256 gasLimit = _gasLimit == 0 ? config.defaultGasLimit : _gasLimit;
+
+        (bool success, bytes memory returnData) = msg_.recipient.call{gas: gasLimit}(
+            abi.encodeWithSignature(
+                "onCrossChainMessage(uint256,address,bytes)",
+                msg_.sourceChainId,
+                msg_.sender,
+                msg_.payload
+            )
+        );
+
+        emit MessageExecuted(_messageHash, success, returnData);
+    }
+
+    function getOutboundNonce(uint256 _destinationChainId) external view returns (uint256) {
+        return outboundNonces[_destinationChainId];
+    }
+
+    function getInboundNonce(uint256 _sourceChainId) external view returns (uint256) {
+        return inboundNonces[_sourceChainId];
+    }
+
+    function isMessageProcessed(bytes32 _messageHash) external view returns (bool) {
+        return processedMessages[_messageHash];
+    }
+
+    function transferOwnership(address _newOwner) external onlyOwner {
+        require(_newOwner != address(0), "Invalid owner");
+        owner = _newOwner;
+    }
+}
+
+interface ICrossChainReceiver {
+    function onCrossChainMessage(
+        uint256 sourceChainId,
+        address sender,
+        bytes calldata payload
+    ) external;
+}

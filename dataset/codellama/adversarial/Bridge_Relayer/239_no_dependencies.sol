@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    address public owner;
+
+    constructor() public {
+        owner = msg.sender;
+    }
+
+    function relay(address _contract, bytes calldata _data) external {
+        require(msg.sender == owner, "Only owner can relay");
+        require(_contract.call.value(msg.value)(_data));
+    }
+}

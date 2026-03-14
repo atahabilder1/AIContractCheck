@@ -1,0 +1,63 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address public owner;
+    uint256 public nonce;
+
+    mapping(bytes32 => bool) public processedTransfers;
+
+    event TransferInitiated(
+        address indexed sender,
+        address indexed recipient,
+        uint256 amount,
+        uint256 targetChainId,
+        uint256 nonce
+    );
+
+    event TransferCompleted(
+        address indexed recipient,
+        uint256 amount,
+        uint256 sourceChainId,
+        uint256 nonce
+    );
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function bridge(address _recipient, uint256 _targetChainId) external payable {
+        require(msg.value > 0, "Must send ETH");
+        require(_recipient != address(0), "Invalid recipient");
+
+        nonce++;
+
+        emit TransferInitiated(msg.sender, _recipient, msg.value, _targetChainId, nonce);
+    }
+
+    function release(
+        address payable _recipient,
+        uint256 _amount,
+        uint256 _sourceChainId,
+        uint256 _nonce
+    ) external onlyOwner {
+        bytes32 transferId = keccak256(
+            abi.encodePacked(_recipient, _amount, _sourceChainId, _nonce)
+        );
+        require(!processedTransfers[transferId], "Already processed");
+
+        processedTransfers[transferId] = true;
+
+        (bool success, ) = _recipient.call{value: _amount}("");
+        require(success, "Transfer failed");
+
+        emit TransferCompleted(_recipient, _amount, _sourceChainId, _nonce);
+    }
+
+    receive() external payable {}
+}

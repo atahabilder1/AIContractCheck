@@ -1,0 +1,80 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+contract SocialRecoveryWallet {
+    address public owner;
+    address[] public guardians;
+    uint256 public requiredGuardianSignatures;
+    mapping(address => bool) public isGuardian;
+    mapping(bytes32 => uint256) public confirmationCount;
+    mapping(bytes32 => mapping(address => bool)) public isConfirmed;
+
+    event GuardiansChanged(address[] newGuardians, uint256 newRequiredSignatures);
+    event RecoveryInitiated(bytes32 recoveryHash);
+    event RecoveryConfirmed(bytes32 recoveryHash, address guardian);
+    event RecoveryExecuted(bytes32 recoveryHash, address newOwner);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    modifier onlyGuardian() {
+        require(isGuardian[msg.sender], "Not a guardian");
+        _;
+    }
+
+    constructor(address[] memory _guardians, uint256 _requiredSignatures) {
+        require(_guardians.length > 0 && _requiredSignatures > 0 && _requiredSignatures <= _guardians.length, "Invalid parameters");
+        owner = msg.sender;
+        for (uint256 i = 0; i < _guardians.length; i++) {
+            require(_guardians[i] != address(0), "Invalid guardian address");
+            guardians.push(_guardians[i]);
+            isGuardian[_guardians[i]] = true;
+        }
+        requiredGuardianSignatures = _requiredSignatures;
+    }
+
+    function changeGuardians(address[] memory _guardians, uint256 _requiredSignatures) external onlyOwner {
+        require(_guardians.length > 0 && _requiredSignatures > 0 && _requiredSignatures <= _guardians.length, "Invalid parameters");
+        for (uint256 i = 0; i < guardians.length; i++) {
+            isGuardian[guardians[i]] = false;
+        }
+        guardians = _guardians;
+        requiredGuardianSignatures = _requiredSignatures;
+        for (uint256 i = 0; i < _guardians.length; i++) {
+            require(_guardians[i] != address(0), "Invalid guardian address");
+            isGuardian[_guardians[i]] = true;
+        }
+        emit GuardiansChanged(_guardians, _requiredSignatures);
+    }
+
+    function initiateRecovery(address _newOwner) external onlyGuardian {
+        bytes32 recoveryHash = keccak256(abi.encodePacked(_newOwner));
+        confirmationCount[recoveryHash]++;
+        isConfirmed[recoveryHash][msg.sender] = true;
+        emit RecoveryInitiated(recoveryHash);
+        if (confirmationCount[recoveryHash] >= requiredGuardianSignatures) {
+            executeRecovery(recoveryHash, _newOwner);
+        }
+    }
+
+    function confirmRecovery(bytes32 _recoveryHash) external onlyGuardian {
+        require(!isConfirmed[_recoveryHash][msg.sender], "Already confirmed");
+        confirmationCount[_recoveryHash]++;
+        isConfirmed[_recoveryHash][msg.sender] = true;
+        emit RecoveryConfirmed(_recoveryHash, msg.sender);
+        if (confirmationCount[_recoveryHash] >= requiredGuardianSignatures) {
+            address newOwner = address(uint160(uint256(_recoveryHash)));
+            executeRecovery(_recoveryHash, newOwner);
+        }
+    }
+
+    function executeRecovery(bytes32 _recoveryHash, address _newOwner) internal {
+        require(_newOwner != address(0), "Invalid new owner");
+        owner = _newOwner;
+        emit RecoveryExecuted(_recoveryHash, _newOwner);
+    }
+}
+```

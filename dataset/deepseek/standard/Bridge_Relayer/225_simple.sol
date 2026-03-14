@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    address public owner;
+    mapping(bytes32 => bool) public processedMessages;
+
+    event MessageSent(bytes32 indexed messageHash, address indexed relayer, bytes32 indexed message);
+    event MessageProcessed(bytes32 indexed messageHash, address indexed relayer, bytes32 indexed message);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    modifier onlyRelayer() {
+        require(isRelayer(msg.sender), "Only relayers can call this function");
+        _;
+    }
+
+    mapping(address => bool) public relayers;
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function addRelayer(address relayer) public onlyOwner {
+        relayers[relayer] = true;
+    }
+
+    function removeRelayer(address relayer) public onlyOwner {
+        relayers[relayer] = false;
+    }
+
+    function isRelayer(address relayer) public view returns (bool) {
+        return relayers[relayer];
+    }
+
+    function sendMessage(bytes32 messageHash, bytes32 message) public onlyRelayer {
+        emit MessageSent(messageHash, msg.sender, message);
+    }
+
+    function processMessage(bytes32 messageHash, bytes32 message) public onlyRelayer {
+        require(!processedMessages[messageHash], "Message already processed");
+        processedMessages[messageHash] = true;
+        emit MessageProcessed(messageHash, msg.sender, message);
+    }
+}

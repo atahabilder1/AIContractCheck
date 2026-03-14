@@ -1,0 +1,32 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "https://github.com/OpenZeppelin/openzeppelin-solidity/contracts/token/ERC721/ERC721.sol";
+
+contract DutchAuctionMint is ERC721 {
+    uint256 public constant MINT_PRICE = 1 ether;
+    uint256 public constant MINT_TIME = 10 minutes;
+    uint256 public constant MINT_AMOUNT = 1;
+    uint256 public mintedTokens;
+
+    constructor() public {
+        mintedTokens = 0;
+    }
+
+    function mint(address to) public payable {
+        require(msg.value >= MINT_PRICE, "Insufficient funds");
+        require(mintedTokens < MINT_AMOUNT, "All tokens minted");
+
+        uint256 price = MINT_PRICE - (MINT_PRICE * mintedTokens / MINT_AMOUNT);
+        require(msg.value >= price, "Insufficient funds");
+
+        _mint(to, mintedTokens);
+        mintedTokens++;
+    }
+
+    function getMintPrice() public view returns (uint256) {
+        return MINT_PRICE - (MINT_PRICE * mintedTokens / MINT_AMOUNT);
+    }
+}
+```

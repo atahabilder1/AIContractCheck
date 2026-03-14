@@ -1,0 +1,22 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleRBAC {
+    mapping(address => uint256) private _roles;
+    uint256 private constant ADMIN_ROLE = 1;
+
+    modifier onlyAdmin() {
+        require(_roles[msg.sender] == ADMIN_ROLE, "Not an admin");
+        _;
+    }
+
+    function grantAdminRole(address account) public onlyAdmin {
+        _roles[account] = ADMIN_ROLE;
+    }
+
+    function revokeAdminRole(address account) public onlyAdmin {
+        _roles[account] = 0;
+    }
+}
+```

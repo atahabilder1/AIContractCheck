@@ -1,0 +1,66 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Crowdfunding {
+    address public owner;
+    uint256 public goal;
+    uint256 public deadline;
+    uint256 public raisedAmount;
+    bool public isCampaignEnded;
+    mapping(address => uint256) public contributions;
+
+    event FundingReceived(address contributor, uint256 amount);
+    event CampaignEnded(bool result);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can call this function");
+        _;
+    }
+
+    modifier campaignActive() {
+        require(block.timestamp < deadline, "Campaign has ended");
+        _;
+    }
+
+    constructor(uint256 _goal, uint256 _durationInDays) {
+        owner = msg.sender;
+        goal = _goal;
+        deadline = block.timestamp + (_durationInDays * 1 days);
+        raisedAmount = 0;
+        isCampaignEnded = false;
+    }
+
+    function contribute() external payable campaignActive {
+        require(msg.value > 0, "Contribution must be greater than 0");
+        contributions[msg.sender] += msg.value;
+        raisedAmount += msg.value;
+        emit FundingReceived(msg.sender, msg.value);
+    }
+
+    function checkGoalReached() public view returns (bool) {
+        return raisedAmount >= goal;
+    }
+
+    function endCampaign() public onlyOwner {
+        require(!isCampaignEnded, "Campaign already ended");
+        isCampaignEnded = true;
+        if (checkGoalReached()) {
+            payable(owner).transfer(raisedAmount);
+            emit CampaignEnded(true);
+        } else {
+            emit CampaignEnded(false);
+        }
+    }
+
+    function getRefund() public {
+        require(block.timestamp > deadline, "Campaign has not yet ended");
+        require(!checkGoalReached(), "Goal has been reached, no refunds");
+        require(contributions[msg.sender] > 0, "No contribution to refund");
+
+        uint256 refundAmount = contributions[msg.sender];
+        contributions[msg.sender] = 0;
+        payable(msg.sender).transfer(refundAmount);
+    }
+}
+```

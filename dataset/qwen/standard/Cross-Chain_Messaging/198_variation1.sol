@@ -1,0 +1,29 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBatchMessenger {
+    event MessageBatchSent(address indexed sender, uint256 batchId, uint256 numberOfMessages);
+
+    struct Message {
+        address destinationChain;
+        address recipient;
+        bytes payload;
+    }
+
+    uint256 public nextBatchId;
+    mapping(uint256 => Message[]) public batches;
+
+    function sendMessageBatch(Message[] memory messages) external {
+        require(messages.length > 0, "Batch must contain at least one message");
+
+        uint256 currentBatchId = nextBatchId;
+        batches[currentBatchId] = messages;
+        nextBatchId++;
+
+        emit MessageBatchSent(msg.sender, currentBatchId, messages.length);
+    }
+
+    function getBatch(uint256 batchId) external view returns (Message[] memory) {
+        return batches[batchId];
+    }
+}

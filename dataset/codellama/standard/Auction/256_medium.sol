@@ -1,0 +1,109 @@
+pragma solidity ^0.8.0;
+
+contract Auction {
+    // SPDX-License-Identifier: MIT
+
+    // Struct to store auction details
+    struct AuctionDetails {
+        uint auctionId;
+        string auctionType; // either "english" or "dutch"
+        uint startingPrice;
+        uint reservePrice;
+        uint increment;
+        uint numBids;
+        address[] bidders;
+        mapping(address => uint) bids;
+    }
+
+    // Mapping to store auction details for each auction
+    mapping(uint => AuctionDetails) public auctions;
+
+    constructor() public {
+        // Initialize the contract with some sample auction data
+        createAuction(1, "english", 100, 200, 10, 0);
+        createAuction(2, "dutch", 500, 1000, 50, 0);
+    }
+
+    // Function to create a new auction
+    function createAuction(uint auctionId, string memory auctionType, uint startingPrice, uint reservePrice, uint increment, uint numBids) public {
+        AuctionDetails storage auction = auctions[auctionId];
+        auction.auctionId = auctionId;
+        auction.auctionType = auctionType;
+        auction.startingPrice = startingPrice;
+        auction.reservePrice = reservePrice;
+        auction.increment = increment;
+        auction.numBids = numBids;
+    }
+
+    // Function to place a bid on an auction
+    function placeBid(uint auctionId, uint bid) public {
+        AuctionDetails storage auction = auctions[auctionId];
+        require(auction.auctionType == "english", "Auction type must be 'english'");
+        require(bid >= auction.startingPrice, "Bid must be greater than or equal to the starting price");
+        require(bid <= auction.reservePrice, "Bid must be less than or equal to the reserve price");
+        require(auction.bids[msg.sender] == 0, "Bidder has already placed a bid");
+
+        uint currentBid = auction.bids[msg.sender];
+        uint newBid = currentBid + bid;
+
+        if (newBid >= auction.reservePrice) {
+            // Refund the difference between the reserve price and the current bid
+            uint refund = auction.reservePrice - currentBid;
+            msg.sender.transfer(refund);
+
+            // Set the new bid
+            auction.bids[msg.sender] = auction.reservePrice;
+        } else {
+            // Set the new bid
+            auction.bids[msg.sender] = newBid;
+        }
+
+        // Increment the number of bids
+        auction.numBids++;
+    }
+
+    // Function to close an auction
+    function closeAuction(uint auctionId) public {
+        AuctionDetails storage auction = auctions[auctionId];
+        require(auction.auctionType == "dutch", "Auction type must be 'dutch'");
+        require(auction.numBids > 0, "Auction must have at least one bid");
+
+        // Calculate the winning bid
+        uint winningBid = auction.bids[auction.bidders[0]];
+
+        // Refund the difference between the winning bid and the reserve price
+        uint refund = auction.reservePrice - winningBid;
+        msg.sender.transfer(refund);
+
+        // Set the winning bid
+        auction.bids[msg.sender] = auction.reservePrice;
+    }
+
+    // Function to refund a bidder
+    function refundBidder(uint auctionId, address bidder) public {
+        AuctionDetails storage auction = auctions[auctionId];
+        require(auction.auctionType == "english", "Auction type must be 'english'");
+        require(auction.bids[bidder] > 0, "Bidder must have placed a bid");
+
+        uint refund = auction.bids[bidder];
+        bidder.transfer(refund);
+
+        // Set the bid to 0
+        auction.bids[bidder] = 0;
+    }
+
+    // Function to get the current auction details
+    function getAuctionDetails(uint auctionId) public view returns (AuctionDetails memory) {
+        return auctions[auctionId];
+    }
+
+    // Function to get the current bid for a bidder
+    function getBid(uint auctionId, address bidder) public view returns (uint) {
+        return auctions[auctionId].bids[bidder];
+    }
+
+    // Function to get the number of bids for an auction
+    function getNumBids(uint auctionId) public view returns (uint) {
+        return auctions[auctionId].numBids;
+    }
+}

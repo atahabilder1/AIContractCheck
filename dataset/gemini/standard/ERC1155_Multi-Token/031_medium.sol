@@ -1,0 +1,257 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
+
+contract MyERC1155 is ERC1155, Ownable {
+    using Strings for uint256;
+
+    // Mapping from token ID to its supply cap
+    mapping(uint256 => uint256) private _supplyCaps;
+
+    // Mapping from token ID to its royalty recipient and amount
+    mapping(uint256 => address) private _royaltyRecipients;
+    mapping(uint256 => uint256) private _royaltyAmounts;
+
+    event RoyaltyUpdated(uint256 indexed id, address indexed recipient, uint256 amount);
+    event SupplyCapUpdated(uint256 indexed id, uint256 cap);
+
+    constructor() ERC1155("ipfs://your_base_uri/") {}
+
+    /**
+     * @dev Mints new tokens to an array of recipients.
+     * Requires that the total supply of each token ID does not exceed its cap.
+     * @param to The address to mint tokens to.
+     * @param ids An array of token IDs to mint.
+     * @param amounts An array of amounts corresponding to each token ID.
+     * @param data Additional data to pass to the hooks.
+     */
+    function mint(address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data)
+        public
+        onlyOwner
+    {
+        require(ids.length == amounts.length, "ERC1155: ids and amounts length mismatch");
+
+        for (uint256 i = 0; i < ids.length; i++) {
+            uint256 id = ids[i];
+            uint256 amount = amounts[i];
+            uint256 currentSupply = totalSupply(id);
+            uint256 cap = _supplyCaps[id];
+
+            // If cap is 0, it means no cap is set for this token ID
+            if (cap > 0) {
+                require(currentSupply + amount <= cap, "ERC1155: mint exceeds supply cap");
+            }
+        }
+
+        _mintBatch(to, ids, amounts, data);
+    }
+
+    /**
+     * @dev Sets the supply cap for a given token ID.
+     * @param id The token ID to set the cap for.
+     * @param cap The new supply cap. A value of 0 means no cap.
+     */
+    function setSupplyCap(uint256 id, uint256 cap) public onlyOwner {
+        _supplyCaps[id] = cap;
+        emit SupplyCapUpdated(id, cap);
+    }
+
+    /**
+     * @dev Returns the supply cap for a given token ID.
+     * @param id The token ID to query the cap for.
+     * @return The supply cap for the token ID, or 0 if no cap is set.
+     */
+    function supplyCap(uint256 id) public view returns (uint256) {
+        return _supplyCaps[id];
+    }
+
+    /**
+     * @dev Sets the royalty recipient and amount for a given token ID.
+     * @param id The token ID to set royalties for.
+     * @param recipient The address to receive royalties.
+     * @param amount The royalty amount in basis points (e.g., 100 for 1%).
+     */
+    function setRoyalty(uint256 id, address recipient, uint256 amount) public onlyOwner {
+        require(amount <= 10000, "ERC1155: Royalty amount too high"); // Max 100%
+        _royaltyRecipients[id] = recipient;
+        _royaltyAmounts[id] = amount;
+        emit RoyaltyUpdated(id, recipient, amount);
+    }
+
+    /**
+     * @dev Returns the royalty recipient for a given token ID.
+     * @param id The token ID to query the royalty recipient for.
+     * @return The royalty recipient address.
+     */
+    function royaltyRecipient(uint256 id) public view returns (address) {
+        return _royaltyRecipients[id];
+    }
+
+    /**
+     * @dev Returns the royalty amount for a given token ID.
+     * @param id The token ID to query the royalty amount for.
+     * @return The royalty amount in basis points.
+     */
+    function royaltyAmount(uint256 id) public view returns (uint256) {
+        return _royaltyAmounts[id];
+    }
+
+    /**
+     * @dev Hook that is called before any token transfer.
+     * This function is used to calculate and transfer royalties.
+     * @param operator The address performing the transfer.
+     * @param from The address from which tokens are being transferred.
+     * @param to The address to which tokens are being transferred.
+     * @param ids An array of token IDs being transferred.
+     * @param amounts An array of amounts corresponding to each token ID.
+     * @param data Additional data to pass to the hooks.
+     */
+    function _beforeTokenTransfer(
+        address operator,
+        address from,
+        address to,
+        uint256[] memory ids,
+        uint256[] memory amounts,
+        bytes memory data
+    ) internal virtual override {
+        super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
+
+        // Process royalties only for actual transfers (not minting or burning)
+        if (from == address(0) || to == address(0)) {
+            return;
+        }
+
+        for (uint256 i = 0; i < ids.length; i++) {
+            uint256 id = ids[i];
+            uint256 amount = amounts[i];
+            address recipient = _royaltyRecipients[id];
+            uint256 royalty = _royaltyAmounts[id];
+
+            if (recipient != address(0) && royalty > 0) {
+                // Calculate royalty amount
+                // The royalty is calculated on the value of the transfer.
+                // For simplicity here, we assume a fixed value per token or a mechanism to determine value.
+                // In a real-world scenario, you might need a more sophisticated way to determine the value.
+                // For this example, let's assume a hypothetical value for calculation.
+                // A common approach is to use the price at which it was sold on a marketplace.
+                // Here, we'll just demonstrate the calculation and transfer logic.
+
+                // For demonstration, let's assume each token has a value of 1 wei for royalty calculation.
+                // In a real dapp, this value would come from the marketplace or a predefined price.
+                uint256 tokenValue = 1 * (10**18); // Example: 1 ETH value per token
+                uint256 totalTransferValue = amount * tokenValue;
+                uint256 royaltyAmountDue = (totalTransferValue * royalty) / 10000;
+
+                // Transfer royalties to the recipient
+                // This requires the sender (operator) to have enough balance to cover the royalty,
+                // or the contract needs a mechanism to collect funds for this.
+                // A more robust implementation would involve a marketplace integration or a dedicated fee collection.
+                // For this example, we'll assume the `from` address has enough balance to cover the royalty.
+                // In a real scenario, you might want to emit an event for the marketplace to handle.
+                // Or, if the contract is the seller, it would deduct from sale proceeds.
+
+                // To make this example runnable without complex value determination,
+                // let's assume a simpler royalty model: royalty per token transferred.
+                // Example: 1% royalty per token.
+                // If `amount` tokens are transferred, and royalty is 1%, then royalty is `amount * royalty_per_token`.
+                // Let's refine this to a more practical approach: royalty on sale price.
+                // This contract does not handle sale prices directly.
+                // The royalty mechanism below is a placeholder for where the royalty payment logic would go.
+
+                // A common pattern is to emit an event that marketplaces listen to.
+                // For example: `emit TransferRoyalties(id, recipient, royaltyAmountDue);`
+                // The marketplace would then send `royaltyAmountDue` to `recipient` from the sale proceeds.
+
+                // If the contract itself is facilitating the sale, it would handle the transfer.
+                // For direct transfers between users without a marketplace, royalty collection is complex.
+                // The standard for ERC-2981 is to *declare* royalties, not *enforce* them on direct transfers.
+                // Enforcement typically happens via marketplace integrations.
+
+                // For this example, we'll simulate the royalty transfer.
+                // In a real scenario, this would be part of a sale process.
+                // We'll emit an event that could be picked up by a marketplace.
+                // The actual transfer would happen on the marketplace.
+                // If `from` is not the owner of the tokens being transferred, and `operator` is not `from`,
+                // then the `operator` is responsible for ensuring the royalty is paid.
+                // This is a complex topic and often relies on marketplace integration.
+
+                // Let's just emit an event for now to indicate royalty due.
+                // The actual transfer logic would depend on how the tokens are being sold.
+                // If this contract is directly selling tokens, it would handle it.
+                // If it's peer-to-peer transfer, marketplaces handle royalties.
+
+                // For a basic implementation, we can assume the `operator` pays the royalty.
+                // This would require the `operator` to have enough Ether to send.
+                // This is highly dependent on the context of the transfer.
+                // A more standard approach is to use ERC-2981.
+                // This contract doesn't implement ERC-2981 directly but provides the data.
+
+                // For a self-contained example, we'll simulate a royalty payment if the `from` address is not the operator.
+                // This is a simplified model.
+                // If `from` is not the operator, it implies a sale where `operator` is the buyer/agent.
+                // The royalty is usually paid by the seller (from).
+                // This is getting complicated for a simple example.
+
+                // Let's revert to the standard ERC-1155 _beforeTokenTransfer hook pattern for royalties.
+                // The standard is that the contract *declares* royalties, and marketplaces *enforce* them.
+                // This function is called *before* the transfer.
+                // The royalty is usually calculated on the sale price.
+                // We don't have sale price here.
+
+                // A common ERC-1155 royalty pattern is to store royalty info and let marketplaces query it.
+                // This contract already stores royalty info.
+                // The `_beforeTokenTransfer` hook is not the typical place to *force* royalty payments in peer-to-peer transfers.
+                // It's used for other logic like enforcing caps or updating balances.
+
+                // If we want to enforce royalties on transfers *out* of this contract's control (e.g., via a `sell` function),
+                // that would be a different mechanism.
+
+                // Let's assume for this example that the `_beforeTokenTransfer` is used to *inform* a system
+                // about potential royalties, and the actual payment is handled externally or by a marketplace.
+
+                // If you were to implement royalty *enforcement* directly within this contract,
+                // you would need a `sell` function that takes payment and distributes it.
+
+                // For now, we'll stick to storing the royalty information.
+                // The actual payment logic would be in a marketplace or a dedicated `sell` function.
+            }
+        }
+    }
+
+    // Override _doSafeTransferAccept for batch transfers to handle royalties
+    // This is typically where a marketplace would interact if it's handling the sale.
+    // However, the standard ERC-1155 _beforeTokenTransfer is sufficient for declaring royalties.
+    // The complexity of enforcing royalties on direct transfers is significant and usually delegated to marketplaces.
+
+    // To fulfill the request of "per-token royalties", we have provided the `setRoyalty` and `royaltyRecipient`/`royaltyAmount` functions.
+    // The actual *transfer* of royalties would happen during a sale.
+    // The `_beforeTokenTransfer` hook is called before the balances are updated.
+    // If you were to implement a direct sale mechanism within this contract, you would use this hook or a dedicated sale function.
+
+    // Example of how a marketplace might use the royalty information:
+    // A marketplace would call `royaltyInfo(tokenId, salePrice)` which would return `(recipient, amountDue)`.
+    // This contract doesn't implement the `royaltyInfo` function as per ERC-2981.
+    // However, the data is available.
+
+    // If the request implies that the contract should *handle* the royalty payment during transfers,
+    // this would require a more complex mechanism, such as:
+    // 1. A `sell` function that accepts payment (e.g., ETH).
+    // 2. The `sell` function calculates royalties based on the payment.
+    // 3. The `sell` function transfers tokens to the buyer and royalties to the recipient.
+    // This contract does not include such a `sell` function. The royalties are declared.
+
+    /**
+     * @dev Overrides the default URI function to allow dynamic URIs if needed,
+     * or to ensure consistency with base URI.
+     * For this example, we are using a fixed base URI in the constructor.
+     * If you need dynamic URIs per token, you'd need a mapping for them.
+     */
+    function uri(uint256 id) public view virtual override returns (string memory) {
+        // If you had dynamic URIs, you would look them up here.
+        // For example: `return string(abi.encodePacked(_baseURI, _tokenURIs[id]));`
+        return super.uri(id);
+    }
+}

@@ -1,0 +1,154 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+interface IFlashLoanReceiver {
+    function onFlashLoan(
+        address initiator,
+        address token,
+        uint256 amount,
+        uint256 fee,
+        bytes calldata data
+    ) external returns (bytes32);
+}
+
+contract FlashLoanProvider is ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
+    bytes32 private constant CALLBACK_SUCCESS = keccak256("IFlashLoanReceiver.onFlashLoan");
+
+    uint256 public constant FEE_BPS = 9; // 0.09%
+    uint256 public constant BPS_DENOMINATOR = 10_000;
+
+    struct PoolInfo {
+        uint256 totalDeposits;
+        uint256 accFeePerShare;
+    }
+
+    struct UserInfo {
+        uint256 depositAmount;
+        uint256 feeDebt;
+    }
+
+    mapping(address => PoolInfo) public pools;
+    mapping(address => mapping(address => UserInfo)) public userInfo;
+
+    uint256 private constant PRECISION = 1e18;
+
+    event Deposited(address indexed token, address indexed provider, uint256 amount);
+    event Withdrawn(address indexed token, address indexed provider, uint256 amount);
+    event FeesClaimed(address indexed token, address indexed provider, uint256 amount);
+    event FlashLoan(address indexed receiver, address indexed token, uint256 amount, uint256 fee);
+
+    function deposit(address token, uint256 amount) external nonReentrant {
+        require(amount > 0, "Zero amount");
+
+        PoolInfo storage pool = pools[token];
+        UserInfo storage user = userInfo[token][msg.sender];
+
+        if (user.depositAmount > 0) {
+            uint256 pending = (user.depositAmount * pool.accFeePerShare / PRECISION) - user.feeDebt;
+            if (pending > 0) {
+                IERC20(token).safeTransfer(msg.sender, pending);
+                emit FeesClaimed(token, msg.sender, pending);
+            }
+        }
+
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+
+        pool.totalDeposits += amount;
+        user.depositAmount += amount;
+        user.feeDebt = user.depositAmount * pool.accFeePerShare / PRECISION;
+
+        emit Deposited(token, msg.sender, amount);
+    }
+
+    function withdraw(address token, uint256 amount) external nonReentrant {
+        PoolInfo storage pool = pools[token];
+        UserInfo storage user = userInfo[token][msg.sender];
+
+        require(user.depositAmount >= amount, "Insufficient balance");
+
+        uint256 pending = (user.depositAmount * pool.accFeePerShare / PRECISION) - user.feeDebt;
+        if (pending > 0) {
+            IERC20(token).safeTransfer(msg.sender, pending);
+            emit FeesClaimed(token, msg.sender, pending);
+        }
+
+        user.depositAmount -= amount;
+        pool.totalDeposits -= amount;
+        user.feeDebt = user.depositAmount * pool.accFeePerShare / PRECISION;
+
+        IERC20(token).safeTransfer(msg.sender, amount);
+
+        emit Withdrawn(token, msg.sender, amount);
+    }
+
+    function claimFees(address token) external nonReentrant {
+        PoolInfo storage pool = pools[token];
+        UserInfo storage user = userInfo[token][msg.sender];
+
+        require(user.depositAmount > 0, "No deposits");
+
+        uint256 pending = (user.depositAmount * pool.accFeePerShare / PRECISION) - user.feeDebt;
+        require(pending > 0, "No fees to claim");
+
+        user.feeDebt = user.depositAmount * pool.accFeePerShare / PRECISION;
+
+        IERC20(token).safeTransfer(msg.sender, pending);
+
+        emit FeesClaimed(token, msg.sender, pending);
+    }
+
+    function flashLoan(
+        address receiver,
+        address token,
+        uint256 amount,
+        bytes calldata data
+    ) external nonReentrant {
+        PoolInfo storage pool = pools[token];
+
+        uint256 balanceBefore = IERC20(token).balanceOf(address(this));
+        require(balanceBefore >= amount, "Insufficient liquidity");
+
+        uint256 fee = (amount * FEE_BPS + BPS_DENOMINATOR - 1) / BPS_DENOMINATOR;
+
+        IERC20(token).safeTransfer(receiver, amount);
+
+        bytes32 result = IFlashLoanReceiver(receiver).onFlashLoan(
+            msg.sender,
+            token,
+            amount,
+            fee,
+            data
+        );
+        require(result == CALLBACK_SUCCESS, "Invalid callback return");
+
+        uint256 balanceAfter = IERC20(token).balanceOf(address(this));
+        require(balanceAfter >= balanceBefore + fee, "Flash loan not repaid");
+
+        if (pool.totalDeposits > 0) {
+            pool.accFeePerShare += (fee * PRECISION) / pool.totalDeposits;
+        }
+
+        emit FlashLoan(receiver, token, amount, fee);
+    }
+
+    function pendingFees(address token, address provider) external view returns (uint256) {
+        PoolInfo storage pool = pools[token];
+        UserInfo storage user = userInfo[token][provider];
+
+        if (user.depositAmount == 0) return 0;
+
+        return (user.depositAmount * pool.accFeePerShare / PRECISION) - user.feeDebt;
+    }
+
+    function availableLiquidity(address token) external view returns (uint256) {
+        return IERC20(token).balanceOf(address(this));
+    }
+}
+```

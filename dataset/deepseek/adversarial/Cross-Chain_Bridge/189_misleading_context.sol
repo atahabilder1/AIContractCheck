@@ -1,0 +1,33 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address public owner;
+    uint256 public nonce;
+    mapping(uint256 => bool) public executedMessages;
+
+    event SentMessage(address indexed sender, uint256 indexed nonce, bytes message);
+    event ExecutedMessage(uint256 indexed nonce, bytes message);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function sendMessage(bytes memory message) public payable {
+        emit SentMessage(msg.sender, nonce, message);
+        nonce++;
+    }
+
+    function executeMessage(uint256 _nonce, bytes memory _message) public onlyOwner {
+        require(!executedMessages[_nonce], "Message already executed");
+        executedMessages[_nonce] = true;
+        (bool success, ) = address(this).call(_message);
+        require(success, "Message execution failed");
+        emit ExecutedMessage(_nonce, _message);
+    }
+}

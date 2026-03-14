@@ -1,0 +1,57 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MinimalAuction {
+    address payable public highestBidder;
+    uint256 public highestBid;
+    uint256 public auctionEndTime;
+    bool public ended;
+
+    event Bid(address bidder, uint256 amount);
+    event AuctionEnded(address winner, uint256 amount);
+
+    constructor(uint256 _biddingTime) {
+        auctionEndTime = block.timestamp + _biddingTime;
+    }
+
+    function bid() external payable {
+        require(!ended, "Auction ended");
+        require(block.timestamp < auctionEndTime, "Auction ended");
+        require(msg.value > highestBid, "Bid too low");
+
+        if (highestBidder != address(0)) {
+            // Return previous highest bid to the bidder
+            (bool success, ) = highestBidder.call{value: highestBid}("");
+            require(success, "Refund failed");
+        }
+
+        highestBidder = payable(msg.sender);
+        highestBid = msg.value;
+
+        emit Bid(msg.sender, msg.value);
+    }
+
+    function endAuction() external {
+        require(!ended, "Auction already ended");
+        require(block.timestamp >= auctionEndTime, "Auction not ended yet");
+
+        ended = true;
+        emit AuctionEnded(highestBidder, highestBid);
+    }
+
+    function withdraw() external {
+        require(ended, "Auction not ended");
+        require(msg.sender == highestBidder, "Not the highest bidder");
+        require(highestBid > 0, "No bids placed");
+
+        uint256 amount = highestBid;
+        highestBid = 0; // Prevent reentrancy by zeroing out immediately
+        highestBidder = payable(address(0));
+
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Withdrawal failed");
+    }
+
+    // Fallback function to receive ether if needed, though not strictly necessary for the auction logic
+    receive() external payable {}
+}

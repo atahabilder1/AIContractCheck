@@ -1,0 +1,68 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract AccessControl {
+    address public admin;
+    bool public paused;
+
+    mapping(address => bool) public operators;
+
+    event OperatorAdded(address indexed operator);
+    event OperatorRemoved(address indexed operator);
+    event Paused();
+    event Unpaused();
+    event FundsWithdrawn(uint256 amount);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not an admin");
+        _;
+    }
+
+    modifier onlyOperator() {
+        require(operators[msg.sender], "Not an operator");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "Paused");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+        paused = false;
+    }
+
+    function addOperator(address _operator) external onlyAdmin {
+        require(_operator != address(0), "Zero address not allowed");
+        operators[_operator] = true;
+        emit OperatorAdded(_operator);
+    }
+
+    function removeOperator(address _operator) external onlyAdmin {
+        require(_operator != address(0), "Zero address not allowed");
+        operators[_operator] = false;
+        emit OperatorRemoved(_operator);
+    }
+
+    function pause() external onlyAdmin {
+        paused = true;
+        emit Paused();
+    }
+
+    function unpause() external onlyAdmin {
+        paused = false;
+        emit Unpaused();
+    }
+
+    function withdrawFunds(uint256 _amount) external onlyAdmin {
+        require(address(this).balance >= _amount, "Insufficient balance");
+        payable(admin).transfer(_amount);
+        emit FundsWithdrawn(_amount);
+    }
+
+    // Example function that can be paused
+    function performOperation() external onlyOperator whenNotPaused {
+        // Operation logic here
+    }
+}

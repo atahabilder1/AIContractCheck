@@ -1,0 +1,60 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Crowdfunding {
+    address payable public immutable owner;
+    uint256 public immutable goal;
+    uint256 public deadline;
+    mapping(address => uint256) public contributions;
+    uint256 public totalContributed;
+
+    event ContributionReceived(address indexed contributor, uint256 amount);
+    event GoalReached();
+    event RefundIssued(address indexed contributor, uint256 amount);
+
+    constructor(uint256 _goal, uint256 _duration) {
+        owner = payable(msg.sender);
+        goal = _goal;
+        deadline = block.timestamp + _duration;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier beforeDeadline() {
+        require(block.timestamp < deadline, "Deadline passed");
+        _;
+    }
+
+    modifier afterDeadline() {
+        require(block.timestamp >= deadline, "Deadline not reached");
+        _;
+    }
+
+    function contribute() external payable beforeDeadline {
+        require(msg.value > 0, "Must contribute more than 0");
+        contributions[msg.sender] += msg.value;
+        totalContributed += msg.value;
+        emit ContributionReceived(msg.sender, msg.value);
+    }
+
+    function claimFunds() external onlyOwner afterDeadline {
+        require(totalContributed >= goal, "Goal not reached");
+        emit GoalReached();
+        selfdestruct(owner);
+    }
+
+    function refund() external afterDeadline {
+        uint256 contributed = contributions[msg.sender];
+        require(contributed > 0, "No contributions");
+        require(totalContributed < goal, "Goal reached, can't refund");
+
+        contributions[msg.sender] = 0;
+        emit RefundIssued(msg.sender, contributed);
+        payable(msg.sender).transfer(contributed);
+    }
+}
+```

@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+
+contract EmergencyNFT is ERC721, Ownable, Pausable {
+    address payable public treasury;
+
+    constructor(string memory name, string memory symbol, address payable _treasury) ERC721(name, symbol) {
+        treasury = _treasury;
+    }
+
+    function mint(address to, uint256 tokenId) public onlyOwner {
+        _safeMint(to, tokenId);
+    }
+
+    function pause() public onlyOwner {
+        _pause();
+    }
+
+    function unpause() public onlyOwner {
+        _unpause();
+    }
+
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal virtual override whenNotPaused {
+        super._beforeTokenTransfer(from, to, tokenId);
+    }
+
+    function withdrawAllFunds() public onlyOwner {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No funds to withdraw");
+        (bool success, ) = treasury.call{value: balance}("");
+        require(success, "Fund transfer failed");
+    }
+}

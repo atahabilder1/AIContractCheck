@@ -1,0 +1,202 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IStrategy {
+    function deposit(uint256 _amount) external returns (uint256);
+    function withdraw(uint256 _amount) external returns (uint256);
+    function getBalance() external view returns (uint256);
+    function getAPY() external view returns (uint256); // APY in basis points (e.g., 500 for 5%)
+    function getUnderlyingToken() external view returns (address);
+    function getStrategyToken() external view returns (address);
+    function isStrategyActive() external view returns (bool);
+}
+
+contract YieldAggregator {
+    address public owner;
+    address[] public strategies;
+    uint256 public rotationThreshold; // APY difference in basis points to trigger rotation
+    address public keeper;
+    uint256 public lastRotationTimestamp;
+    uint256 public rotationInterval; // Minimum time in seconds between rotations
+
+    event StrategyAdded(address indexed strategyAddress);
+    event StrategyRemoved(address indexed strategyAddress);
+    event Deposited(address indexed strategyAddress, uint256 amount);
+    event Withdrawn(address indexed strategyAddress, uint256 amount);
+    event RotationTriggered(address indexed bestStrategy, address indexed oldStrategy);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can perform this action");
+        _;
+    }
+
+    modifier onlyKeeper() {
+        require(msg.sender == keeper, "Only keeper can perform this action");
+        _;
+    }
+
+    constructor(uint256 _rotationThreshold, uint256 _rotationInterval) {
+        owner = msg.sender;
+        rotationThreshold = _rotationThreshold;
+        rotationInterval = _rotationInterval;
+        keeper = msg.sender; // Initially, owner is also the keeper
+    }
+
+    function setKeeper(address _keeper) public onlyOwner {
+        keeper = _keeper;
+    }
+
+    function setRotationThreshold(uint256 _rotationThreshold) public onlyOwner {
+        rotationThreshold = _rotationThreshold;
+    }
+
+    function setRotationInterval(uint256 _rotationInterval) public onlyOwner {
+        rotationInterval = _rotationInterval;
+    }
+
+    function addStrategy(address _strategyAddress) public onlyOwner {
+        require(_strategyAddress != address(0), "Invalid strategy address");
+        // Add validation to ensure it's a valid IStrategy implementation if needed
+        strategies.push(_strategyAddress);
+        emit StrategyAdded(_strategyAddress);
+    }
+
+    function removeStrategy(address _strategyAddress) public onlyOwner {
+        for (uint i = 0; i < strategies.length; i++) {
+            if (strategies[i] == _strategyAddress) {
+                strategies[i] = strategies[strategies.length - 1];
+                strategies.pop();
+                emit StrategyRemoved(_strategyAddress);
+                return;
+            }
+        }
+        revert("Strategy not found");
+    }
+
+    function getBestStrategy() public view returns (address) {
+        address bestStrategy = address(0);
+        uint256 maxAPY = 0;
+
+        for (uint i = 0; i < strategies.length; i++) {
+            IStrategy strategy = IStrategy(strategies[i]);
+            if (strategy.isStrategyActive()) {
+                uint256 currentAPY = strategy.getAPY();
+                if (currentAPY > maxAPY) {
+                    maxAPY = currentAPY;
+                    bestStrategy = strategies[i];
+                }
+            }
+        }
+        return bestStrategy;
+    }
+
+    function getActiveStrategy() public view returns (address) {
+        // For simplicity, assume only one strategy is active at a time or we want to know the primary one.
+        // A more complex implementation might track the currently allocated strategy.
+        // This example assumes we'll always be depositing to the 'best' strategy.
+        return getBestStrategy();
+    }
+
+    function depositToStrategy(address _strategyAddress, uint256 _amount) public {
+        require(_strategyAddress != address(0), "Invalid strategy address");
+        IStrategy strategy = IStrategy(_strategyAddress);
+        // In a real-world scenario, you'd need to handle token transfers and approvals here.
+        // For this example, we assume the caller has already approved and transferred tokens.
+        // If this contract holds the tokens, you'd need to implement token management.
+        uint256 shares = strategy.deposit(_amount);
+        emit Deposited(_strategyAddress, _amount);
+    }
+
+    function withdrawFromStrategy(address _strategyAddress, uint256 _amount) public {
+        require(_strategyAddress != address(0), "Invalid strategy address");
+        IStrategy strategy = IStrategy(_strategyAddress);
+        uint256 withdrawnAmount = strategy.withdraw(_amount);
+        emit Withdrawn(_strategyAddress, withdrawnAmount);
+        // In a real-world scenario, you'd transfer withdrawnAmount back to the user.
+    }
+
+    function rotateStrategies() public onlyKeeper {
+        require(block.timestamp >= lastRotationTimestamp + rotationInterval, "Rotation interval not met");
+
+        address currentBestStrategy = getBestStrategy();
+        if (currentBestStrategy == address(0)) {
+            revert("No active strategies available");
+        }
+
+        // This is a simplified rotation logic. In a real scenario, you'd need to track
+        // the currently used strategy and compare its APY to others.
+        // This function assumes we are simply finding the best and if it's significantly better,
+        // we might rebalance. For a true rotation, we'd need to know which strategy is currently holding funds.
+
+        // For this example, we'll simulate a rotation if the best strategy's APY is
+        // significantly higher than the average or a predefined benchmark strategy.
+        // A more robust approach would involve tracking the allocated capital.
+
+        // Let's assume for simplicity that if a new "best" strategy is found and
+        // the difference in APY is significant, we might consider reallocating.
+        // This requires a more complex state management of capital allocation.
+
+        // Simplified approach for this example:
+        // If we have a current strategy that is *not* the best, and the best strategy's APY
+        // is significantly higher, we could trigger a rebalance.
+        // This requires knowing the 'current' strategy. Let's add a state variable for that.
+
+        // For now, let's just emit an event if a significantly better strategy is found.
+        // A real rotation would involve withdrawing from the old and depositing to the new.
+
+        // To implement actual rotation, we need to know which strategy is currently active or holding funds.
+        // Let's add a variable for the currently active strategy.
+        // For this example, we'll just find the best and assume we'd move funds if needed.
+
+        // A more realistic scenario:
+        // 1. Find the current strategy holding funds (e.g., `currentStrategyAddress`).
+        // 2. Find the `newBestStrategy`.
+        // 3. Calculate `currentAPY = IStrategy(currentStrategyAddress).getAPY()`.
+        // 4. Calculate `bestAPY = IStrategy(newBestStrategy).getAPY()`.
+        // 5. If `bestAPY > currentAPY + rotationThreshold`:
+        //    - Withdraw all funds from `currentStrategyAddress`.
+        //    - Deposit all funds to `newBestStrategy`.
+        //    - Update `currentStrategyAddress`.
+
+        // Since we don't have explicit capital tracking per strategy in this basic example,
+        // let's just trigger rotation if a significantly better strategy is available.
+        // This function would typically be called by a keeper bot.
+
+        // Let's assume `activeStrategy` is the strategy currently holding the aggregator's funds.
+        // We need to add `address public activeStrategy;` and initialize it.
+
+        // This `rotateStrategies` function is more of a trigger for potential rebalancing.
+        // The actual rebalancing logic would be more complex and depend on how capital is managed.
+
+        // For this example, we'll just find the best strategy and emit an event.
+        // A real keeper would then execute the rebalancing.
+        emit RotationTriggered(currentBestStrategy, address(0)); // Placeholder for old strategy
+        lastRotationTimestamp = block.timestamp;
+    }
+
+    // Function to manually rebalance if needed, could be called by keeper or owner
+    function rebalance() public onlyKeeper {
+        address bestStrategy = getBestStrategy();
+        if (bestStrategy == address(0)) {
+            revert("No active strategies");
+        }
+
+        // In a real scenario, you'd need to know how much capital is currently deployed
+        // and in which strategy. This contract doesn't track that granularly in this example.
+        // If this contract itself holds the underlying tokens, it would manage deposits/withdrawals.
+
+        // For this example, let's assume if the best strategy has a significantly higher APY
+        // than some benchmark or current strategy, we'd move funds.
+
+        // If this aggregator holds funds, you'd implement logic here to:
+        // 1. Check the current allocation of funds across strategies.
+        // 2. Identify the strategy with the lowest APY (that is not the best).
+        // 3. Withdraw from the lowest APY strategy.
+        // 4. Deposit to the highest APY strategy.
+
+        // This `rebalance` function is a placeholder for actual capital reallocation logic.
+        // It would require more sophisticated state management of capital.
+        emit RotationTriggered(bestStrategy, address(0)); // Placeholder for old strategy
+        lastRotationTimestamp = block.timestamp;
+    }
+}

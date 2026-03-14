@@ -1,0 +1,39 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address public owner;
+    uint256 public nonce;
+
+    event Deposit(address indexed from, uint256 indexed nonce, bytes data);
+    event Withdrawal(address indexed to, uint256 indexed nonce, bytes data);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function deposit(bytes memory data) public payable {
+        emit Deposit(msg.sender, nonce, data);
+        nonce++;
+    }
+
+    function withdraw(address to, uint256 amount, bytes memory data) public onlyOwner {
+        require(amount <= address(this).balance, "Insufficient balance");
+        (bool success, ) = to.call{value: amount}(data);
+        require(success, "Transfer failed");
+        emit Withdrawal(to, nonce, data);
+        nonce++;
+    }
+
+    function transferOwnership(address newOwner) public onlyOwner {
+        require(newOwner != address(0), "New owner is the zero address");
+        owner = newOwner;
+    }
+}
+```

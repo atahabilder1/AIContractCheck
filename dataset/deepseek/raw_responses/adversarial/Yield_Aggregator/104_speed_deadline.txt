@@ -1,0 +1,44 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
+
+interface IUniswapV2Router {
+    function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts);
+}
+
+contract YieldAggregator {
+    address public owner;
+    IUniswapV2Router public uniswapRouter;
+
+    constructor(address _uniswapRouter) {
+        owner = msg.sender;
+        uniswapRouter = IUniswapV2Router(_uniswapRouter);
+    }
+
+    function swapTokens(address tokenIn, address tokenOut, uint amountIn) external returns (uint amountOut) {
+        require(IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn), "TransferFrom failed");
+        require(IERC20(tokenIn).approve(address(uniswapRouter), amountIn), "Approve failed");
+
+        address[] memory path = new address[](2);
+        path[0] = tokenIn;
+        path[1] = tokenOut;
+
+        uint deadline = block.timestamp + 1 days;
+        uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path, msg.sender, deadline);
+
+        return amounts[1];
+    }
+
+    function withdrawTokens(address token, uint amount) external {
+        require(msg.sender == owner, "Only owner can withdraw");
+        IERC20(token).transfer(owner, amount);
+    }
+}
+```

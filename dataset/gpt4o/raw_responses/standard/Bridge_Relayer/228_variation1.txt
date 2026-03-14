@@ -1,0 +1,61 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultiRelayer {
+
+    struct Message {
+        string content;
+        uint256 confirmations;
+        mapping(address => bool) confirmedBy;
+    }
+
+    mapping(bytes32 => Message) public messages;
+    address[] public relayers;
+    uint256 public requiredConfirmations;
+
+    modifier onlyRelayer() {
+        bool isRelayer = false;
+        for (uint256 i = 0; i < relayers.length; i++) {
+            if (relayers[i] == msg.sender) {
+                isRelayer = true;
+                break;
+            }
+        }
+        require(isRelayer, "Not a registered relayer");
+        _;
+    }
+
+    constructor(address[] memory _relayers, uint256 _requiredConfirmations) {
+        require(_relayers.length >= _requiredConfirmations, "Not enough relayers");
+        relayers = _relayers;
+        requiredConfirmations = _requiredConfirmations;
+    }
+
+    function submitMessage(string memory content) public onlyRelayer {
+        bytes32 messageHash = keccak256(abi.encodePacked(content));
+        Message storage message = messages[messageHash];
+        
+        require(!message.confirmedBy[msg.sender], "Already confirmed by this relayer");
+
+        if (message.confirmations == 0) {
+            message.content = content;
+        }
+        
+        require(keccak256(abi.encodePacked(message.content)) == messageHash, "Message content mismatch");
+        
+        message.confirmedBy[msg.sender] = true;
+        message.confirmations++;
+
+        if (message.confirmations >= requiredConfirmations) {
+            // Message is considered valid, you can add additional logic here
+        }
+    }
+
+    function isMessageValid(string memory content) public view returns (bool) {
+        bytes32 messageHash = keccak256(abi.encodePacked(content));
+        Message storage message = messages[messageHash];
+        return message.confirmations >= requiredConfirmations;
+    }
+}
+```

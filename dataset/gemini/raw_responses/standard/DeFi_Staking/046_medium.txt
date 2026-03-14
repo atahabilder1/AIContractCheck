@@ -1,0 +1,277 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract TieredStakingPool is Ownable {
+    using SafeMath for uint256;
+
+    struct Stake {
+        uint256 amount;
+        uint256 startTime;
+        uint256 lockUpDuration;
+        bool active;
+    }
+
+    IERC20 public stakingToken;
+    uint256 public totalStakedAmount;
+
+    // Mapping from staker address to their stake details
+    mapping(address => Stake) public stakes;
+    // Mapping from staker address to the amount they can withdraw (after penalties)
+    mapping(address => uint256) public withdrawableAmounts;
+
+    // Reward rates for different lock-up durations (in basis points per second)
+    // Example: 10000 bps = 100% APY if locked for 1 year
+    // 100 bps = 1% APY
+    mapping(uint256 => uint256) public rewardRates; // duration => bps_per_second
+
+    // Minimum lock-up durations
+    uint256[] public lockUpDurations;
+
+    // Penalty for early withdrawal (in basis points)
+    // Example: 500 bps = 5% penalty
+    uint256 public earlyWithdrawalPenaltyBps; // 10000 bps = 100%
+
+    event Staked(address indexed staker, uint256 amount, uint256 lockUpDuration);
+    event Withdrawn(address indexed staker, uint256 amount, bool earlyWithdrawal);
+    event RewardClaimed(address indexed staker, uint256 amount);
+
+    constructor(address _stakingTokenAddress) {
+        stakingToken = IERC20(_stakingTokenAddress);
+        // Default penalty: 5%
+        earlyWithdrawalPenaltyBps = 500;
+    }
+
+    /**
+     * @notice Sets the reward rates for different lock-up durations.
+     * @param _durations Array of lock-up durations in seconds.
+     * @param _rates Array of reward rates in basis points per second.
+     * For example, to set an APY of 10% for a 1-year lock-up:
+     * Duration: 31536000 seconds (1 year)
+     * Reward Rate: (10% / 1 year) = (0.10 / 31536000) * 10^18 (for precision)
+     * The input `_rates` should be in bps per second, so for 10% APY over 1 year,
+     * the rate per second is (0.10 / 31536000).
+     * To express this in bps per second: (0.10 / 31536000) * 10000.
+     * However, it's more practical to define APY and calculate the bps per second internally.
+     * Let's redefine `rewardRates` to be APY in bps for a given duration.
+     * The contract will then calculate the rate per second.
+     * So, `rewardRates[duration]` = APY in bps for that duration.
+     * Example: `rewardRates[31536000] = 1000` (10% APY for 1 year)
+     */
+    function setRewardRates(uint256[] memory _durations, uint256[] memory _apyBps) public onlyOwner {
+        require(_durations.length == _apyBps.length, "Arrays must have the same length");
+        for (uint i = 0; i < _durations.length; i++) {
+            uint256 duration = _durations[i];
+            uint256 apyBps = _apyBps[i];
+            require(duration > 0, "Duration must be greater than 0");
+            require(apyBps <= 10000, "APY cannot exceed 100%"); // Max 100% APY
+            rewardRates[duration] = apyBps;
+            // Add duration to lockUpDurations if not already present
+            bool found = false;
+            for (uint j = 0; j < lockUpDurations.length; j++) {
+                if (lockUpDurations[j] == duration) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                lockUpDurations.push(duration);
+            }
+        }
+        // Sort lockUpDurations for easier lookup (optional but good practice)
+        // This can be done with a library or manually if needed.
+        // For simplicity, we'll assume they are added in a somewhat ordered fashion or handled during lookup.
+    }
+
+    /**
+     * @notice Sets the penalty for early withdrawal in basis points.
+     * @param _penaltyBps The penalty rate in basis points (e.g., 500 for 5%).
+     */
+    function setEarlyWithdrawalPenalty(uint256 _penaltyBps) public onlyOwner {
+        require(_penaltyBps <= 10000, "Penalty cannot exceed 100%"); // Max 100% penalty
+        earlyWithdrawalPenaltyBps = _penaltyBps;
+    }
+
+    /**
+     * @notice Allows users to stake tokens.
+     * @param _amount The amount of tokens to stake.
+     * @param _lockUpDuration The desired lock-up duration in seconds.
+     */
+    function stake(uint256 _amount, uint256 _lockUpDuration) public {
+        require(_amount > 0, "Amount must be greater than 0");
+        require(_lockUpDuration > 0, "Lock-up duration must be greater than 0");
+        require(rewardRates[_lockUpDuration] > 0, "Invalid or unsupported lock-up duration");
+
+        require(stakes[msg.sender].active == false, "You already have an active stake. Withdraw first.");
+
+        // Transfer tokens from user to the contract
+        require(stakingToken.transferFrom(msg.sender, address(this), _amount), "Token transfer failed");
+
+        stakes[msg.sender] = Stake({
+            amount: _amount,
+            startTime: block.timestamp,
+            lockUpDuration: _lockUpDuration,
+            active: true
+        });
+        totalStakedAmount = totalStakedAmount.add(_amount);
+
+        emit Staked(msg.sender, _amount, _lockUpDuration);
+    }
+
+    /**
+     * @notice Calculates the rewards earned by a staker.
+     * @param _staker The address of the staker.
+     * @return The amount of rewards earned.
+     */
+    function calculateRewards(address _staker) public view returns (uint256) {
+        Stake storage stake = stakes[_staker];
+        if (!stake.active) {
+            return 0;
+        }
+
+        uint256 elapsedTime = block.timestamp.sub(stake.startTime);
+        uint256 duration = stake.lockUpDuration;
+        uint256 rewardRateBpsPerSecond = rewardRates[duration]; // APY in bps
+        uint256 secondsInYear = 31536000; // Approximate seconds in a year
+
+        // Calculate rate per second from APY in bps
+        // rate_per_second = (APY_bps / 10000) / secondsInYear
+        // To avoid floating point, we use:
+        // reward_per_second_scaled = (APY_bps * 10^18) / (10000 * secondsInYear)
+        // Or more precisely: reward_per_second_scaled = (APY_bps * 1e18) / (10000 * secondsInYear)
+        // For simplicity and to avoid large multipliers, let's calculate reward based on staked amount and time.
+        // Reward = (StakeAmount * APY_bps * ElapsedTime) / (10000 * SecondsInYear)
+
+        uint256 reward = (stake.amount.mul(rewardRateBpsPerSecond).mul(elapsedTime)) / (10000 * secondsInYear);
+
+        return reward;
+    }
+
+    /**
+     * @notice Allows users to claim their earned rewards.
+     */
+    function claimRewards() public {
+        uint256 rewards = calculateRewards(msg.sender);
+        require(rewards > 0, "No rewards to claim");
+
+        // Reset rewards calculation for this staker (effectively) by considering current rewards as claimed.
+        // This is implicitly handled by `calculateRewards` using `block.timestamp`.
+        // If we wanted to track claimed rewards separately, we'd need another mapping.
+        // For this model, `calculateRewards` always calculates based on current `block.timestamp`.
+
+        require(stakingToken.transfer(msg.sender, rewards), "Reward transfer failed");
+        emit RewardClaimed(msg.sender, rewards);
+    }
+
+    /**
+     * @notice Allows users to withdraw their staked tokens.
+     * @return The amount withdrawn.
+     */
+    function withdraw() public returns (uint256) {
+        Stake storage stake = stakes[msg.sender];
+        require(stake.active, "No active stake to withdraw");
+
+        uint256 elapsedTime = block.timestamp.sub(stake.startTime);
+        uint256 lockUpDuration = stake.lockUpDuration;
+        uint256 stakedAmount = stake.amount;
+        uint256 withdrawalAmount;
+        bool earlyWithdrawal = false;
+
+        // Check if lock-up period has ended
+        if (block.timestamp >= stake.startTime.add(lockUpDuration)) {
+            // Lock-up period ended, withdraw full amount + rewards
+            uint256 rewards = calculateRewards(msg.sender);
+            withdrawalAmount = stakedAmount.add(rewards);
+        } else {
+            // Early withdrawal
+            earlyWithdrawal = true;
+            // Calculate penalty
+            uint256 penaltyAmount = stakedAmount.mul(earlyWithdrawalPenaltyBps) / 10000;
+            // Amount to withdraw is staked amount minus penalty
+            // Note: Rewards are forfeited on early withdrawal in this model.
+            withdrawalAmount = stakedAmount.sub(penaltyAmount);
+        }
+
+        // Reset stake
+        stake.active = false;
+        stake.amount = 0;
+        stake.startTime = 0;
+        stake.lockUpDuration = 0;
+
+        totalStakedAmount = totalStakedAmount.sub(stakedAmount);
+
+        // Transfer tokens to user
+        require(stakingToken.transfer(msg.sender, withdrawalAmount), "Withdrawal transfer failed");
+
+        emit Withdrawn(msg.sender, withdrawalAmount, earlyWithdrawal);
+        return withdrawalAmount;
+    }
+
+    /**
+     * @notice Allows users to unstake their tokens and claim rewards in one transaction.
+     * This is essentially the same as calling withdraw(), but can be useful for clarity.
+     * In this implementation, `withdraw()` already handles reward calculation for completed lock-ups.
+     */
+    function unstakeAndClaim() public returns (uint256) {
+        return withdraw();
+    }
+
+    /**
+     * @notice Get current stake details for a user.
+     * @param _staker The address of the staker.
+     * @return amount The staked amount.
+     * @return startTime The start time of the stake.
+     * @return lockUpDuration The lock-up duration.
+     * @return active Whether the stake is active.
+     */
+    function getUserStake(address _staker) public view returns (uint256 amount, uint256 startTime, uint256 lockUpDuration, bool active) {
+        Stake storage stake = stakes[_staker];
+        return (stake.amount, stake.startTime, stake.lockUpDuration, stake.active);
+    }
+
+    /**
+     * @notice Get available withdrawal amount for a user.
+     * This function is useful to show the user how much they can withdraw *now*,
+     * considering penalties if applicable.
+     * @param _staker The address of the staker.
+     * @return The amount the staker can withdraw.
+     */
+    function getWithdrawableAmount(address _staker) public view returns (uint256) {
+        Stake storage stake = stakes[_staker];
+        if (!stake.active) {
+            return 0;
+        }
+
+        uint256 elapsedTime = block.timestamp.sub(stake.startTime);
+        uint256 lockUpDuration = stake.lockUpDuration;
+        uint256 stakedAmount = stake.amount;
+        uint256 withdrawable;
+
+        if (block.timestamp >= stake.startTime.add(lockUpDuration)) {
+            // Lock-up period ended, withdraw full amount + rewards
+            uint256 rewards = calculateRewards(_staker);
+            withdrawable = stakedAmount.add(rewards);
+        } else {
+            // Early withdrawal
+            uint256 penaltyAmount = stakedAmount.mul(earlyWithdrawalPenaltyBps) / 10000;
+            withdrawable = stakedAmount.sub(penaltyAmount);
+        }
+        return withdrawable;
+    }
+
+    /**
+     * @notice Function to allow owner to emergency withdraw all staked funds if needed.
+     * This is a critical function and should be used with extreme caution.
+     * It bypasses all staking logic and transfers all contract balance to the owner.
+     */
+    function emergencyWithdrawAll() public onlyOwner {
+        uint256 balance = stakingToken.balanceOf(address(this));
+        require(balance > 0, "No balance to withdraw");
+        stakingToken.transfer(owner(), balance);
+    }
+}
+```

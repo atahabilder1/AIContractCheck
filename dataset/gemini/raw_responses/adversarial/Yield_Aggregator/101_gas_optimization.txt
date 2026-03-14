@@ -1,0 +1,78 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract GasOptimizedYieldAggregator is Ownable, ReentrancyGuard {
+    IERC20 public immutable underlyingToken;
+    address public immutable strategy;
+
+    event Deposit(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
+    event Harvest(uint256 harvestedAmount);
+
+    constructor(address _underlyingToken, address _strategy) {
+        underlyingToken = IERC20(_underlyingToken);
+        strategy = _strategy;
+    }
+
+    function deposit(uint256 _amount) external nonReentrant {
+        uint256 balanceBefore = underlyingToken.balanceOf(address(this));
+        require(underlyingToken.transferFrom(msg.sender, address(this), _amount), "Transfer failed");
+        uint256 balanceAfter = underlyingToken.balanceOf(address(this));
+        uint256 actualAmount = balanceAfter - balanceBefore; // Account for potential fees or rounding
+        emit Deposit(msg.sender, actualAmount);
+    }
+
+    function withdraw(uint256 _amount) external nonReentrant {
+        uint256 controllerBalance = underlyingToken.balanceOf(address(this));
+        require(_amount <= controllerBalance, "Insufficient balance in controller");
+
+        uint256 strategyBalance = underlyingToken.balanceOf(strategy);
+        require(_amount <= strategyBalance, "Insufficient balance in strategy");
+
+        require(underlyingToken.transfer(msg.sender, _amount), "Transfer failed");
+        emit Withdraw(msg.sender, _amount);
+    }
+
+    function harvest() external nonReentrant onlyOwner {
+        uint256 harvested = IERC20(strategy).balanceOf(address(this)); // Assuming strategy is also an ERC20 token
+        if (harvested > 0) {
+            require(underlyingToken.transfer(strategy, harvested), "Transfer to strategy failed");
+            // The strategy contract should handle the actual yield generation and return of underlying tokens.
+            // This function is a placeholder for calling a strategy's harvest/reinvest function if needed.
+            // For a truly gas-optimized aggregator, you might directly interact with the strategy's specific function.
+            // Example: IStrategy(_strategy).harvest();
+            emit Harvest(harvested);
+        }
+    }
+
+    // This function might be used to pull profits from the strategy contract itself,
+    // if the strategy contract does not automatically return funds to this aggregator.
+    // This is a more advanced scenario and depends on the strategy's design.
+    // function pullProfitsFromStrategy() external nonReentrant onlyOwner {
+    //     // Example: If strategy has a function to withdraw profits
+    //     // IStrategy(_strategy).withdrawProfits(address(this));
+    // }
+
+    function getControllerBalance() external view returns (uint256) {
+        return underlyingToken.balanceOf(address(this));
+    }
+
+    function getStrategyBalance() external view returns (uint256) {
+        return underlyingToken.balanceOf(strategy);
+    }
+
+    // A simple function to allow the owner to withdraw any accidentally sent tokens
+    function emergencyWithdrawERC20(address _tokenAddress) external onlyOwner {
+        IERC20 token = IERC20(_tokenAddress);
+        uint256 balance = token.balanceOf(address(this));
+        if (balance > 0) {
+            token.transfer(owner(), balance);
+        }
+    }
+}
+```

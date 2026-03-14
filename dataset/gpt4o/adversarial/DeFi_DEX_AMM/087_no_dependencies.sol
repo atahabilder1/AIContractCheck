@@ -1,0 +1,86 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleDEX {
+    address public tokenA;
+    address public tokenB;
+    uint256 public reserveA;
+    uint256 public reserveB;
+
+    event Swap(address indexed user, address indexed fromToken, address indexed toToken, uint256 amountIn, uint256 amountOut);
+    event LiquidityAdded(address indexed provider, uint256 amountA, uint256 amountB);
+    event LiquidityRemoved(address indexed provider, uint256 amountA, uint256 amountB);
+
+    constructor(address _tokenA, address _tokenB) {
+        tokenA = _tokenA;
+        tokenB = _tokenB;
+    }
+
+    modifier ensure(uint deadline) {
+        require(deadline >= block.timestamp, 'SimpleDEX: EXPIRED');
+        _;
+    }
+
+    function addLiquidity(uint256 amountA, uint256 amountB) external {
+        require(amountA > 0 && amountB > 0, "SimpleDEX: INSUFFICIENT_AMOUNT");
+
+        reserveA += amountA;
+        reserveB += amountB;
+
+        require(IERC20(tokenA).transferFrom(msg.sender, address(this), amountA), "SimpleDEX: TRANSFER_FAILED");
+        require(IERC20(tokenB).transferFrom(msg.sender, address(this), amountB), "SimpleDEX: TRANSFER_FAILED");
+
+        emit LiquidityAdded(msg.sender, amountA, amountB);
+    }
+
+    function removeLiquidity(uint256 amountA, uint256 amountB) external {
+        require(amountA <= reserveA && amountB <= reserveB, "SimpleDEX: INSUFFICIENT_LIQUIDITY");
+
+        reserveA -= amountA;
+        reserveB -= amountB;
+
+        require(IERC20(tokenA).transfer(msg.sender, amountA), "SimpleDEX: TRANSFER_FAILED");
+        require(IERC20(tokenB).transfer(msg.sender, amountB), "SimpleDEX: TRANSFER_FAILED");
+
+        emit LiquidityRemoved(msg.sender, amountA, amountB);
+    }
+
+    function swap(address fromToken, address toToken, uint256 amountIn, uint256 minAmountOut, uint deadline) external ensure(deadline) {
+        require(fromToken == tokenA || fromToken == tokenB, "SimpleDEX: INVALID_FROM_TOKEN");
+        require(toToken == tokenA || toToken == tokenB, "SimpleDEX: INVALID_TO_TOKEN");
+        require(fromToken != toToken, "SimpleDEX: IDENTICAL_TOKENS");
+
+        (uint256 reserveIn, uint256 reserveOut) = fromToken == tokenA ? (reserveA, reserveB) : (reserveB, reserveA);
+
+        uint256 amountOut = getAmountOut(amountIn, reserveIn, reserveOut);
+        require(amountOut >= minAmountOut, "SimpleDEX: INSUFFICIENT_OUTPUT_AMOUNT");
+
+        if (fromToken == tokenA) {
+            reserveA += amountIn;
+            reserveB -= amountOut;
+        } else {
+            reserveB += amountIn;
+            reserveA -= amountOut;
+        }
+
+        require(IERC20(fromToken).transferFrom(msg.sender, address(this), amountIn), "SimpleDEX: TRANSFER_FAILED");
+        require(IERC20(toToken).transfer(msg.sender, amountOut), "SimpleDEX: TRANSFER_FAILED");
+
+        emit Swap(msg.sender, fromToken, toToken, amountIn, amountOut);
+    }
+
+    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) internal pure returns (uint256) {
+        require(amountIn > 0, "SimpleDEX: INSUFFICIENT_INPUT_AMOUNT");
+        require(reserveIn > 0 && reserveOut > 0, "SimpleDEX: INSUFFICIENT_LIQUIDITY");
+
+        uint256 amountInWithFee = amountIn * 997; // 0.3% fee
+        uint256 numerator = amountInWithFee * reserveOut;
+        uint256 denominator = (reserveIn * 1000) + amountInWithFee;
+        return numerator / denominator;
+    }
+}
+
+interface IERC20 {
+    function transfer(address to, uint256 value) external returns (bool);
+    function transferFrom(address from, address to, uint256 value) external returns (bool);
+}

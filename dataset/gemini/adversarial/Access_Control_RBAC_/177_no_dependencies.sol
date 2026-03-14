@@ -1,0 +1,77 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract RBAC {
+    address public owner;
+
+    mapping(address => uint256) private _roles;
+
+    uint256 constant ROLE_ADMIN = 1 << 0;
+    uint256 constant ROLE_MANAGER = 1 << 1;
+    uint256 constant ROLE_USER = 1 << 2;
+
+    event RoleGranted(address indexed account, uint256 indexed role);
+    event RoleRevoked(address indexed account, uint256 indexed role);
+    event OwnerChanged(address indexed oldOwner, address indexed newOwner);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "RBAC: Caller is not the owner");
+        _;
+    }
+
+    modifier onlyRole(uint256 role) {
+        require(_hasRole(msg.sender, role), "RBAC: Caller does not have the required role");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+        _roles[msg.sender] = ROLE_ADMIN; // Grant admin role to the deployer
+        emit RoleGranted(msg.sender, ROLE_ADMIN);
+    }
+
+    function getRole(address account) public view returns (uint256) {
+        return _roles[account];
+    }
+
+    function hasRole(address account, uint256 role) public view returns (bool) {
+        return _hasRole(account, role);
+    }
+
+    function grantRole(address account, uint256 role) public onlyOwner {
+        require(account != address(0), "RBAC: Grant to the zero address is not allowed");
+        require(role != 0, "RBAC: Cannot grant zero role");
+        require((_roles[account] & role) == 0, "RBAC: Account already has this role");
+
+        _roles[account] |= role;
+        emit RoleGranted(account, role);
+    }
+
+    function revokeRole(address account, uint256 role) public onlyOwner {
+        require(account != address(0), "RBAC: Revoke from the zero address is not allowed");
+        require(role != 0, "RBAC: Cannot revoke zero role");
+        require((_roles[account] & role) != 0, "RBAC: Account does not have this role");
+
+        _roles[account] &= ~role;
+        emit RoleRevoked(account, role);
+    }
+
+    function renounceAdminRole() public {
+        require(_hasRole(msg.sender, ROLE_ADMIN), "RBAC: Caller does not have the admin role");
+        require(msg.sender != owner, "RBAC: Owner cannot renounce their admin role");
+
+        _roles[msg.sender] &= ~ROLE_ADMIN;
+        emit RoleRevoked(msg.sender, ROLE_ADMIN);
+    }
+
+    function transferOwnership(address newOwner) public onlyOwner {
+        require(newOwner != address(0), "RBAC: New owner cannot be the zero address");
+        address oldOwner = owner;
+        owner = newOwner;
+        emit OwnerChanged(oldOwner, newOwner);
+    }
+
+    function _hasRole(address account, uint256 role) internal view returns (bool) {
+        return (_roles[account] & role) != 0;
+    }
+}

@@ -1,0 +1,99 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+interface IFlashLoanReceiver {
+    function onFlashLoan(
+        address token,
+        uint256 amount,
+        uint256 fee,
+        bytes calldata data
+    ) external;
+}
+
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address to, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+}
+
+contract FlashLoanProvider {
+    address public owner;
+    uint256 public feeBasisPoints = 9; // 0.09%
+
+    mapping(address => mapping(address => uint256)) public deposits;
+    mapping(address => uint256) public totalDeposits;
+    mapping(address => uint256) public totalFees;
+
+    event Deposit(address indexed token, address indexed depositor, uint256 amount);
+    event Withdrawal(address indexed token, address indexed depositor, uint256 amount);
+    event FlashLoan(address indexed token, address indexed borrower, uint256 amount, uint256 fee);
+    event FeeUpdated(uint256 newFeeBasisPoints);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function deposit(address token, uint256 amount) external {
+        require(amount > 0, "Amount must be > 0");
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
+        deposits[token][msg.sender] += amount;
+        totalDeposits[token] += amount;
+        emit Deposit(token, msg.sender, amount);
+    }
+
+    function withdraw(address token, uint256 amount) external {
+        require(deposits[token][msg.sender] >= amount, "Insufficient deposit");
+        deposits[token][msg.sender] -= amount;
+        totalDeposits[token] -= amount;
+        IERC20(token).transfer(msg.sender, amount);
+        emit Withdrawal(token, msg.sender, amount);
+    }
+
+    function flashLoan(
+        address token,
+        uint256 amount,
+        bytes calldata data
+    ) external {
+        uint256 balanceBefore = IERC20(token).balanceOf(address(this));
+        require(balanceBefore >= amount, "Insufficient liquidity");
+
+        uint256 fee = (amount * feeBasisPoints) / 10000;
+
+        IERC20(token).transfer(msg.sender, amount);
+
+        IFlashLoanReceiver(msg.sender).onFlashLoan(token, amount, fee, data);
+
+        uint256 balanceAfter = IERC20(token).balanceOf(address(this));
+        require(balanceAfter >= balanceBefore + fee, "Flash loan not repaid");
+
+        totalFees[token] += fee;
+        emit FlashLoan(token, msg.sender, amount, fee);
+    }
+
+    function setFee(uint256 newFeeBasisPoints) external onlyOwner {
+        require(newFeeBasisPoints <= 1000, "Fee too high");
+        feeBasisPoints = newFeeBasisPoints;
+        emit FeeUpdated(newFeeBasisPoints);
+    }
+
+    function withdrawFees(address token) external onlyOwner {
+        uint256 fees = totalFees[token];
+        require(fees > 0, "No fees to withdraw");
+        totalFees[token] = 0;
+        IERC20(token).transfer(owner, fees);
+    }
+
+    function getPoolBalance(address token) external view returns (uint256) {
+        return IERC20(token).balanceOf(address(this));
+    }
+}
+```

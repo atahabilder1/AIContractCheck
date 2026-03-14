@@ -1,0 +1,140 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract NFTauctionHouse {
+    // Define variables and constants
+    address payable public owner;
+    uint public auctionId;
+    uint public bidId;
+    uint public bidExtensionTime;
+    uint public auctionExtensionTime;
+    uint public royaltyPercentage;
+    uint public numBids;
+    uint public numAuctions;
+    uint public totalRoyalties;
+
+    struct Bid {
+        address bidder;
+        uint value;
+        uint timestamp;
+    }
+
+    struct Auction {
+        address creator;
+        string name;
+        string description;
+        uint startTime;
+        uint endTime;
+        uint highestBid;
+        address highestBidder;
+        bool settled;
+        uint numBids;
+        mapping(address => Bid[]) bids;
+    }
+
+    mapping(uint => Auction) public auctions;
+    mapping(uint => Bid) public bids;
+
+    // Events
+    event NewAuction(uint indexed auctionId, address indexed creator, string name, string description, uint startTime, uint endTime);
+    event NewBid(uint indexed auctionId, address indexed bidder, uint value, uint timestamp);
+    event BidExtension(uint indexed auctionId, address indexed bidder, uint value, uint timestamp, uint extensionTime);
+    event AuctionExtension(uint indexed auctionId, address indexed creator, uint extensionTime);
+    event AuctionSettled(uint indexed auctionId, address indexed winner, uint value, uint timestamp);
+
+    // Constructor
+    constructor() public {
+        owner = msg.sender;
+        auctionId = 0;
+        bidId = 0;
+        bidExtensionTime = 1 hours;
+        auctionExtensionTime = 24 hours;
+        royaltyPercentage = 5;
+        numBids = 0;
+        numAuctions = 0;
+        totalRoyalties = 0;
+    }
+
+    // Create new auction
+    function createAuction(string memory _name, string memory _description, uint _startTime, uint _endTime) public {
+        require(msg.sender == owner, "Only the owner can create auctions");
+        require(_startTime > block.timestamp, "Auction start time must be in the future");
+        require(_endTime > _startTime, "Auction end time must be after start time");
+
+        auctionId++;
+        Auction memory newAuction = Auction({
+            creator: msg.sender,
+            name: _name,
+            description: _description,
+            startTime: _startTime,
+            endTime: _endTime,
+            highestBid: 0,
+            highestBidder: address(0),
+            settled: false,
+            numBids: 0
+        });
+        auctions[auctionId] = newAuction;
+        numAuctions++;
+
+        emit NewAuction(auctionId, msg.sender, _name, _description, _startTime, _endTime);
+    }
+
+    // Bid on an auction
+    function bid(uint _auctionId, uint _value) public {
+        require(_value > 0, "Bid must be greater than zero");
+        require(block.timestamp < auctions[_auctionId].endTime, "Auction has already ended");
+
+        Bid memory newBid = Bid({
+            bidder: msg.sender,
+            value: _value,
+            timestamp: block.timestamp
+        });
+        bids[bidId] = newBid;
+        auctions[_auctionId].bids[msg.sender].push(newBid);
+        numBids++;
+
+        // Check if the bid is the highest bid
+        if (_value > auctions[_auctionId].highestBid) {
+            auctions[_auctionId].highestBid = _value;
+            auctions[_auctionId].highestBidder = msg.sender;
+            emit NewBid(_auctionId, msg.sender, _value, block.timestamp);
+        }
+
+        // Check if the bid is a new highest bid
+        if (block.timestamp < auctions[_auctionId].endTime && _value == auctions[_auctionId].highestBid) {
+            emit BidExtension(_auctionId, msg.sender, _value, block.timestamp, bidExtensionTime);
+        }
+    }
+
+    // Extend the auction by the auction extension time
+    function extendAuction(uint _auctionId) public {
+        require(auctions[_auctionId].creator == msg.sender, "Only the creator can extend the auction");
+        require(block.timestamp < auctions[_auctionId].endTime, "Auction has already ended");
+        require(block.timestamp > auctions[_auctionId].endTime - auctionExtensionTime, "Auction cannot be extended more than once");
+
+        auctions[_auctionId].endTime += auctionExtensionTime;
+        emit AuctionExtension(_auctionId, msg.sender, auctionExtensionTime);
+    }
+
+    // Settle the auction and distribute the royalties
+    function settleAuction(uint _auctionId) public {
+        require(auctions[_auctionId].creator == msg.sender, "Only the creator can settle the auction");
+        require(block.timestamp > auctions[_auctionId].endTime, "Auction has not yet ended");
+        require(auctions[_auctionId].settled == false, "Auction has already been settled");
+
+        address payable winner = auctions[_auctionId].highestBidder;
+        uint value = auctions[_auctionId].highestBid;
+        uint royalty = value * royaltyPercentage / 100;
+        totalRoyalties += royalty;
+
+        // Transfer the funds to the winner and the creator
+        winner.transfer(value - royalty);
+        auctions[_auctionId].creator.transfer(royalty);
+
+        // Update the auction to show that it has been settled
+        auctions[_auctionId].settled = true;
+        emit AuctionSettled(_auctionId, winner, value, block.timestamp);
+    }
+}
+```

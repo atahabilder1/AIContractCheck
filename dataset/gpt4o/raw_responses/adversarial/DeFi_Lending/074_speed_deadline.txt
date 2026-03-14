@@ -1,0 +1,73 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiLending {
+    mapping(address => uint256) public balances;
+    mapping(address => uint256) public loanedAmounts;
+    uint256 public totalLent;
+    uint256 public totalBorrowed;
+    address public owner;
+    uint256 public interestRate; // in basis points (100 = 1%)
+
+    event Deposited(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
+    event Loaned(address indexed user, uint256 amount);
+    event Repaid(address indexed user, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    constructor(uint256 _interestRate) {
+        owner = msg.sender;
+        interestRate = _interestRate;
+    }
+
+    function deposit() external payable {
+        balances[msg.sender] += msg.value;
+        totalLent += msg.value;
+        emit Deposited(msg.sender, msg.value);
+    }
+
+    function withdraw(uint256 amount) external {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        balances[msg.sender] -= amount;
+        totalLent -= amount;
+        payable(msg.sender).transfer(amount);
+        emit Withdrawn(msg.sender, amount);
+    }
+
+    function loan(uint256 amount) external {
+        require(amount <= totalLent - totalBorrowed, "Not enough liquidity");
+        loanedAmounts[msg.sender] += amount;
+        totalBorrowed += amount;
+        payable(msg.sender).transfer(amount);
+        emit Loaned(msg.sender, amount);
+    }
+
+    function repay() external payable {
+        require(loanedAmounts[msg.sender] > 0, "No loan to repay");
+        uint256 interest = (loanedAmounts[msg.sender] * interestRate) / 10000;
+        require(msg.value >= loanedAmounts[msg.sender] + interest, "Insufficient amount to repay");
+
+        uint256 refund = msg.value - (loanedAmounts[msg.sender] + interest);
+        if (refund > 0) {
+            payable(msg.sender).transfer(refund);
+        }
+
+        totalBorrowed -= loanedAmounts[msg.sender];
+        loanedAmounts[msg.sender] = 0;
+        emit Repaid(msg.sender, msg.value);
+    }
+
+    function setInterestRate(uint256 _interestRate) external onlyOwner {
+        interestRate = _interestRate;
+    }
+
+    receive() external payable {
+        deposit();
+    }
+}
+```

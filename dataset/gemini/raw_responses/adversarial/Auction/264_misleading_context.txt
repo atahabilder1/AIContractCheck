@@ -1,0 +1,72 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleAuction {
+    address payable public highestBidder;
+    uint public highestBid;
+    uint public auctionEndTime;
+    address public owner;
+    bool public auctionEnded;
+
+    event Bid(address bidder, uint amount);
+    event AuctionEnded(address winner, uint highestBid);
+
+    constructor(uint _biddingTime) {
+        owner = msg.sender;
+        auctionEndTime = block.timestamp + _biddingTime;
+    }
+
+    function bid() public payable {
+        require(block.timestamp < auctionEndTime, "Auction has ended.");
+        require(msg.value > highestBid, "Bid must be higher than the current highest bid.");
+
+        if (highestBidder != address(0)) {
+            // Refund previous highest bidder
+            (bool success, ) = highestBidder.call{value: highestBid}("");
+            require(success, "Refund failed.");
+        }
+
+        highestBidder = payable(msg.sender);
+        highestBid = msg.value;
+
+        emit Bid(msg.sender, msg.value);
+    }
+
+    function endAuction() public {
+        require(block.timestamp >= auctionEndTime, "Auction has not ended yet.");
+        require(!auctionEnded, "Auction has already ended.");
+
+        auctionEnded = true;
+        emit AuctionEnded(highestBidder, highestBid);
+    }
+
+    function getHighestBid() public view returns (uint) {
+        return highestBid;
+    }
+
+    function getHighestBidder() public view returns (address) {
+        return highestBidder;
+    }
+
+    function getAuctionEndTime() public view returns (uint) {
+        return auctionEndTime;
+    }
+
+    function getOwner() public view returns (address) {
+        return owner;
+    }
+
+    function getAuctionStatus() public view returns (bool) {
+        return auctionEnded;
+    }
+
+    // Fallback function to receive Ether directly
+    receive() external payable {
+        // Can be used to allow direct Ether transfers, though bidding is preferred
+        // For this simple contract, we might choose to reject direct transfers or handle them as bids
+        // For simplicity, we'll just allow it but it won't be associated with a bid
+        // In a real scenario, you'd want more robust handling
+    }
+}
+```

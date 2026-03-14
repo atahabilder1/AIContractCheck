@@ -1,0 +1,70 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+
+    address public owner;
+    address public destinationChainContract;
+    uint256 public nextMessageId;
+
+    event MessageSent(uint256 indexed messageId, address indexed sender, bytes data);
+    event MessageReceived(uint256 indexed messageId, address indexed originalSender, bytes data);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "BridgeRelayer: Caller is not the owner");
+        _;
+    }
+
+    constructor(address _destinationChainContract) {
+        owner = msg.sender;
+        destinationChainContract = _destinationChainContract;
+        nextMessageId = 1;
+    }
+
+    function sendMessage(bytes memory _data) public payable {
+        require(destinationChainContract != address(0), "BridgeRelayer: Destination contract not set");
+
+        // In a real-world scenario, you might want to emit an event to signal
+        // that a message has been prepared for relaying.
+        // The actual relaying would typically be done by an off-chain relayer process.
+        // This contract focuses on the on-chain logic of preparing and verifying.
+
+        emit MessageSent(nextMessageId, msg.sender, _data);
+
+        // In a real bridge, the off-chain relayer would pick up this event,
+        // call the destination chain's contract to forward the message,
+        // and potentially receive a confirmation.
+
+        nextMessageId++;
+    }
+
+    // This function would be called by the destination chain's relayer
+    // after it has successfully processed a message from this chain.
+    // It's a placeholder for cross-chain communication confirmation.
+    function confirmMessageReception(uint256 _messageId, address _originalSender, bytes memory _data) public {
+        // In a real bridge, you would implement robust verification here.
+        // This could involve:
+        // 1. Checking if the message ID has already been confirmed.
+        // 2. Verifying the signature of the relayer (if applicable).
+        // 3. Ensuring the message data matches what was originally sent.
+        // 4. Potentially checking a fee or reward for the relayer.
+
+        // For this simplified example, we assume the caller is a trusted relayer.
+        // A more secure implementation would require a way to authenticate the relayer.
+
+        emit MessageReceived(_messageId, _originalSender, _data);
+    }
+
+    function setDestinationChainContract(address _destinationChainContract) public onlyOwner {
+        require(_destinationChainContract != address(0), "BridgeRelayer: Invalid destination contract address");
+        destinationChainContract = _destinationChainContract;
+    }
+
+    function getNextMessageId() public view returns (uint256) {
+        return nextMessageId;
+    }
+
+    // Fallback function to receive Ether, if needed
+    receive() external payable {}
+    fallback() external payable {}
+}

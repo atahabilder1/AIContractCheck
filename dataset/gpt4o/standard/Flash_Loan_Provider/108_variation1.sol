@@ -1,0 +1,112 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+}
+
+interface IFlashLoanReceiver {
+    function executeOperation(address token, uint256 amount, uint256 fee, bytes calldata params) external;
+}
+
+contract ProtocolToken is IERC20 {
+    string public constant name = "ProtocolToken";
+    string public constant symbol = "PTK";
+    uint8 public constant decimals = 18;
+    uint256 private totalSupply_;
+    mapping(address => uint256) private balances;
+    mapping(address => mapping(address => uint256)) private allowances;
+
+    constructor() {
+        totalSupply_ = 0;
+    }
+
+    function totalSupply() public view returns (uint256) {
+        return totalSupply_;
+    }
+
+    function balanceOf(address account) public view override returns (uint256) {
+        return balances[account];
+    }
+
+    function transfer(address recipient, uint256 amount) public override returns (bool) {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        balances[msg.sender] -= amount;
+        balances[recipient] += amount;
+        emit Transfer(msg.sender, recipient, amount);
+        return true;
+    }
+
+    function transferFrom(address sender, address recipient, uint256 amount) public override returns (bool) {
+        require(balances[sender] >= amount, "Insufficient balance");
+        require(allowances[sender][msg.sender] >= amount, "Allowance exceeded");
+        balances[sender] -= amount;
+        balances[recipient] += amount;
+        allowances[sender][msg.sender] -= amount;
+        emit Transfer(sender, recipient, amount);
+        return true;
+    }
+
+    function approve(address spender, uint256 amount) public returns (bool) {
+        allowances[msg.sender][spender] = amount;
+        emit Approval(msg.sender, spender, amount);
+        return true;
+    }
+
+    function allowance(address owner, address spender) public view returns (uint256) {
+        return allowances[owner][spender];
+    }
+
+    function mint(address account, uint256 amount) internal {
+        totalSupply_ += amount;
+        balances[account] += amount;
+        emit Transfer(address(0), account, amount);
+    }
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
+contract FlashLoanProvider is ProtocolToken {
+    uint256 public constant mintFee = 0.0001 ether; // Fee per token minted
+
+    event FlashLoanExecuted(address indexed borrower, address indexed token, uint256 amount, uint256 fee);
+
+    function executeFlashLoan(address receiverAddress, uint256 amount, bytes calldata params) external {
+        uint256 balanceBefore = balanceOf(address(this));
+        require(balanceBefore >= amount, "Insufficient pool balance");
+
+        // Transfer tokens to the receiver
+        transfer(receiverAddress, amount);
+
+        // Execute the operation
+        IFlashLoanReceiver(receiverAddress).executeOperation(address(this), amount, 0, params);
+
+        // Check if the borrowed amount is returned
+        uint256 balanceAfter = balanceOf(address(this));
+        require(balanceAfter >= balanceBefore, "Loan wasn't paid back");
+
+        emit FlashLoanExecuted(receiverAddress, address(this), amount, 0);
+    }
+
+    function flashMint(address receiverAddress, uint256 amount, bytes calldata params) external payable {
+        require(msg.value >= amount * mintFee, "Insufficient mint fee");
+
+        // Mint tokens to the receiver
+        mint(receiverAddress, amount);
+
+        // Execute the operation
+        IFlashLoanReceiver(receiverAddress).executeOperation(address(this), amount, 0, params);
+
+        // Burn the tokens from the receiver
+        require(balanceOf(receiverAddress) >= amount, "Not enough tokens to burn");
+        balances[receiverAddress] -= amount;
+        totalSupply_ -= amount;
+        emit Transfer(receiverAddress, address(0), amount);
+    }
+
+    // Allow contract to receive ether for mint fees
+    receive() external payable {}
+}

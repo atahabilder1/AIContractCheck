@@ -1,0 +1,86 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultisigWallet {
+    address[] public owners;
+    uint public required;
+    uint public transactionCount;
+
+    struct Transaction {
+        address to;
+        uint value;
+        bytes data;
+        bool executed;
+    }
+
+    mapping(uint => Transaction) public transactions;
+    mapping(uint => mapping(address => bool)) public confirmations;
+
+    event Submission(uint indexed transactionId);
+    event Confirmation(uint indexed transactionId, address indexed owner);
+    event Execution(uint indexed transactionId);
+    event ExecutionFailure(uint indexed transactionId);
+
+    modifier onlyOwner() {
+        bool isOwner = false;
+        for (uint i = 0; i < owners.length; i++) {
+            if (owners[i] == msg.sender) {
+                isOwner = true;
+                break;
+            }
+        }
+        require(isOwner, "Only owner can call this function");
+        _;
+    }
+
+    modifier transactionExists(uint _transactionId) {
+        require(_transactionId < transactionCount, "Transaction does not exist");
+        _;
+    }
+
+    modifier notExecuted(uint _transactionId) {
+        require(!transactions[_transactionId].executed, "Transaction already executed");
+        _;
+    }
+
+    constructor(address[] memory _owners, uint _required) {
+        require(_owners.length > 0 && _required > 0 && _required <= _owners.length, "Invalid number of owners or required confirmations");
+        owners = _owners;
+        required = _required;
+    }
+
+    function submitTransaction(address _to, uint _value, bytes memory _data) public onlyOwner {
+        uint transactionId = transactionCount;
+        transactions[transactionId] = Transaction({
+            to: _to,
+            value: _value,
+            data: _data,
+            executed: false
+        });
+        transactionCount++;
+        emit Submission(transactionId);
+    }
+
+    function confirmTransaction(uint _transactionId) public onlyOwner transactionExists(_transactionId) notExecuted(_transactionId) {
+        confirmations[_transactionId][msg.sender] = true;
+        emit Confirmation(_transactionId, msg.sender);
+    }
+
+    function executeTransaction(uint _transactionId) public onlyOwner transactionExists(_transactionId) notExecuted(_transactionId) {
+        Transaction storage transaction = transactions[_transactionId];
+        require(confirmations[_transactionId][msg.sender], "Transaction not confirmed by this owner");
+
+        // Here you would typically add a check to ensure the contract has enough balance to send the specified value
+        // However, for simplicity, we will just mark the transaction as executed
+        transaction.executed = true;
+        (bool success, ) = transaction.to.call{value: transaction.value}(transaction.data);
+        if (success) {
+            emit Execution(_transactionId);
+        } else {
+            transaction.executed = false; // Revert the transaction if it fails
+            emit ExecutionFailure(_transactionId);
+        }
+    }
+}
+```

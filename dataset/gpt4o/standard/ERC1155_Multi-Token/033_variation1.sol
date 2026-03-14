@@ -1,0 +1,44 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract GameAssets is ERC1155, Ownable {
+    // Mapping from token ID to rarity level
+    mapping(uint256 => uint8) private _rarityLevels;
+
+    // Event emitted when a new token type is created
+    event TokenTypeCreated(uint256 indexed id, uint8 rarityLevel);
+
+    constructor(string memory uri) ERC1155(uri) {}
+
+    /**
+     * @dev Creates a new token type with a specific rarity level.
+     * Can only be called by the contract owner.
+     * @param id The token ID of the new token type.
+     * @param rarityLevel The rarity level of the new token type.
+     * @param initialSupply The initial supply of the new token type.
+     * @param data Additional data with no specified format.
+     */
+    function createTokenType(
+        uint256 id,
+        uint8 rarityLevel,
+        uint256 initialSupply,
+        bytes memory data
+    ) public onlyOwner {
+        require(_rarityLevels[id] == 0, "Token type already exists");
+        _rarityLevels[id] = rarityLevel;
+        _mint(msg.sender, id, initialSupply, data);
+        emit TokenTypeCreated(id, rarityLevel);
+    }
+
+    /**
+     * @dev Returns the rarity level of a specific token ID.
+     * @param id The token ID.
+     */
+    function getRarityLevel(uint256 id) public view returns (uint8) {
+        require(_rarityLevels[id] != 0, "Token type does not exist");
+        return _rarityLevels[id];
+    }
+}

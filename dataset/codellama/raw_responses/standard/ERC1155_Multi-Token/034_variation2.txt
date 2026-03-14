@@ -1,0 +1,63 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract ERC1155Token is ERC1155, ERC1155Metadata {
+    // Mapping from token ID to serial number
+    mapping(uint256 => uint256) private _tokenSerialNumbers;
+
+    // Mapping from token ID to owner
+    mapping(uint256 => address) private _tokenOwners;
+
+    // Mapping from owner to balance
+    mapping(address => uint256) private _balances;
+
+    // Mapping from token ID to operators
+    mapping(uint256 => mapping(address => bool)) private _tokenOperators;
+
+    // Mapping from owner to number of tokens
+    mapping(address => uint256) private _numTokens;
+
+    constructor() public {
+        _name = "My ERC1155 Token";
+        _symbol = "M1155";
+    }
+
+    function mint(uint256 tokenId, uint256 serialNumber) public {
+        require(msg.sender == _tokenOwners[tokenId], "Only the owner of the token can mint new tokens");
+        require(serialNumber > 0, "Serial number must be greater than zero");
+        require(serialNumber <= _tokenSerialNumbers[tokenId], "Serial number must be less than or equal to the current serial number");
+
+        _tokenSerialNumbers[tokenId] = serialNumber;
+        _tokenOwners[tokenId] = msg.sender;
+        _balances[msg.sender] += 1;
+        _numTokens[msg.sender] += 1;
+
+        emit Transfer(address(0), msg.sender, 1);
+    }
+
+    function balanceOf(address owner) public view returns (uint256) {
+        require(owner != address(0), "Invalid owner address");
+        return _balances[owner];
+    }
+
+    function totalSupply() public view returns (uint256) {
+        return _numTokens[msg.sender];
+    }
+
+    function transfer(address from, address to, uint256 tokenId, uint256 serialNumber) public {
+        require(msg.sender == _tokenOwners[tokenId], "Only the owner of the token can transfer it");
+        require(serialNumber > 0, "Serial number must be greater than zero");
+        require(serialNumber <= _tokenSerialNumbers[tokenId], "Serial number must be less than or equal to the current serial number");
+
+        _tokenSerialNumbers[tokenId] = serialNumber;
+        _tokenOwners[tokenId] = to;
+        _balances[from] -= 1;
+        _balances[to] += 1;
+        _numTokens[from] -= 1;
+        _numTokens[to] += 1;
+
+        emit Transfer(from, to, 1);
+    }
+}
+```

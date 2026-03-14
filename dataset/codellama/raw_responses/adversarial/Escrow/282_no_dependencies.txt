@@ -1,0 +1,46 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address private _owner;
+    address private _recipient;
+    address private _arbiter;
+    uint private _amount;
+    bool private _dispute;
+
+    constructor(address owner, address recipient, address arbiter, uint amount) public {
+        _owner = owner;
+        _recipient = recipient;
+        _arbiter = arbiter;
+        _amount = amount;
+        _dispute = false;
+    }
+
+    function release() public {
+        require(msg.sender == _owner, "Only the owner can release the funds.");
+        require(!_dispute, "Funds are currently being disputed.");
+        _recipient.transfer(_amount);
+        _owner.transfer(_amount);
+    }
+
+    function dispute() public {
+        require(msg.sender == _arbiter, "Only the arbiter can dispute the funds.");
+        _dispute = true;
+    }
+
+    function resolve() public {
+        require(msg.sender == _arbiter, "Only the arbiter can resolve the dispute.");
+        _dispute = false;
+    }
+
+    function getAmount() public view returns (uint) {
+        return _amount;
+    }
+
+    function getDispute() public view returns (bool) {
+        return _dispute;
+    }
+}
+```
+Note: This is a basic implementation of an Escrow contract and may not be suitable for production use. It is important to thoroughly test and audit any smart contract before deploying it on the blockchain.

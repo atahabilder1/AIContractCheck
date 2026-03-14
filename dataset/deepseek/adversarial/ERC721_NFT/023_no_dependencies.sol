@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MyNFT {
+    string public name = "My NFT Collection";
+    string public symbol = "MNFT";
+
+    struct Token {
+        uint256 id;
+        address owner;
+    }
+
+    uint256 private tokenCounter;
+    mapping(uint256 => address) private tokenOwner;
+    mapping(address => uint256) private ownerTokenCount;
+
+    event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
+
+    constructor() {
+        tokenCounter = 0;
+    }
+
+    function mint() public {
+        tokenCounter++;
+        tokenOwner[tokenCounter] = msg.sender;
+        ownerTokenCount[msg.sender]++;
+        emit Transfer(address(0), msg.sender, tokenCounter);
+    }
+
+    function transferFrom(address from, address to, uint256 tokenId) public {
+        require(ownerOf(tokenId) == msg.sender, "Not the owner of this token");
+        require(to != address(0), "Cannot transfer to the zero address");
+
+        ownerTokenCount[from]--;
+        ownerTokenCount[to]++;
+        tokenOwner[tokenId] = to;
+
+        emit Transfer(from, to, tokenId);
+    }
+
+    function ownerOf(uint256 tokenId) public view returns (address) {
+        return tokenOwner[tokenId];
+    }
+
+    function balanceOf(address owner) public view returns (uint256) {
+        return ownerTokenCount[owner];
+    }
+}

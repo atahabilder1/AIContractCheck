@@ -1,0 +1,34 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "https://github.com/OpenZeppelin/openzeppelin-solidity/contracts/token/ERC721/ERC721.sol";
+
+contract MyNFT is ERC721 {
+    constructor() ERC721("MyNFT", "NFT") {}
+
+    function mint(address to, string memory tokenURI) public returns (bool) {
+        require(_totalSupply < 10000, "Maximum NFT supply exceeded");
+        require(to != address(0), "Invalid address");
+
+        _mint(to, tokenURI);
+        return true;
+    }
+
+    function tokenURI(uint256 tokenId) public view returns (string memory) {
+        require(_exists(tokenId), "ERC721Metadata: URI query for nonexistent token");
+
+        return _tokenURIs[tokenId];
+    }
+
+    function setTokenURI(uint256 tokenId, string memory _tokenURI) public {
+        require(_exists(tokenId), "ERC721Metadata: URI query for nonexistent token");
+        require(msg.sender == _tokenIdToOwner[tokenId], "Only the owner can set the token URI");
+
+        _tokenURIs[tokenId] = _tokenURI;
+    }
+}
+```
+This contract inherits from the OpenZeppelin ERC721 contract and adds the functionality to mint new tokens with a unique metadata URI. The `mint` function requires a valid `to` address and a `tokenURI` string, and returns a boolean indicating whether the mint was successful. The `tokenURI` function returns the metadata URI for a given token ID, and the `setTokenURI` function allows the owner of a token to set a new metadata URI.
+
+Note that this contract does not include any logic for managing the supply of NFTs, so it is up to the developer to ensure that the total supply of NFTs does not exceed 10000. Additionally, this contract does not include any logic for handling the transfer of NFTs, so it is up to the developer to ensure that the ownership of NFTs is correctly managed.

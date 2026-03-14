@@ -1,0 +1,38 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    // The owner of the Timelock contract
+    address private _owner;
+
+    // The timestamp at which the Timelock will be unlocked
+    uint256 private _unlockTime;
+
+    // The constructor sets the owner and unlock time
+    constructor(address owner_, uint256 unlockTime_) public {
+        _owner = owner_;
+        _unlockTime = unlockTime_;
+    }
+
+    // The fallback function
+    fallback() external {
+        // Revert if the Timelock is not unlocked
+        require(block.timestamp >= _unlockTime, "Timelock: not unlocked");
+
+        // Revert if the sender is not the owner
+        require(msg.sender == _owner, "Timelock: not owner");
+
+        // Revert if the Timelock is not empty
+        require(address(this).balance == 0, "Timelock: not empty");
+
+        // Send the Ether to the owner
+        msg.sender.transfer(address(this).balance);
+    }
+}
+```
+This Solidity code implements a gas-optimized Timelock contract. It has a constructor that sets the owner and unlock time, and a fallback function that reverts if the Timelock is not unlocked, the sender is not the owner, or the Timelock is not empty. If the Timelock is unlocked and the sender is the owner, the Ether is sent to the owner.
+
+The code is optimized for gas costs by using the `require` statement instead of `if` statements, and by using a single `transfer` statement instead of multiple `transfer` statements. The `require` statement is more gas-efficient because it only checks a single condition, while the `if` statement would require multiple conditions to be checked. Similarly, the `transfer` statement is more gas-efficient because it only requires a single call to the Ether transfer function, while multiple `transfer` statements would require multiple calls.
+
+Overall, this code is designed to be as gas-efficient as possible, while still ensuring that the Timelock contract functions correctly.

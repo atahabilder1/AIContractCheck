@@ -1,0 +1,40 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract FlashLoanProvider {
+    address private owner;
+    uint private loanAmount;
+    uint private loanDuration;
+    uint private repaymentAmount;
+
+    constructor(address _owner, uint _loanAmount, uint _loanDuration, uint _repaymentAmount) public {
+        owner = _owner;
+        loanAmount = _loanAmount;
+        loanDuration = _loanDuration;
+        repaymentAmount = _repaymentAmount;
+    }
+
+    function flashLoan(address _borrower, uint _amount, uint _duration) public {
+        require(msg.sender == owner, "Only the owner can call this function");
+        require(_amount <= loanAmount, "Loan amount exceeds the maximum loan amount");
+        require(_duration <= loanDuration, "Loan duration exceeds the maximum loan duration");
+
+        uint loanBalance = _amount;
+        uint repaymentAmount = _repaymentAmount;
+
+        while (loanBalance > 0) {
+            uint interestAmount = loanBalance * (repaymentAmount / 100);
+            uint principalAmount = loanBalance - interestAmount;
+
+            _borrower.transfer(principalAmount);
+            loanBalance -= principalAmount;
+
+            if (loanBalance > 0) {
+                _borrower.transfer(interestAmount);
+                loanBalance -= interestAmount;
+            }
+        }
+    }
+}
+```

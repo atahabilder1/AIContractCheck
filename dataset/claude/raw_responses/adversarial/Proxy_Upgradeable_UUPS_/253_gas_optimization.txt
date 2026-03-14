@@ -1,0 +1,101 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract UUPSProxy {
+    // EIP-1967 implementation slot: keccak256("eip1967.proxy.implementation") - 1
+    bytes32 private constant _IMPL_SLOT = 0x360894a13ba1a3210667c828492db4e5cc36b0a631acea7e3f1f4d188a81c177;
+    // EIP-1967 admin slot: keccak256("eip1967.proxy.admin") - 1
+    bytes32 private constant _ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+
+    constructor(address implementation, bytes memory data) {
+        assembly {
+            sstore(_ADMIN_SLOT, caller())
+            sstore(_IMPL_SLOT, implementation)
+        }
+        if (data.length > 0) {
+            (bool ok,) = implementation.delegatecall(data);
+            require(ok);
+        }
+    }
+
+    fallback() external payable {
+        assembly {
+            let impl := sload(_IMPL_SLOT)
+            calldatacopy(0, 0, calldatasize())
+            let result := delegatecall(gas(), impl, 0, calldatasize(), 0, 0)
+            returndatacopy(0, 0, returndatasize())
+            switch result
+            case 0 { revert(0, returndatasize()) }
+            default { return(0, returndatasize()) }
+        }
+    }
+
+    receive() external payable {}
+}
+
+abstract contract UUPSUpgradeable {
+    bytes32 private constant _IMPL_SLOT = 0x360894a13ba1a3210667c828492db4e5cc36b0a631acea7e3f1f4d188a81c177;
+    bytes32 private constant _ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+
+    modifier onlyAdmin() {
+        address admin;
+        assembly { admin := sload(_ADMIN_SLOT) }
+        require(msg.sender == admin);
+        _;
+    }
+
+    function upgradeTo(address newImplementation) external onlyAdmin {
+        require(newImplementation.code.length > 0);
+        require(_isUUPS(newImplementation));
+        assembly { sstore(_IMPL_SLOT, newImplementation) }
+    }
+
+    function upgradeToAndCall(address newImplementation, bytes calldata data) external onlyAdmin {
+        require(newImplementation.code.length > 0);
+        require(_isUUPS(newImplementation));
+        assembly { sstore(_IMPL_SLOT, newImplementation) }
+        if (data.length > 0) {
+            (bool ok,) = address(this).delegatecall(data);
+            require(ok);
+        }
+    }
+
+    function transferAdmin(address newAdmin) external onlyAdmin {
+        require(newAdmin != address(0));
+        assembly { sstore(_ADMIN_SLOT, newAdmin) }
+    }
+
+    function implementation() external view returns (address impl) {
+        assembly { impl := sload(_IMPL_SLOT) }
+    }
+
+    function admin() external view returns (address adm) {
+        assembly { adm := sload(_ADMIN_SLOT) }
+    }
+
+    function proxiableUUID() external pure returns (bytes32) {
+        return _IMPL_SLOT;
+    }
+
+    function _isUUPS(address target) private view returns (bool) {
+        (bool ok, bytes memory ret) = target.staticcall(abi.encodeWithSignature("proxiableUUID()"));
+        return ok && ret.length == 32 && abi.decode(ret, (bytes32)) == _IMPL_SLOT;
+    }
+}
+
+contract ImplementationV1 is UUPSUpgradeable {
+    uint256 public value;
+    bool private _initialized;
+
+    function initialize(uint256 val) external {
+        require(!_initialized);
+        _initialized = true;
+        value = val;
+    }
+
+    function setValue(uint256 val) external {
+        value = val;
+    }
+}
+```

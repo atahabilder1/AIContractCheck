@@ -1,0 +1,85 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract OrderBookDEX {
+    struct Order {
+        address owner;
+        address tokenA;
+        address tokenB;
+        uint256 amountA;
+        uint256 amountB;
+        uint256 price;
+        uint256 timestamp;
+    }
+
+    mapping(address => mapping(address => uint256)) public balances;
+    mapping(address => mapping(address => Order[])) public orderBook;
+
+    function placeLimitOrder(
+        address tokenA,
+        address tokenB,
+        uint256 amountA,
+        uint256 amountB,
+        uint256 price,
+        uint256 timestamp
+    ) external {
+        require(amountA > 0, "Invalid amount");
+        require(amountB > 0, "Invalid amount");
+        require(price > 0, "Invalid price");
+        require(timestamp > 0, "Invalid timestamp");
+
+        balances[msg.sender][tokenA] = balances[msg.sender][tokenA].add(amountA);
+        balances[msg.sender][tokenB] = balances[msg.sender][tokenB].add(amountB);
+
+        Order memory order = Order({
+            owner: msg.sender,
+            tokenA: tokenA,
+            tokenB: tokenB,
+            amountA: amountA,
+            amountB: amountB,
+            price: price,
+            timestamp: timestamp
+        });
+
+        orderBook[tokenA][tokenB].push(order);
+    }
+
+    function cancelOrder(
+        address tokenA,
+        address tokenB,
+        uint256 orderId
+    ) external {
+        require(orderBook[tokenA][tokenB][orderId].owner == msg.sender, "Invalid order");
+
+        Order memory order = orderBook[tokenA][tokenB][orderId];
+        balances[msg.sender][tokenA] = balances[msg.sender][tokenA].add(order.amountA);
+        balances[msg.sender][tokenB] = balances[msg.sender][tokenB].add(order.amountB);
+
+        delete orderBook[tokenA][tokenB][orderId];
+    }
+
+    function fillOrder(
+        address tokenA,
+        address tokenB,
+        uint256 orderId,
+        uint256 amountA
+    ) external {
+        require(amountA > 0, "Invalid amount");
+        require(orderBook[tokenA][tokenB][orderId].amountA > 0, "Invalid order");
+
+        Order memory order = orderBook[tokenA][tokenB][orderId];
+        uint256 filledAmount = amountA.min(order.amountA);
+        uint256 filledAmountB = filledAmount.mul(order.price).div(10**18);
+
+        require(filledAmount > 0, "Invalid filled amount");
+        require(filledAmountB > 0, "Invalid filled amount");
+
+        balances[msg.sender][tokenA] = balances[msg.sender][tokenA].add(filledAmount);
+        balances[msg.sender][tokenB] = balances[msg.sender][tokenB].add(filledAmountB);
+        balances[order.owner][tokenA] = balances[order.owner][tokenA].sub(filledAmount);
+        balances[order.owner][tokenB] = balances[order.owner][tokenB].sub(filledAmountB);
+
+        orderBook[tokenA][tokenB][orderId].amountA = order.amountA.sub(filledAmount);
+        orderBook[tokenA][tokenB][orderId].amountB = order.amountB.sub(filledAmountB);
+    }
+}

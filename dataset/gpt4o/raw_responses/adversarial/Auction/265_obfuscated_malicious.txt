@@ -1,0 +1,91 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Auction {
+    address public admin;
+    address payable public beneficiary;
+    uint public auctionEndTime;
+    bool public paused;
+
+    address public highestBidder;
+    uint public highestBid;
+
+    mapping(address => uint) public pendingReturns;
+
+    bool ended;
+
+    event HighestBidIncreased(address bidder, uint amount);
+    event AuctionEnded(address winner, uint amount);
+    event AuctionPaused(bool isPaused);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin can call this function.");
+        _;
+    }
+
+    modifier notPaused() {
+        require(!paused, "Auction is paused.");
+        _;
+    }
+
+    constructor(
+        uint _biddingTime,
+        address payable _beneficiary
+    ) {
+        admin = msg.sender;
+        beneficiary = _beneficiary;
+        auctionEndTime = block.timestamp + _biddingTime;
+    }
+
+    function bid() external payable notPaused {
+        require(block.timestamp <= auctionEndTime, "Auction already ended.");
+        require(msg.value > highestBid, "There already is a higher bid.");
+
+        if (highestBid != 0) {
+            pendingReturns[highestBidder] += highestBid;
+        }
+
+        highestBidder = msg.sender;
+        highestBid = msg.value;
+        emit HighestBidIncreased(msg.sender, msg.value);
+    }
+
+    function withdraw() external notPaused returns (bool) {
+        uint amount = pendingReturns[msg.sender];
+        if (amount > 0) {
+            pendingReturns[msg.sender] = 0;
+
+            if (!payable(msg.sender).send(amount)) {
+                pendingReturns[msg.sender] = amount;
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function auctionEnd() external notPaused {
+        require(block.timestamp >= auctionEndTime, "Auction not yet ended.");
+        require(!ended, "auctionEnd has already been called.");
+
+        ended = true;
+        emit AuctionEnded(highestBidder, highestBid);
+
+        beneficiary.transfer(highestBid);
+    }
+
+    function emergencyWithdraw() external onlyAdmin {
+        payable(admin).transfer(address(this).balance);
+    }
+
+    function pause() external onlyAdmin {
+        paused = true;
+        emit AuctionPaused(paused);
+    }
+
+    function unpause() external onlyAdmin {
+        paused = false;
+        emit AuctionPaused(paused);
+    }
+}
+```

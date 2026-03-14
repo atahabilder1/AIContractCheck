@@ -1,0 +1,44 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract YieldAggregator {
+    // Mapping of token addresses to their respective yield aggregators
+    mapping(address => YieldAggregator) public yieldAggregators;
+
+    // Mapping of token addresses to their respective yield aggregator addresses
+    mapping(address => address) public yieldAggregatorAddresses;
+
+    constructor() public {
+        // Initialize the yield aggregators mapping with the address of the current contract
+        yieldAggregators[address(this)] = this;
+    }
+
+    // Function to add a new yield aggregator for a token
+    function addYieldAggregator(address _tokenAddress, YieldAggregator _yieldAggregator) public {
+        // Check if the yield aggregator for the token is already set
+        require(yieldAggregatorAddresses[_tokenAddress] == address(0), "Yield aggregator already set for token");
+
+        // Set the yield aggregator for the token
+        yieldAggregators[_tokenAddress] = _yieldAggregator;
+
+        // Set the yield aggregator address for the token
+        yieldAggregatorAddresses[_tokenAddress] = address(_yieldAggregator);
+    }
+
+    // Function to get the yield aggregator for a token
+    function getYieldAggregator(address _tokenAddress) public view returns (YieldAggregator) {
+        // Return the yield aggregator for the token
+        return yieldAggregators[_tokenAddress];
+    }
+
+    // Function to get the yield aggregator address for a token
+    function getYieldAggregatorAddress(address _tokenAddress) public view returns (address) {
+        // Return the yield aggregator address for the token
+        return yieldAggregatorAddresses[_tokenAddress];
+    }
+}
+```
+This contract is a simple yield aggregator that allows you to add new yield aggregators for different tokens. It also provides functions to get the yield aggregator for a token and the yield aggregator address for a token.
+
+Note that this contract does not include any external libraries or dependencies, so it can be used as a standalone contract. However, it is recommended to use OpenZeppelin or other external libraries to make the contract more secure and efficient.

@@ -1,0 +1,22 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+/**
+ * @title IERC20
+ * @dev Interface for the ERC20 token standard.
+ * Minimal interface to query balance and total supply for governance token.
+ */
+interface IERC20 {
+    function balanceOf(address account) external view returns (uint256);
+    function totalSupply() external view returns (uint256);
+}
+
+/**
+ * @title SimpleGovernance
+ * @dev A basic DAO/Governance contract for creating proposals, voting, and executing actions.
+ * Voting power is determined by the balance of a specified ERC20 token.
+ */
+contract SimpleGovernance {
+    // --- State Variables ---
+    

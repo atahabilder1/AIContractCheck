@@ -1,0 +1,42 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiDEX {
+    address public admin;
+    address public token;
+    uint public totalSupply;
+    mapping(address => uint) public balances;
+
+    constructor(address _token) {
+        admin = msg.sender;
+        token = _token;
+        totalSupply = 1000;
+    }
+
+    function deposit(uint _amount) public {
+        require(msg.sender == admin, "Only admin can deposit");
+        require(_amount > 0, "Invalid amount");
+        require(balances[msg.sender] + _amount > 0, "Insufficient balance");
+        balances[msg.sender] += _amount;
+        totalSupply += _amount;
+    }
+
+    function withdraw(uint _amount) public {
+        require(msg.sender == admin, "Only admin can withdraw");
+        require(_amount > 0, "Invalid amount");
+        require(balances[msg.sender] - _amount > 0, "Insufficient balance");
+        balances[msg.sender] -= _amount;
+        totalSupply -= _amount;
+    }
+
+    function swap(uint _amount, address _receiver) public {
+        require(msg.sender == admin, "Only admin can swap");
+        require(_amount > 0, "Invalid amount");
+        require(balances[msg.sender] - _amount > 0, "Insufficient balance");
+        require(balances[_receiver] + _amount > 0, "Insufficient balance");
+        balances[msg.sender] -= _amount;
+        balances[_receiver] += _amount;
+    }
+}
+```

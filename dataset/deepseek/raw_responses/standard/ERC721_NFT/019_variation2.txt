@@ -1,0 +1,43 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+
+contract DutchAuctionNFT is ERC721, Ownable, ERC721Enumerable {
+    uint256 public constant MAX_TOKENS = 100;
+    uint256 public constant INITIAL_PRICE = 1 ether;
+    uint256 public constant AUCTION_DURATION = 10 minutes;
+    uint256 public constant AUCTION_START_TIME = block.timestamp;
+
+    uint256 public totalTokensSold;
+    uint256 public currentPrice;
+
+    constructor() ERC721("DutchAuctionNFT", "DAN") {
+        currentPrice = INITIAL_PRICE;
+    }
+
+    function mint() external payable {
+        require(totalTokensSold < MAX_TOKENS, "All tokens have been sold.");
+        require(msg.value >= currentPrice, "Insufficient funds sent.");
+
+        uint256 tokenId = totalTokensSold + 1;
+        _safeMint(msg.sender, tokenId);
+        totalTokensSold++;
+
+        if (block.timestamp >= AUCTION_START_TIME + AUCTION_DURATION) {
+            currentPrice -= (INITIAL_PRICE / MAX_TOKENS) * 2;
+        }
+    }
+
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal override(ERC721, ERC721Enumerable) {
+        super._beforeTokenTransfer(from, to, tokenId);
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721, ERC721Enumerable) returns (bool) {
+        return super.supportsInterface(interfaceId);
+    }
+}
+```

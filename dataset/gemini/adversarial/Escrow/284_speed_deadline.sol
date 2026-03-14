@@ -1,0 +1,84 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address payable public seller;
+    address payable public buyer;
+    uint256 public depositAmount;
+    bool public isDisputed;
+    bool public isReleased;
+
+    event Deposit(address indexed buyer, uint256 amount);
+    event Release(address indexed seller);
+    event Refund(address indexed buyer);
+    event Dispute(address indexed buyer);
+
+    modifier onlySeller() {
+        require(msg.sender == seller, "Only the seller can perform this action");
+        _;
+    }
+
+    modifier onlyBuyer() {
+        require(msg.sender == buyer, "Only the buyer can perform this action");
+        _;
+    }
+
+    modifier notDisputed() {
+        require(!isDisputed, "The contract is currently in dispute");
+        _;
+    }
+
+    modifier notReleased() {
+        require(!isReleased, "Funds have already been released or refunded");
+        _;
+    }
+
+    constructor(address payable _seller, address payable _buyer, uint256 _depositAmount) {
+        seller = _seller;
+        buyer = _buyer;
+        depositAmount = _depositAmount;
+        isDisputed = false;
+        isReleased = false;
+    }
+
+    function deposit() public payable notDisputed notReleased {
+        require(msg.sender == buyer, "Only the buyer can deposit funds");
+        require(msg.value == depositAmount, "Incorrect deposit amount");
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function releaseFunds() public onlySeller notDisputed notReleased {
+        require(msg.sender == seller, "Only the seller can release funds");
+        require(address(this).balance >= depositAmount, "Not enough funds in escrow");
+        isReleased = true;
+        (bool success, ) = seller.call{value: address(this).balance}("");
+        require(success, "Failed to send funds to seller");
+        emit Release(seller);
+    }
+
+    function refundBuyer() public onlyBuyer notDisputed notReleased {
+        require(msg.sender == buyer, "Only the buyer can request a refund");
+        require(address(this).balance >= depositAmount, "Not enough funds in escrow");
+        isReleased = true;
+        (bool success, ) = buyer.call{value: address(this).balance}("");
+        require(success, "Failed to send funds to buyer");
+        emit Refund(buyer);
+    }
+
+    function dispute() public onlyBuyer notDisputed notReleased {
+        require(msg.sender == buyer, "Only the buyer can initiate a dispute");
+        isDisputed = true;
+        emit Dispute(buyer);
+    }
+
+    // This is a simplified dispute resolution. In a real scenario,
+    // you would need a mechanism for a third party (e.g., an arbitrator)
+    // to resolve disputes and call releaseFunds or refundBuyer accordingly.
+    // For this demo, we'll assume the dispute is automatically resolved in favor of the buyer
+    // if it's initiated and not resolved by the seller within a certain timeframe (not implemented here).
+    // For a truly functional escrow, a more robust dispute resolution mechanism is required.
+
+    receive() external payable {
+        // Fallback function to receive Ether
+    }
+}

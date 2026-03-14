@@ -1,0 +1,21 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultisigWallet {
+    address[] public owners;
+    uint public requiredSignatures;
+    mapping(address => uint) public signatures;
+
+    constructor(address[] memory _owners, uint _requiredSignatures) public {
+        owners = _owners;
+        requiredSignatures = _requiredSignatures;
+    }
+
+    function transfer(address payable recipient, uint amount) public {
+        require(msg.sender == owners[0], "Only the owner can transfer");
+        require(signatures[msg.sender] >= requiredSignatures, "Insufficient signatures");
+        recipient.transfer(amount);
+    }
+}
+```

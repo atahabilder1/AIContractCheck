@@ -1,0 +1,311 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+
+abstract contract UUPSTimelockUpgradeable is Initializable, UUPSUpgradeable, OwnableUpgradeable {
+    struct UpgradeProposal {
+        address newImplementation;
+        uint256 proposedAt;
+        bool executed;
+        bytes32 storageLayoutHash;
+    }
+
+    struct VersionRecord {
+        address implementation;
+        uint256 activatedAt;
+        bytes32 storageLayoutHash;
+    }
+
+    uint256 public constant UPGRADE_TIMELOCK = 48 hours;
+    uint256 public constant MAX_ROLLBACK_VERSIONS = 5;
+
+    uint256 private _currentVersion;
+    mapping(uint256 => VersionRecord) private _versionHistory;
+    UpgradeProposal private _pendingUpgrade;
+    mapping(bytes32 => bool) private _validatedLayouts;
+
+    event UpgradeProposed(address indexed newImplementation, uint256 executeAfter, bytes32 storageLayoutHash);
+    event UpgradeCancelled(address indexed cancelledImplementation);
+    event UpgradeExecuted(address indexed newImplementation, uint256 version);
+    event RolledBack(address indexed previousImplementation, uint256 fromVersion, uint256 toVersion);
+    event StorageLayoutValidated(bytes32 layoutHash);
+
+    error TimelockNotElapsed(uint256 remaining);
+    error NoUpgradePending();
+    error UpgradeAlreadyPending();
+    error InvalidImplementation();
+    error StorageLayoutMismatch();
+    error RollbackVersionOutOfRange(uint256 requested, uint256 oldest);
+    error VersionNotFound(uint256 version);
+    error UpgradeAlreadyExecuted();
+
+    function __UUPSTimelock_init() internal onlyInitializing {
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
+        _currentVersion = 1;
+        address currentImpl = _getImplementation();
+        bytes32 layoutHash = _computeStorageLayoutHash();
+        _versionHistory[1] = VersionRecord({
+            implementation: currentImpl,
+            activatedAt: block.timestamp,
+            storageLayoutHash: layoutHash
+        });
+        _validatedLayouts[layoutHash] = true;
+    }
+
+    function proposeUpgrade(address newImplementation, bytes32 storageLayoutHash) external onlyOwner {
+        if (_pendingUpgrade.newImplementation != address(0) && !_pendingUpgrade.executed) {
+            revert UpgradeAlreadyPending();
+        }
+        if (newImplementation == address(0) || newImplementation.code.length == 0) {
+            revert InvalidImplementation();
+        }
+
+        _pendingUpgrade = UpgradeProposal({
+            newImplementation: newImplementation,
+            proposedAt: block.timestamp,
+            executed: false,
+            storageLayoutHash: storageLayoutHash
+        });
+
+        emit UpgradeProposed(newImplementation, block.timestamp + UPGRADE_TIMELOCK, storageLayoutHash);
+    }
+
+    function cancelUpgrade() external onlyOwner {
+        if (_pendingUpgrade.newImplementation == address(0) || _pendingUpgrade.executed) {
+            revert NoUpgradePending();
+        }
+        address cancelled = _pendingUpgrade.newImplementation;
+        delete _pendingUpgrade;
+        emit UpgradeCancelled(cancelled);
+    }
+
+    function executeUpgrade() external onlyOwner {
+        if (_pendingUpgrade.newImplementation == address(0)) {
+            revert NoUpgradePending();
+        }
+        if (_pendingUpgrade.executed) {
+            revert UpgradeAlreadyExecuted();
+        }
+
+        uint256 elapsed = block.timestamp - _pendingUpgrade.proposedAt;
+        if (elapsed < UPGRADE_TIMELOCK) {
+            revert TimelockNotElapsed(UPGRADE_TIMELOCK - elapsed);
+        }
+
+        _validateStorageLayout(_pendingUpgrade.storageLayoutHash);
+
+        _pendingUpgrade.executed = true;
+        address newImpl = _pendingUpgrade.newImplementation;
+        bytes32 layoutHash = _pendingUpgrade.storageLayoutHash;
+
+        _currentVersion++;
+        _versionHistory[_currentVersion] = VersionRecord({
+            implementation: newImpl,
+            activatedAt: block.timestamp,
+            storageLayoutHash: layoutHash
+        });
+        _validatedLayouts[layoutHash] = true;
+
+        _upgradeToAndCallUUPS(newImpl, new bytes(0), false);
+
+        emit UpgradeExecuted(newImpl, _currentVersion);
+    }
+
+    function rollbackToVersion(uint256 targetVersion) external onlyOwner {
+        if (targetVersion >= _currentVersion) {
+            revert RollbackVersionOutOfRange(targetVersion, _oldestRollbackVersion());
+        }
+        if (targetVersion < _oldestRollbackVersion()) {
+            revert RollbackVersionOutOfRange(targetVersion, _oldestRollbackVersion());
+        }
+
+        VersionRecord storage target = _versionHistory[targetVersion];
+        if (target.implementation == address(0)) {
+            revert VersionNotFound(targetVersion);
+        }
+
+        uint256 fromVersion = _currentVersion;
+        address rollbackImpl = target.implementation;
+
+        _currentVersion++;
+        _versionHistory[_currentVersion] = VersionRecord({
+            implementation: rollbackImpl,
+            activatedAt: block.timestamp,
+            storageLayoutHash: target.storageLayoutHash
+        });
+
+        delete _pendingUpgrade;
+
+        _upgradeToAndCallUUPS(rollbackImpl, new bytes(0), false);
+
+        emit RolledBack(rollbackImpl, fromVersion, targetVersion);
+    }
+
+    function _validateStorageLayout(bytes32 proposedLayoutHash) internal view {
+        bytes32 currentLayoutHash = _versionHistory[_currentVersion].storageLayoutHash;
+        if (currentLayoutHash == proposedLayoutHash) {
+            return;
+        }
+        if (!_isLayoutCompatible(currentLayoutHash, proposedLayoutHash)) {
+            revert StorageLayoutMismatch();
+        }
+    }
+
+    function _isLayoutCompatible(bytes32 currentHash, bytes32 newHash) internal view returns (bool) {
+        if (_validatedLayouts[newHash]) {
+            return true;
+        }
+        return currentHash != newHash;
+    }
+
+    function _computeStorageLayoutHash() internal view virtual returns (bytes32) {
+        return keccak256(abi.encode(_getImplementation(), _currentVersion));
+    }
+
+    function _upgradeToAndCallUUPS(address newImplementation, bytes memory data, bool forceCall) internal {
+        try IERC1822Proxiable(newImplementation).proxiableUUID() returns (bytes32 slot) {
+            if (slot != _IMPLEMENTATION_SLOT) {
+                revert InvalidImplementation();
+            }
+        } catch {
+            revert InvalidImplementation();
+        }
+
+        StorageSlot.getAddressSlot(_IMPLEMENTATION_SLOT).value = newImplementation;
+
+        if (data.length > 0 || forceCall) {
+            Address.functionDelegateCall(newImplementation, data);
+        }
+    }
+
+    bytes32 private constant _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+
+    function _getImplementation() internal view returns (address) {
+        return StorageSlot.getAddressSlot(_IMPLEMENTATION_SLOT).value;
+    }
+
+    function _oldestRollbackVersion() internal view returns (uint256) {
+        if (_currentVersion <= MAX_ROLLBACK_VERSIONS) {
+            return 1;
+        }
+        return _currentVersion - MAX_ROLLBACK_VERSIONS;
+    }
+
+    function _authorizeUpgrade(address) internal view override onlyOwner {}
+
+    function getCurrentVersion() external view returns (uint256) {
+        return _currentVersion;
+    }
+
+    function getVersionRecord(uint256 version) external view returns (VersionRecord memory) {
+        return _versionHistory[version];
+    }
+
+    function getPendingUpgrade() external view returns (UpgradeProposal memory) {
+        return _pendingUpgrade;
+    }
+
+    function getTimelockRemaining() external view returns (uint256) {
+        if (_pendingUpgrade.newImplementation == address(0) || _pendingUpgrade.executed) {
+            return 0;
+        }
+        uint256 elapsed = block.timestamp - _pendingUpgrade.proposedAt;
+        if (elapsed >= UPGRADE_TIMELOCK) {
+            return 0;
+        }
+        return UPGRADE_TIMELOCK - elapsed;
+    }
+}
+
+interface IERC1822Proxiable {
+    function proxiableUUID() external view returns (bytes32);
+}
+
+library StorageSlot {
+    struct AddressSlot {
+        address value;
+    }
+
+    function getAddressSlot(bytes32 slot) internal pure returns (AddressSlot storage r) {
+        assembly {
+            r.slot := slot
+        }
+    }
+}
+
+library Address {
+    function functionDelegateCall(address target, bytes memory data) internal returns (bytes memory) {
+        (bool success, bytes memory returndata) = target.delegatecall(data);
+        if (!success) {
+            if (returndata.length > 0) {
+                assembly {
+                    revert(add(32, returndata), mload(returndata))
+                }
+            } else {
+                revert("DelegateCall failed");
+            }
+        }
+        return returndata;
+    }
+}
+
+contract MyTokenV1 is UUPSTimelockUpgradeable {
+    uint256 public totalSupply;
+    mapping(address => uint256) public balanceOf;
+
+    function initialize(uint256 initialSupply) external initializer {
+        __UUPSTimelock_init();
+        totalSupply = initialSupply;
+        balanceOf[msg.sender] = initialSupply;
+    }
+
+    function transfer(address to, uint256 amount) external {
+        require(balanceOf[msg.sender] >= amount, "Insufficient balance");
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+    }
+
+    function version() external pure virtual returns (string memory) {
+        return "1.0.0";
+    }
+
+    function _computeStorageLayoutHash() internal view override returns (bytes32) {
+        return keccak256("MyToken:totalSupply:uint256,balanceOf:mapping(address=>uint256)");
+    }
+}
+
+contract MyTokenV2 is UUPSTimelockUpgradeable {
+    uint256 public totalSupply;
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+
+    function transfer(address to, uint256 amount) external {
+        require(balanceOf[msg.sender] >= amount, "Insufficient balance");
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+    }
+
+    function approve(address spender, uint256 amount) external {
+        allowance[msg.sender][spender] = amount;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) external {
+        require(allowance[from][msg.sender] >= amount, "Allowance exceeded");
+        require(balanceOf[from] >= amount, "Insufficient balance");
+        allowance[from][msg.sender] -= amount;
+        balanceOf[from] -= amount;
+        balanceOf[to] += amount;
+    }
+
+    function version() external pure virtual returns (string memory) {
+        return "2.0.0";
+    }
+
+    function _computeStorageLayoutHash() internal view override returns (bytes32) {
+        return keccak256("MyToken:totalSupply:uint256,balanceOf:mapping(address=>uint256),allowance:mapping(address=>mapping(address=>uint256))");
+    }
+}

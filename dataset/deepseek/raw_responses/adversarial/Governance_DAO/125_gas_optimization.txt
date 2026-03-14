@@ -1,0 +1,84 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function approve(address spender, uint256 amount) external returns (bool);
+}
+
+contract Governance {
+    struct Proposal {
+        uint256 id;
+        address recipient;
+        uint256 amount;
+        uint256 votesFor;
+        uint256 votesAgainst;
+        bool executed;
+        mapping(address => bool) votes;
+    }
+
+    IERC20 public token;
+    uint256 public proposalCount;
+    mapping(uint256 => Proposal) public proposals;
+    mapping(address => bool) public whitelisted;
+
+    event ProposalCreated(uint256 id, address recipient, uint256 amount);
+    event Voted(uint256 proposalId, bool vote);
+    event ProposalExecuted(uint256 id, address recipient, uint256 amount);
+
+    modifier onlyWhitelisted() {
+        require(whitelisted[msg.sender], "Not whitelisted");
+        _;
+    }
+
+    constructor(address _token) {
+        token = IERC20(_token);
+    }
+
+    function createProposal(address _recipient, uint256 _amount) external onlyWhitelisted {
+        Proposal storage proposal = proposals[++proposalCount];
+        proposal.id = proposalCount;
+        proposal.recipient = _recipient;
+        proposal.amount = _amount;
+        proposal.executed = false;
+
+        emit ProposalCreated(proposalCount, _recipient, _amount);
+    }
+
+    function vote(uint256 _proposalId, bool _vote) external onlyWhitelisted {
+        require(_proposalId <= proposalCount, "Proposal does not exist");
+        Proposal storage proposal = proposals[_proposalId];
+        require(!proposal.executed, "Proposal already executed");
+        require(proposal.votes[msg.sender] == false, "Already voted");
+
+        if (_vote) {
+            proposal.votesFor++;
+        } else {
+            proposal.votesAgainst++;
+        }
+
+        proposal.votes[msg.sender] = true;
+        emit Voted(_proposalId, _vote);
+    }
+
+    function executeProposal(uint256 _proposalId) external {
+        Proposal storage proposal = proposals[_proposalId];
+        require(_proposalId <= proposalCount, "Proposal does not exist");
+        require(!proposal.executed, "Proposal already executed");
+        require(proposal.votesFor > proposal.votesAgainst, "Not enough votes for proposal");
+
+        proposal.executed = true;
+        token.transfer(proposal.recipient, proposal.amount);
+        emit ProposalExecuted(_proposalId, proposal.recipient, proposal.amount);
+    }
+
+    function addToWhitelist(address _address) external onlyWhitelisted {
+        whitelisted[_address] = true;
+    }
+
+    function removeFromWhitelist(address _address) external onlyWhitelisted {
+        whitelisted[_address] = false;
+    }
+}
+```

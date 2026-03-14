@@ -1,0 +1,42 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleGovernance {
+    struct Proposal {
+        uint256 id;
+        string description;
+        uint256 voteCount;
+        bool executed;
+    }
+
+    mapping(uint256 => Proposal) public proposals;
+    mapping(address => bool) public hasVoted;
+    uint256 public proposalCount;
+
+    event ProposalCreated(uint256 indexed id, string description);
+    event Voted(uint256 indexed proposalId, address indexed voter);
+    event ProposalExecuted(uint256 indexed id);
+
+    function createProposal(string memory _description) public {
+        proposalCount++;
+        proposals[proposalCount] = Proposal(proposalCount, _description, 0, false);
+        emit ProposalCreated(proposalCount, _description);
+    }
+
+    function vote(uint256 _proposalId) public {
+        require(!hasVoted[msg.sender], "Already voted");
+        require(proposals[_proposalId].executed == false, "Proposal already executed");
+
+        proposals[_proposalId].voteCount++;
+        hasVoted[msg.sender] = true;
+        emit Voted(_proposalId, msg.sender);
+    }
+
+    function executeProposal(uint256 _proposalId) public {
+        require(proposals[_proposalId].executed == false, "Proposal already executed");
+        require(proposals[_proposalId].voteCount > 0, "Proposal has no votes");
+
+        proposals[_proposalId].executed = true;
+        emit ProposalExecuted(_proposalId);
+    }
+}

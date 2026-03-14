@@ -1,0 +1,124 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+interface IKYCVerifier {
+    function isKYCCompleted(address _user) external view returns (bool);
+}
+
+contract TokenICO {
+    IERC20 public token;
+    IKYCVerifier public kycVerifier;
+
+    uint256 public softCap;
+    uint256 public hardCap;
+    uint256 public raisedAmount;
+    uint256 public startTime;
+    uint256 public endTime;
+
+    enum Round { Seed, Private, Public }
+    struct PriceTier {
+        uint256 price; // in wei
+        uint256 cap;
+        uint256 raised;
+    }
+    mapping(Round => PriceTier) public rounds;
+    mapping(address => uint256) public whitelist;
+    mapping(address => uint256) public vestingSchedules;
+
+    event TokensPurchased(address indexed buyer, uint256 amount, uint256 priceTier);
+    event TokenRefund(address indexed buyer, uint256 amount);
+    event ICOCompleted(bool success);
+
+    constructor(
+        address _token,
+        address _kycVerifier,
+        uint256 _softCap,
+        uint256 _hardCap,
+        uint256 _startTime,
+        uint256 _endTime
+    ) {
+        require(_startTime < _endTime, "Invalid time range");
+        token = IERC20(_token);
+        kycVerifier = IKYCVerifier(_kycVerifier);
+        softCap = _softCap;
+        hardCap = _hardCap;
+        startTime = _startTime;
+        endTime = _endTime;
+
+        rounds[Round.Seed] = PriceTier(1000, 100 ether, 0);
+        rounds[Round.Private] = PriceTier(500, 200 ether, 0);
+        rounds[Round.Public] = PriceTier(250, 300 ether, 0);
+    }
+
+    modifier onlyWhileOpen {
+        require(block.timestamp >= startTime && block.timestamp <= endTime, "ICO not open");
+        _;
+    }
+
+    modifier onlyAfterOpen {
+        require(block.timestamp > endTime, "ICO not finished");
+        _;
+    }
+
+    function setWhitelist(address[] calldata _users, uint256[] calldata _tiers) external {
+        require(_users.length == _tiers.length, "Mismatched input lengths");
+        for (uint256 i = 0; i < _users.length; i++) {
+            whitelist[_users[i]] = _tiers[i];
+        }
+    }
+
+    function purchaseTokens(uint256 _amount) external payable onlyWhileOpen {
+        require(kycVerifier.isKYCCompleted(msg.sender), "KYC not completed");
+        require(_amount > 0, "Amount must be greater than 0");
+        uint256 tier = whitelist[msg.sender];
+        require(tier > 0, "Not whitelisted");
+
+        PriceTier storage round = rounds[tier];
+        require(round.raised + _amount <= round.cap, "Round cap exceeded");
+        require(raisedAmount + _amount <= hardCap, "Hard cap exceeded");
+
+        uint256 tokensToBuy = _amount * round.price;
+        require(token.balanceOf(address(this)) >= tokensToBuy, "Insufficient tokens");
+
+        round.raised += _amount;
+        raisedAmount += _amount;
+
+        token.transfer(msg.sender, tokensToBuy);
+        vestingSchedules[msg.sender] += tokensToBuy;
+
+        emit TokensPurchased(msg.sender, tokensToBuy, tier);
+    }
+
+    function refund() external onlyAfterOpen {
+        require(raisedAmount < softCap, "Soft cap reached");
+        require(vestingSchedules[msg.sender] > 0, "No tokens to refund");
+
+        uint256 tokensToRefund = vestingSchedules[msg.sender];
+        vestingSchedules[msg.sender] = 0;
+        token.transfer(msg.sender, tokensToRefund);
+
+        emit TokenRefund(msg.sender, tokensToRefund);
+    }
+
+    function completeICO() external onlyAfterOpen {
+        require(raisedAmount >= softCap, "Soft cap not reached");
+        require(raisedAmount <= hardCap, "Hard cap exceeded");
+
+        emit ICOCompleted(true);
+    }
+
+    function claimTokens() external onlyAfterOpen {
+        uint256 tokensToClaim = vestingSchedules[msg.sender];
+        require(tokensToClaim > 0, "No tokens to claim");
+
+        vestingSchedules[msg.sender] = 0;
+        token.transfer(msg.sender, tokensToClaim);
+    }
+}
+
+interface IERC20 {
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+}
+```

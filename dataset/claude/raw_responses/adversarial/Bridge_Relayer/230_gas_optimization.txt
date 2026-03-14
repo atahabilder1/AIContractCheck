@@ -1,0 +1,144 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract BridgeRelayer {
+    struct Message {
+        uint256 sourceChain;
+        uint256 destChain;
+        address sender;
+        address recipient;
+        uint256 amount;
+        bytes data;
+        uint256 nonce;
+    }
+
+    address public owner;
+    uint256 public requiredConfirmations;
+    uint256 public chainId;
+    uint256 public nonce;
+
+    mapping(address => bool) public relayers;
+    uint256 public relayerCount;
+
+    mapping(bytes32 => uint256) public confirmationCount;
+    mapping(bytes32 => mapping(address => bool)) public hasConfirmed;
+    mapping(bytes32 => bool) public executed;
+    mapping(bytes32 => bool) public deposits;
+
+    event Deposit(bytes32 indexed depositHash, address indexed sender, address indexed recipient, uint256 amount, uint256 destChain, uint256 nonce, bytes data);
+    event Confirmed(bytes32 indexed messageHash, address indexed relayer, uint256 count);
+    event Executed(bytes32 indexed messageHash, address indexed recipient, uint256 amount);
+    event RelayerAdded(address indexed relayer);
+    event RelayerRemoved(address indexed relayer);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner);
+        _;
+    }
+
+    modifier onlyRelayer() {
+        require(relayers[msg.sender]);
+        _;
+    }
+
+    constructor(uint256 _chainId, uint256 _requiredConfirmations, address[] memory _relayers) {
+        owner = msg.sender;
+        chainId = _chainId;
+        requiredConfirmations = _requiredConfirmations;
+
+        uint256 len = _relayers.length;
+        for (uint256 i; i < len;) {
+            relayers[_relayers[i]] = true;
+            unchecked { ++i; }
+        }
+        relayerCount = len;
+    }
+
+    function deposit(address recipient, uint256 destChain, bytes calldata data) external payable {
+        uint256 _nonce;
+        unchecked { _nonce = nonce++; }
+
+        bytes32 depositHash = keccak256(abi.encodePacked(chainId, destChain, msg.sender, recipient, msg.value, data, _nonce));
+        deposits[depositHash] = true;
+
+        emit Deposit(depositHash, msg.sender, recipient, msg.value, destChain, _nonce, data);
+    }
+
+    function confirm(Message calldata message) external onlyRelayer {
+        bytes32 messageHash = hashMessage(message);
+        require(!executed[messageHash]);
+        require(!hasConfirmed[messageHash][msg.sender]);
+
+        hasConfirmed[messageHash][msg.sender] = true;
+        uint256 count;
+        unchecked { count = ++confirmationCount[messageHash]; }
+
+        emit Confirmed(messageHash, msg.sender, count);
+
+        if (count >= requiredConfirmations) {
+            _execute(messageHash, message);
+        }
+    }
+
+    function execute(Message calldata message) external {
+        bytes32 messageHash = hashMessage(message);
+        require(!executed[messageHash]);
+        require(confirmationCount[messageHash] >= requiredConfirmations);
+
+        _execute(messageHash, message);
+    }
+
+    function _execute(bytes32 messageHash, Message calldata message) internal {
+        require(message.destChain == chainId);
+        executed[messageHash] = true;
+
+        if (message.amount > 0) {
+            (bool success,) = message.recipient.call{value: message.amount}(message.data);
+            require(success);
+        } else if (message.data.length > 0) {
+            (bool success,) = message.recipient.call(message.data);
+            require(success);
+        }
+
+        emit Executed(messageHash, message.recipient, message.amount);
+    }
+
+    function hashMessage(Message calldata message) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(
+            message.sourceChain,
+            message.destChain,
+            message.sender,
+            message.recipient,
+            message.amount,
+            message.data,
+            message.nonce
+        ));
+    }
+
+    function addRelayer(address relayer) external onlyOwner {
+        require(!relayers[relayer]);
+        relayers[relayer] = true;
+        unchecked { ++relayerCount; }
+        emit RelayerAdded(relayer);
+    }
+
+    function removeRelayer(address relayer) external onlyOwner {
+        require(relayers[relayer]);
+        relayers[relayer] = false;
+        unchecked { --relayerCount; }
+        emit RelayerRemoved(relayer);
+    }
+
+    function setRequiredConfirmations(uint256 _requiredConfirmations) external onlyOwner {
+        require(_requiredConfirmations > 0 && _requiredConfirmations <= relayerCount);
+        requiredConfirmations = _requiredConfirmations;
+    }
+
+    function transferOwnership(address newOwner) external onlyOwner {
+        owner = newOwner;
+    }
+
+    receive() external payable {}
+}
+```

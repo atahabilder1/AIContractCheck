@@ -1,0 +1,136 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleLending {
+
+    mapping(address => uint256) public balances; // Stores user balances (deposits and loans)
+    mapping(address => uint256) public loanAmounts; // Stores the amount of crypto borrowed by a user
+    mapping(address => uint256) public loanDueDates; // Stores the due date for a user's loan
+
+    uint256 public constant INTEREST_RATE_PER_BLOCK = 1; // Example: 1 wei interest per block
+    uint256 public constant LOAN_DURATION_BLOCKS = 100; // Example: Loan duration of 100 blocks
+
+    address public owner;
+
+    event Deposit(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
+    event Borrow(address indexed user, uint256 amount, uint256 dueDate);
+    event Repay(address indexed user, uint256 amount);
+    event LoanLiquidated(address indexed user, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can perform this action");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    // Function to deposit Ether into the lending pool
+    function deposit() public payable {
+        require(msg.value > 0, "Deposit amount must be greater than zero");
+        balances[msg.sender] += msg.value;
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    // Function to withdraw Ether from the lending pool
+    function withdraw(uint256 _amount) public {
+        require(_amount > 0, "Withdraw amount must be greater than zero");
+        require(balances[msg.sender] >= _amount, "Insufficient balance");
+        // Ensure user doesn't withdraw more than their available balance (including potential loans that might be called)
+        // This is a simplified check; a real-world scenario would need more robust collateral management.
+        require(balances[msg.sender] - loanAmounts[msg.sender] >= _amount, "Withdrawal would put you in debt");
+
+        balances[msg.sender] -= _amount;
+        payable(msg.sender).transfer(_amount);
+        emit Withdraw(msg.sender, _amount);
+    }
+
+    // Function to borrow Ether from the lending pool
+    function borrow(uint256 _amount) public {
+        require(_amount > 0, "Borrow amount must be greater than zero");
+        // In a real-world scenario, this would require collateral.
+        // For this simple example, we'll assume a user can borrow up to their deposited balance,
+        // but this is highly insecure.
+        require(balances[msg.sender] >= _amount, "Insufficient deposited balance to borrow");
+        require(loanAmounts[msg.sender] == 0, "Already have an active loan"); // Only one loan per user for simplicity
+
+        uint256 dueDate = block.number + LOAN_DURATION_BLOCKS;
+        loanAmounts[msg.sender] = _amount;
+        loanDueDates[msg.sender] = dueDate;
+        balances[msg.sender] -= _amount; // Deduct borrowed amount from balance
+
+        payable(msg.sender).transfer(_amount);
+        emit Borrow(msg.sender, _amount, dueDate);
+    }
+
+    // Function to repay a borrowed amount
+    function repay() public payable {
+        require(loanAmounts[msg.sender] > 0, "No active loan to repay");
+        require(msg.value > 0, "Repayment amount must be greater than zero");
+
+        uint256 totalOwed = calculateOwedAmount(msg.sender);
+        uint256 amountToRepay = msg.value;
+
+        if (amountToRepay >= totalOwed) {
+            // Full repayment
+            balances[msg.sender] += amountToRepay - totalOwed; // Add any overpayment to balance
+            loanAmounts[msg.sender] = 0;
+            loanDueDates[msg.sender] = 0;
+            emit Repay(msg.sender, totalOwed);
+            emit Withdraw(msg.sender, amountToRepay - totalOwed); // If overpaid
+        } else {
+            // Partial repayment
+            loanAmounts[msg.sender] -= amountToRepay; // Reduce the principal loan amount
+            emit Repay(msg.sender, amountToRepay);
+        }
+    }
+
+    // Function to calculate the total amount owed for a loan (principal + interest)
+    function calculateOwedAmount(address _user) public view returns (uint256) {
+        if (loanAmounts[_user] == 0) {
+            return 0;
+        }
+
+        uint256 outstandingPrincipal = loanAmounts[_user];
+        uint256 blocksPassed = block.number > loanDueDates[_user] ? block.number - loanDueDates[_user] : 0;
+        uint256 accruedInterest = (outstandingPrincipal * INTEREST_RATE_PER_BLOCK * blocksPassed) / 1 ether; // Assuming interest rate is per wei, adjust if needed
+
+        return outstandingPrincipal + accruedInterest;
+    }
+
+    // Function to liquidate a loan if it's past due and not repaid
+    // In a real-world scenario, this would be triggered by a liquidator and involve selling collateral.
+    // For this simplified version, we'll just revert the user's balance and consider the loan "liquidated".
+    function liquidateLoan(address _user) public onlyOwner {
+        require(loanAmounts[_user] > 0, "User has no active loan");
+        require(block.number > loanDueDates[_user], "Loan is not yet due");
+
+        uint256 owed = calculateOwedAmount(_user);
+        // In a real contract, this would involve seizing collateral.
+        // Here, we'll assume the "liquidation" means the contract takes whatever balance the user has
+        // and applies it towards the debt. If the balance is insufficient, the debt remains.
+        uint256 availableBalance = balances[_user];
+        uint256 amountToLiquidate = owed > availableBalance ? availableBalance : owed;
+
+        if (availableBalance >= owed) {
+            balances[_user] -= owed;
+            loanAmounts[_user] = 0;
+            loanDueDates[_user] = 0;
+            emit LoanLiquidated(_user, owed);
+        } else {
+            // Not enough balance to cover the debt, partial liquidation.
+            balances[_user] = 0; // User's balance is used up
+            loanAmounts[_user] -= availableBalance; // Remaining debt
+            emit LoanLiquidated(_user, availableBalance);
+        }
+    }
+
+    // Fallback function to receive Ether
+    receive() external payable {
+        deposit();
+    }
+}
+```

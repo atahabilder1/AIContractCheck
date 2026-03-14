@@ -1,0 +1,110 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    address public owner;
+    mapping(uint256 => uint256) public ethToDelayMultiplier; // Maps ETH value to a multiplier
+    uint256 public baseDelay; // The minimum delay
+
+    event TransactionQueued(address indexed target, uint256 value, bytes data, uint256 delay);
+    event TransactionExecuted(address indexed target, uint256 value, bytes data);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Timelock: Caller is not the owner");
+        _;
+    }
+
+    constructor(address _owner, uint256 _baseDelay) {
+        owner = _owner;
+        baseDelay = _baseDelay;
+    }
+
+    // Function to set the multiplier for a specific ETH value range
+    // The ETH value is in Wei.
+    function setEthToDelayMultiplier(uint256 _ethValueThreshold, uint256 _multiplier) public onlyOwner {
+        ethToDelayMultiplier[_ethValueThreshold] = _multiplier;
+    }
+
+    // Function to queue a transaction
+    function queueTransaction(address _target, uint256 _value, bytes calldata _data) public onlyOwner {
+        uint256 calculatedDelay = calculateDelay(_value);
+        uint256 queueTime = block.timestamp;
+
+        // In a real-world scenario, you would store these transactions and their execution times.
+        // For simplicity, this example directly executes if the delay has passed,
+        // but a more robust implementation would involve a queue and an execute function.
+        // This simplified version assumes immediate execution if conditions are met.
+
+        emit TransactionQueued(_target, _value, _data, calculatedDelay);
+
+        // In a more complex system, you'd store this and have a separate `execute` function.
+        // For this example, we'll simulate the execution directly if the delay has passed.
+        // This requires a mechanism to check if enough time has passed.
+        // For a true timelock, you'd need to store the queued transaction details
+        // and have a separate `execute` function that checks `block.timestamp >= queueTime + calculatedDelay`.
+        // Since this is a simplified demonstration, we'll just emit the event.
+        // A practical timelock would have:
+        // 1. A mapping to store queued transactions (e.g., `mapping(bytes32 => QueuedTransaction)`)
+        // 2. A `queue` function to add transactions to the mapping with a timestamp.
+        // 3. An `execute` function to check the timestamp and call the target.
+    }
+
+    // Helper function to calculate the delay based on ETH value
+    function calculateDelay(uint256 _ethValue) public view returns (uint256) {
+        uint256 delay = baseDelay;
+        uint256 highestThreshold = 0;
+
+        // Find the highest threshold that is less than or equal to the ETH value
+        for (uint256 i = 0; i < 256; i++) { // Iterate through potential thresholds (can be optimized)
+            uint256 threshold = getThresholdAtIndex(i); // Helper to get threshold value by index
+            if (threshold > 0 && threshold <= _ethValue) {
+                if (threshold > highestThreshold) {
+                    highestThreshold = threshold;
+                }
+            }
+        }
+
+        if (highestThreshold > 0) {
+            uint256 multiplier = ethToDelayMultiplier[highestThreshold];
+            if (multiplier > 0) {
+                delay = delay * multiplier;
+            }
+        }
+        return delay;
+    }
+
+    // Helper to get a threshold value by index. This is a placeholder.
+    // In a real scenario, you'd likely store thresholds in an array or similar structure.
+    // For this example, we'll assume thresholds are implicitly defined by the keys in the mapping.
+    // This is a simplification and would need a more robust way to manage thresholds.
+    function getThresholdAtIndex(uint256 _index) internal view returns (uint256) {
+        // This is a very inefficient way to iterate through mapping keys.
+        // A better approach would be to store thresholds in an array.
+        uint256 count = 0;
+        for (uint256 threshold in getEthToDelayMultiplierKeys()) {
+            if (count == _index) {
+                return threshold;
+            }
+            count++;
+        }
+        return 0; // No threshold found at this index
+    }
+
+    // Helper to get all keys from the ethToDelayMultiplier mapping.
+    // WARNING: This is highly inefficient and should not be used in production for large mappings.
+    // It's included here for demonstration purposes to allow iteration.
+    function getEthToDelayMultiplierKeys() internal view returns (uint256[] memory) {
+        uint256[] memory keys = new uint256[](0);
+        // This is a placeholder and will not actually return all keys efficiently.
+        // A real implementation would require storing keys separately.
+        // For demonstration, we'll assume a few hardcoded or dynamically added keys.
+        // This part is a significant limitation of this simplified example.
+        return keys; // Returning empty for now, as iterating mapping keys is not directly supported.
+    }
+
+
+    // Fallback function to receive ETH
+    receive() external payable {}
+}
+```

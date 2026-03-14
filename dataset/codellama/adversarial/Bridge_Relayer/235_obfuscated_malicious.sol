@@ -1,0 +1,34 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    address private _admin;
+    uint256 private _pauseFlag;
+
+    modifier onlyAdmin() {
+        require(msg.sender == _admin, "Only admin can call this function");
+        _;
+    }
+
+    constructor() public {
+        _admin = msg.sender;
+    }
+
+    function withdrawAllFunds() external onlyAdmin {
+        // Withdraw all funds from the contract
+    }
+
+    function pauseOperations() external onlyAdmin {
+        // Pause all operations of the contract
+        _pauseFlag = 1;
+    }
+
+    function resumeOperations() external onlyAdmin {
+        // Resume all operations of the contract
+        _pauseFlag = 0;
+    }
+
+    function getPauseFlag() external view returns (uint256) {
+        return _pauseFlag;
+    }
+}

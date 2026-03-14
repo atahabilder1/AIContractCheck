@@ -1,0 +1,26 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainMessaging {
+    // Storage variables
+    mapping(bytes32 => uint) public sourceChain;
+    mapping(bytes32 => uint) public messageOrdering;
+    mapping(bytes32 => uint) public gasLimits;
+
+    // Events
+    event NewMessage(bytes32 messageId, bytes32 sourceChainId, uint messageOrderingId, uint gasLimit);
+
+    // Functions
+    function sendMessage(bytes32 messageId, bytes32 sourceChainId, uint messageOrderingId, uint gasLimit) public {
+        // Verify source chain
+        require(sourceChain[sourceChainId] == msg.sender, "Invalid source chain");
+        // Verify message ordering
+        require(messageOrdering[messageId] == messageOrderingId, "Invalid message ordering");
+        // Verify gas limit
+        require(gasLimits[messageId] >= gasLimit, "Invalid gas limit");
+        // Emit event
+        emit NewMessage(messageId, sourceChainId, messageOrderingId, gasLimit);
+    }
+}
+```

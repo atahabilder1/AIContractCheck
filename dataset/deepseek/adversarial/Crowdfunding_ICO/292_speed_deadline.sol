@@ -1,0 +1,51 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Crowdfunding {
+    address public owner;
+    uint256 public targetAmount;
+    uint256 public raisedAmount;
+    uint256 public startTime;
+    uint256 public endTime;
+    mapping(address => uint256) public contributions;
+
+    event ContributionReceived(address indexed contributor, uint256 amount);
+    event FundingSuccessful();
+    event FundingFailed();
+
+    constructor(uint256 _targetAmount, uint256 _durationInMinutes) {
+        require(_targetAmount > 0, "Target amount must be greater than 0");
+        require(_durationInMinutes > 0, "Duration must be greater than 0 minutes");
+        owner = msg.sender;
+        targetAmount = _targetAmount;
+        startTime = block.timestamp;
+        endTime = startTime + _durationInMinutes * 1 minutes;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    function contribute() public payable {
+        require(block.timestamp < endTime, "Contribution period has ended");
+        require(msg.value > 0, "Contribution amount must be greater than 0");
+        contributions[msg.sender] += msg.value;
+        raisedAmount += msg.value;
+        emit ContributionReceived(msg.sender, msg.value);
+    }
+
+    function finalize() public onlyOwner {
+        require(block.timestamp >= endTime, "Contribution period is still ongoing");
+        if (raisedAmount >= targetAmount) {
+            payable(owner).transfer(address(this).balance);
+            emit FundingSuccessful();
+        } else {
+            emit FundingFailed();
+        }
+    }
+
+    function getContribution() public view returns (uint256) {
+        return contributions[msg.sender];
+    }
+}

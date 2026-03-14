@@ -1,0 +1,359 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+contract MultiRewardStaking is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
+    struct RewardToken {
+        IERC20 token;
+        uint256 rewardPerEpoch;
+        uint256 accRewardPerShare;
+        uint256 lastUpdateEpoch;
+        bool active;
+    }
+
+    struct BoostTier {
+        uint256 minNFTCount;
+        uint256 boostBps; // basis points, 10000 = 1x
+    }
+
+    struct UserInfo {
+        uint256 stakedAmount;
+        uint256 boostBps;
+        uint256[] nftIds;
+        mapping(uint256 => uint256) rewardDebt; // rewardIndex => debt
+        mapping(uint256 => uint256) pendingRewards; // rewardIndex => pending
+    }
+
+    IERC20 public immutable stakingToken;
+    IERC721 public boostNFT;
+
+    uint256 public epochDuration;
+    uint256 public genesisTime;
+    uint256 public totalStaked;
+    uint256 public totalBoostedStaked;
+
+    RewardToken[] public rewardTokens;
+    BoostTier[] public boostTiers;
+    mapping(address => UserInfo) private users;
+    mapping(uint256 => address) public nftStaker;
+
+    uint256 private constant PRECISION = 1e18;
+    uint256 private constant BPS_BASE = 10000;
+
+    event Staked(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
+    event RewardClaimed(address indexed user, address indexed rewardToken, uint256 amount);
+    event Compounded(address indexed user, uint256 rewardIndex, uint256 amount);
+    event NFTStaked(address indexed user, uint256 tokenId);
+    event NFTUnstaked(address indexed user, uint256 tokenId);
+    event EpochDurationUpdated(uint256 newDuration);
+    event RewardTokenAdded(address token, uint256 rewardPerEpoch);
+    event BoostTierSet(uint256 minNFTCount, uint256 boostBps);
+
+    constructor(
+        address _stakingToken,
+        address _boostNFT,
+        uint256 _epochDuration,
+        address _owner
+    ) Ownable(_owner) {
+        require(_stakingToken != address(0), "Invalid staking token");
+        require(_epochDuration > 0, "Invalid epoch duration");
+        stakingToken = IERC20(_stakingToken);
+        boostNFT = IERC721(_boostNFT);
+        epochDuration = _epochDuration;
+        genesisTime = block.timestamp;
+    }
+
+    function currentEpoch() public view returns (uint256) {
+        return (block.timestamp - genesisTime) / epochDuration;
+    }
+
+    function addRewardToken(address _token, uint256 _rewardPerEpoch) external onlyOwner {
+        require(_token != address(0), "Invalid token");
+        rewardTokens.push(RewardToken({
+            token: IERC20(_token),
+            rewardPerEpoch: _rewardPerEpoch,
+            accRewardPerShare: 0,
+            lastUpdateEpoch: currentEpoch(),
+            active: true
+        }));
+        emit RewardTokenAdded(_token, _rewardPerEpoch);
+    }
+
+    function setRewardRate(uint256 _rewardIndex, uint256 _rewardPerEpoch) external onlyOwner {
+        require(_rewardIndex < rewardTokens.length, "Invalid index");
+        _updateReward(_rewardIndex);
+        rewardTokens[_rewardIndex].rewardPerEpoch = _rewardPerEpoch;
+    }
+
+    function setRewardActive(uint256 _rewardIndex, bool _active) external onlyOwner {
+        require(_rewardIndex < rewardTokens.length, "Invalid index");
+        _updateReward(_rewardIndex);
+        rewardTokens[_rewardIndex].active = _active;
+    }
+
+    function setBoostTiers(uint256[] calldata _minNFTCounts, uint256[] calldata _boostBps) external onlyOwner {
+        require(_minNFTCounts.length == _boostBps.length, "Length mismatch");
+        delete boostTiers;
+        for (uint256 i = 0; i < _minNFTCounts.length; i++) {
+            require(_boostBps[i] >= BPS_BASE, "Boost must be >= 1x");
+            if (i > 0) {
+                require(_minNFTCounts[i] > _minNFTCounts[i - 1], "Must be ascending");
+            }
+            boostTiers.push(BoostTier(_minNFTCounts[i], _boostBps[i]));
+            emit BoostTierSet(_minNFTCounts[i], _boostBps[i]);
+        }
+    }
+
+    function setEpochDuration(uint256 _newDuration) external onlyOwner {
+        require(_newDuration > 0, "Invalid duration");
+        _updateAllRewards();
+        epochDuration = _newDuration;
+        emit EpochDurationUpdated(_newDuration);
+    }
+
+    function setBoostNFT(address _boostNFT) external onlyOwner {
+        boostNFT = IERC721(_boostNFT);
+    }
+
+    function stake(uint256 _amount) external nonReentrant {
+        require(_amount > 0, "Cannot stake 0");
+        _updateAllRewards();
+        UserInfo storage user = users[msg.sender];
+        _settleRewards(user);
+
+        stakingToken.safeTransferFrom(msg.sender, address(this), _amount);
+
+        uint256 oldBoosted = _boostedAmount(user.stakedAmount, user.boostBps);
+        user.stakedAmount += _amount;
+        uint256 newBoosted = _boostedAmount(user.stakedAmount, user.boostBps);
+
+        totalStaked += _amount;
+        totalBoostedStaked = totalBoostedStaked - oldBoosted + newBoosted;
+
+        _updateDebts(user, newBoosted);
+        emit Staked(msg.sender, _amount);
+    }
+
+    function withdraw(uint256 _amount) external nonReentrant {
+        UserInfo storage user = users[msg.sender];
+        require(user.stakedAmount >= _amount, "Insufficient balance");
+        require(_amount > 0, "Cannot withdraw 0");
+
+        _updateAllRewards();
+        _settleRewards(user);
+
+        uint256 oldBoosted = _boostedAmount(user.stakedAmount, user.boostBps);
+        user.stakedAmount -= _amount;
+        uint256 newBoosted = _boostedAmount(user.stakedAmount, user.boostBps);
+
+        totalStaked -= _amount;
+        totalBoostedStaked = totalBoostedStaked - oldBoosted + newBoosted;
+
+        _updateDebts(user, newBoosted);
+        stakingToken.safeTransfer(msg.sender, _amount);
+        emit Withdrawn(msg.sender, _amount);
+    }
+
+    function stakeNFTs(uint256[] calldata _tokenIds) external nonReentrant {
+        _updateAllRewards();
+        UserInfo storage user = users[msg.sender];
+        _settleRewards(user);
+
+        uint256 oldBoosted = _boostedAmount(user.stakedAmount, user.boostBps);
+
+        for (uint256 i = 0; i < _tokenIds.length; i++) {
+            boostNFT.transferFrom(msg.sender, address(this), _tokenIds[i]);
+            nftStaker[_tokenIds[i]] = msg.sender;
+            user.nftIds.push(_tokenIds[i]);
+            emit NFTStaked(msg.sender, _tokenIds[i]);
+        }
+
+        user.boostBps = _calculateBoost(user.nftIds.length);
+        uint256 newBoosted = _boostedAmount(user.stakedAmount, user.boostBps);
+        totalBoostedStaked = totalBoostedStaked - oldBoosted + newBoosted;
+
+        _updateDebts(user, newBoosted);
+    }
+
+    function unstakeNFTs(uint256[] calldata _tokenIds) external nonReentrant {
+        _updateAllRewards();
+        UserInfo storage user = users[msg.sender];
+        _settleRewards(user);
+
+        uint256 oldBoosted = _boostedAmount(user.stakedAmount, user.boostBps);
+
+        for (uint256 i = 0; i < _tokenIds.length; i++) {
+            require(nftStaker[_tokenIds[i]] == msg.sender, "Not your NFT");
+            delete nftStaker[_tokenIds[i]];
+            _removeNFT(user, _tokenIds[i]);
+            boostNFT.transferFrom(address(this), msg.sender, _tokenIds[i]);
+            emit NFTUnstaked(msg.sender, _tokenIds[i]);
+        }
+
+        user.boostBps = _calculateBoost(user.nftIds.length);
+        uint256 newBoosted = _boostedAmount(user.stakedAmount, user.boostBps);
+        totalBoostedStaked = totalBoostedStaked - oldBoosted + newBoosted;
+
+        _updateDebts(user, newBoosted);
+    }
+
+    function claimRewards() external nonReentrant {
+        _updateAllRewards();
+        UserInfo storage user = users[msg.sender];
+        _settleRewards(user);
+
+        uint256 boosted = _boostedAmount(user.stakedAmount, user.boostBps);
+        for (uint256 i = 0; i < rewardTokens.length; i++) {
+            uint256 pending = user.pendingRewards[i];
+            if (pending > 0) {
+                user.pendingRewards[i] = 0;
+                rewardTokens[i].token.safeTransfer(msg.sender, pending);
+                emit RewardClaimed(msg.sender, address(rewardTokens[i].token), pending);
+            }
+            user.rewardDebt[i] = (boosted * rewardTokens[i].accRewardPerShare) / PRECISION;
+        }
+    }
+
+    function compound(uint256 _rewardIndex) external nonReentrant {
+        require(_rewardIndex < rewardTokens.length, "Invalid index");
+        require(address(rewardTokens[_rewardIndex].token) == address(stakingToken), "Can only compound staking token");
+
+        _updateAllRewards();
+        UserInfo storage user = users[msg.sender];
+        _settleRewards(user);
+
+        uint256 pending = user.pendingRewards[_rewardIndex];
+        require(pending > 0, "Nothing to compound");
+
+        user.pendingRewards[_rewardIndex] = 0;
+
+        uint256 oldBoosted = _boostedAmount(user.stakedAmount, user.boostBps);
+        user.stakedAmount += pending;
+        uint256 newBoosted = _boostedAmount(user.stakedAmount, user.boostBps);
+
+        totalStaked += pending;
+        totalBoostedStaked = totalBoostedStaked - oldBoosted + newBoosted;
+
+        _updateDebts(user, newBoosted);
+        emit Compounded(msg.sender, _rewardIndex, pending);
+    }
+
+    function pendingReward(address _user, uint256 _rewardIndex) external view returns (uint256) {
+        require(_rewardIndex < rewardTokens.length, "Invalid index");
+        UserInfo storage user = users[_user];
+        RewardToken storage reward = rewardTokens[_rewardIndex];
+
+        uint256 accPerShare = reward.accRewardPerShare;
+        if (totalBoostedStaked > 0 && reward.active) {
+            uint256 epoch = currentEpoch();
+            uint256 elapsed = epoch - reward.lastUpdateEpoch;
+            if (elapsed > 0) {
+                accPerShare += (elapsed * reward.rewardPerEpoch * PRECISION) / totalBoostedStaked;
+            }
+        }
+
+        uint256 boosted = _boostedAmount(user.stakedAmount, user.boostBps);
+        return user.pendingRewards[_rewardIndex] + (boosted * accPerShare) / PRECISION - user.rewardDebt[_rewardIndex];
+    }
+
+    function getUserInfo(address _user) external view returns (
+        uint256 stakedAmount,
+        uint256 boostBps,
+        uint256 nftCount
+    ) {
+        UserInfo storage user = users[_user];
+        return (user.stakedAmount, user.boostBps, user.nftIds.length);
+    }
+
+    function getUserNFTs(address _user) external view returns (uint256[] memory) {
+        return users[_user].nftIds;
+    }
+
+    function rewardTokenCount() external view returns (uint256) {
+        return rewardTokens.length;
+    }
+
+    function boostTierCount() external view returns (uint256) {
+        return boostTiers.length;
+    }
+
+    function recoverToken(address _token, uint256 _amount) external onlyOwner {
+        require(_token != address(stakingToken), "Cannot recover staking token");
+        IERC20(_token).safeTransfer(owner(), _amount);
+    }
+
+    function _updateAllRewards() internal {
+        for (uint256 i = 0; i < rewardTokens.length; i++) {
+            _updateReward(i);
+        }
+    }
+
+    function _updateReward(uint256 _index) internal {
+        RewardToken storage reward = rewardTokens[_index];
+        uint256 epoch = currentEpoch();
+        if (epoch <= reward.lastUpdateEpoch || !reward.active) {
+            reward.lastUpdateEpoch = epoch;
+            return;
+        }
+        if (totalBoostedStaked == 0) {
+            reward.lastUpdateEpoch = epoch;
+            return;
+        }
+        uint256 elapsed = epoch - reward.lastUpdateEpoch;
+        reward.accRewardPerShare += (elapsed * reward.rewardPerEpoch * PRECISION) / totalBoostedStaked;
+        reward.lastUpdateEpoch = epoch;
+    }
+
+    function _settleRewards(UserInfo storage user) internal {
+        uint256 boosted = _boostedAmount(user.stakedAmount, user.boostBps);
+        for (uint256 i = 0; i < rewardTokens.length; i++) {
+            if (boosted > 0) {
+                uint256 accumulated = (boosted * rewardTokens[i].accRewardPerShare) / PRECISION;
+                user.pendingRewards[i] += accumulated - user.rewardDebt[i];
+            }
+        }
+    }
+
+    function _updateDebts(UserInfo storage user, uint256 _boostedAmount_) internal {
+        for (uint256 i = 0; i < rewardTokens.length; i++) {
+            user.rewardDebt[i] = (_boostedAmount_ * rewardTokens[i].accRewardPerShare) / PRECISION;
+        }
+    }
+
+    function _boostedAmount(uint256 _amount, uint256 _boostBps) internal pure returns (uint256) {
+        if (_boostBps == 0) return _amount;
+        return (_amount * _boostBps) / BPS_BASE;
+    }
+
+    function _calculateBoost(uint256 _nftCount) internal view returns (uint256) {
+        uint256 boost = BPS_BASE;
+        for (uint256 i = 0; i < boostTiers.length; i++) {
+            if (_nftCount >= boostTiers[i].minNFTCount) {
+                boost = boostTiers[i].boostBps;
+            } else {
+                break;
+            }
+        }
+        return boost;
+    }
+
+    function _removeNFT(UserInfo storage user, uint256 _tokenId) internal {
+        uint256 len = user.nftIds.length;
+        for (uint256 i = 0; i < len; i++) {
+            if (user.nftIds[i] == _tokenId) {
+                user.nftIds[i] = user.nftIds[len - 1];
+                user.nftIds.pop();
+                return;
+            }
+        }
+        revert("NFT not found");
+    }
+}

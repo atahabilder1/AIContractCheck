@@ -1,0 +1,87 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+contract Timelock {
+    address public owner;
+    uint256 public constant MIN_DELAY = 1 days;
+    uint256 public constant MAX_DELAY = 30 days;
+
+    mapping(bytes32 => bool) public queued;
+
+    error NotOwner();
+    error AlreadyQueued();
+    error NotQueued();
+    error TooEarly();
+    error TooLate();
+    error InvalidDelay();
+    error TxFailed();
+
+    event Queue(bytes32 indexed txId, address indexed target, uint256 value, bytes data, uint256 executeAfter);
+    event Execute(bytes32 indexed txId, address indexed target, uint256 value, bytes data);
+    event Cancel(bytes32 indexed txId);
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert NotOwner();
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function getTxId(
+        address _target,
+        uint256 _value,
+        bytes calldata _data,
+        uint256 _executeAfter,
+        uint256 _nonce
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encode(_target, _value, _data, _executeAfter, _nonce));
+    }
+
+    function queue(
+        address _target,
+        uint256 _value,
+        bytes calldata _data,
+        uint256 _executeAfter,
+        uint256 _nonce
+    ) external onlyOwner returns (bytes32 txId) {
+        txId = getTxId(_target, _value, _data, _executeAfter, _nonce);
+        if (queued[txId]) revert AlreadyQueued();
+
+        uint256 delay = _executeAfter - block.timestamp;
+        if (delay < MIN_DELAY || delay > MAX_DELAY) revert InvalidDelay();
+
+        queued[txId] = true;
+        emit Queue(txId, _target, _value, _data, _executeAfter);
+    }
+
+    function execute(
+        address _target,
+        uint256 _value,
+        bytes calldata _data,
+        uint256 _executeAfter,
+        uint256 _nonce
+    ) external payable onlyOwner returns (bytes memory) {
+        bytes32 txId = getTxId(_target, _value, _data, _executeAfter, _nonce);
+        if (!queued[txId]) revert NotQueued();
+        if (block.timestamp < _executeAfter) revert TooEarly();
+        if (block.timestamp > _executeAfter + MAX_DELAY) revert TooLate();
+
+        delete queued[txId];
+
+        (bool ok, bytes memory result) = _target.call{value: _value}(_data);
+        if (!ok) revert TxFailed();
+
+        emit Execute(txId, _target, _value, _data);
+        return result;
+    }
+
+    function cancel(bytes32 _txId) external onlyOwner {
+        if (!queued[_txId]) revert NotQueued();
+        delete queued[_txId];
+        emit Cancel(_txId);
+    }
+
+    receive() external payable {}
+}

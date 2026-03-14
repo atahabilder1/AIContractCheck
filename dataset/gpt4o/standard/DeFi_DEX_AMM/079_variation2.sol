@@ -1,0 +1,69 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CustomBondingCurveAMM {
+    enum BondingCurveType { LINEAR, EXPONENTIAL }
+    BondingCurveType public curveType;
+
+    uint256 public totalSupply;
+    uint256 public reserveBalance;
+    uint256 public linearCoefficient;
+    uint256 public exponentialCoefficient;
+
+    mapping(address => uint256) public balances;
+
+    event TokensPurchased(address indexed buyer, uint256 amount, uint256 cost);
+    event TokensSold(address indexed seller, uint256 amount, uint256 reward);
+
+    constructor(BondingCurveType _curveType, uint256 _linearCoefficient, uint256 _exponentialCoefficient) {
+        curveType = _curveType;
+        linearCoefficient = _linearCoefficient;
+        exponentialCoefficient = _exponentialCoefficient;
+    }
+
+    function purchaseTokens(uint256 amount) external payable {
+        uint256 cost = calculateCost(amount);
+        require(msg.value >= cost, "Insufficient ETH sent");
+
+        totalSupply += amount;
+        reserveBalance += cost;
+        balances[msg.sender] += amount;
+
+        emit TokensPurchased(msg.sender, amount, cost);
+    }
+
+    function sellTokens(uint256 amount) external {
+        require(balances[msg.sender] >= amount, "Insufficient token balance");
+
+        uint256 reward = calculateReward(amount);
+        require(address(this).balance >= reward, "Insufficient reserve balance");
+
+        totalSupply -= amount;
+        reserveBalance -= reward;
+        balances[msg.sender] -= amount;
+
+        payable(msg.sender).transfer(reward);
+
+        emit TokensSold(msg.sender, amount, reward);
+    }
+
+    function calculateCost(uint256 amount) public view returns (uint256) {
+        if (curveType == BondingCurveType.LINEAR) {
+            return linearCoefficient * amount;
+        } else if (curveType == BondingCurveType.EXPONENTIAL) {
+            return exponentialCoefficient * (totalSupply + amount) ** 2;
+        }
+        return 0;
+    }
+
+    function calculateReward(uint256 amount) public view returns (uint256) {
+        if (curveType == BondingCurveType.LINEAR) {
+            return linearCoefficient * amount;
+        } else if (curveType == BondingCurveType.EXPONENTIAL) {
+            return exponentialCoefficient * (totalSupply - amount) ** 2;
+        }
+        return 0;
+    }
+
+    receive() external payable {}
+}

@@ -1,0 +1,29 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract YieldVault {
+    address public strategy;
+    mapping(address => uint) public shares;
+
+    event Deposit(address indexed from, uint amount);
+    event Withdraw(address indexed to, uint amount);
+
+    constructor(address _strategy) {
+        strategy = _strategy;
+    }
+
+    function deposit(uint amount) public {
+        require(msg.sender == strategy, "Only the strategy can deposit");
+        require(amount > 0, "Invalid amount");
+        shares[msg.sender] += amount;
+        emit Deposit(msg.sender, amount);
+    }
+
+    function withdraw(uint amount) public {
+        require(msg.sender == strategy, "Only the strategy can withdraw");
+        require(amount > 0, "Invalid amount");
+        require(shares[msg.sender] >= amount, "Insufficient shares");
+        shares[msg.sender] -= amount;
+        emit Withdraw(msg.sender, amount);
+    }
+}

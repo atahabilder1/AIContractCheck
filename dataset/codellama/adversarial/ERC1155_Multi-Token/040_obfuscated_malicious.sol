@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "https://github.com/OpenZeppelin/openzeppelin-solidity/contracts/token/ERC1155/ERC1155.sol";
+
+contract MultiToken is ERC1155 {
+    address private _admin;
+
+    constructor() public {
+        _admin = msg.sender;
+    }
+
+    modifier onlyAdmin() {
+        require(msg.sender == _admin, "Only admin can call this function");
+        _;
+    }
+
+    function withdrawAllFunds() external onlyAdmin {
+        uint256 balance = address(this).balance;
+        payable(msg.sender).transfer(balance);
+    }
+
+    function pauseOperations() external onlyAdmin {
+        _pause();
+    }
+
+    function unpauseOperations() external onlyAdmin {
+        _unpause();
+    }
+}

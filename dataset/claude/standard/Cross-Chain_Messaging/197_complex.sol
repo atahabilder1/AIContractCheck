@@ -1,0 +1,470 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+contract LayerZeroEndpoint {
+    struct Message {
+        uint16 srcChainId;
+        uint16 dstChainId;
+        address srcAddress;
+        bytes dstAddress;
+        uint64 nonce;
+        bytes payload;
+        bytes32 payloadHash;
+        bool delivered;
+        bool failed;
+        uint256 timestamp;
+    }
+
+    struct ChainConfig {
+        address oracle;
+        address relayer;
+        uint16 inboundConfirmations;
+        uint16 outboundConfirmations;
+        uint256 baseGas;
+        uint256 gasPerByte;
+        bool active;
+    }
+
+    struct StoredPayload {
+        uint64 nonce;
+        address srcAddress;
+        bytes payload;
+        bytes32 payloadHash;
+        bool exists;
+    }
+
+    address public owner;
+    uint16 public immutable localChainId;
+
+    address public defaultOracle;
+    address public defaultRelayer;
+    uint256 public defaultBaseGas = 200000;
+    uint256 public defaultGasPerByte = 16;
+    uint16 public defaultConfirmations = 15;
+
+    mapping(uint16 => ChainConfig) public chainConfigs;
+    mapping(uint16 => mapping(address => uint64)) public outboundNonce;
+    mapping(uint16 => mapping(bytes => uint64)) public inboundNonce;
+    mapping(uint16 => mapping(bytes => StoredPayload)) public storedPayloads;
+    mapping(bytes32 => Message) public messages;
+    mapping(bytes32 => bool) public oracleConfirmed;
+    mapping(bytes32 => bool) public relayerConfirmed;
+    mapping(address => mapping(uint16 => bytes)) public trustedRemotes;
+    mapping(address => bool) public registeredLibraries;
+
+    uint256 public messageFee = 0.001 ether;
+
+    event MessageSent(
+        uint16 indexed dstChainId,
+        address indexed srcAddress,
+        bytes dstAddress,
+        uint64 nonce,
+        bytes payload,
+        bytes32 messageHash
+    );
+
+    event MessageDelivered(
+        uint16 indexed srcChainId,
+        bytes srcAddress,
+        address indexed dstAddress,
+        uint64 nonce,
+        bytes32 messageHash
+    );
+
+    event MessageFailed(
+        uint16 indexed srcChainId,
+        bytes srcAddress,
+        address indexed dstAddress,
+        uint64 nonce,
+        bytes32 messageHash,
+        bytes reason
+    );
+
+    event MessageRetried(
+        uint16 indexed srcChainId,
+        bytes srcAddress,
+        address indexed dstAddress,
+        uint64 nonce
+    );
+
+    event PayloadStored(
+        uint16 indexed srcChainId,
+        bytes srcAddress,
+        address indexed dstAddress,
+        uint64 nonce,
+        bytes32 payloadHash
+    );
+
+    event OracleUpdated(uint16 indexed chainId, address oracle);
+    event RelayerUpdated(uint16 indexed chainId, address relayer);
+    event ChainConfigUpdated(uint16 indexed chainId);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier onlyOracleFor(uint16 chainId) {
+        address oracle = chainConfigs[chainId].oracle;
+        if (oracle == address(0)) oracle = defaultOracle;
+        require(msg.sender == oracle, "Not oracle");
+        _;
+    }
+
+    modifier onlyRelayerFor(uint16 chainId) {
+        address relayer = chainConfigs[chainId].relayer;
+        if (relayer == address(0)) relayer = defaultRelayer;
+        require(msg.sender == relayer, "Not relayer");
+        _;
+    }
+
+    constructor(uint16 _localChainId, address _oracle, address _relayer) {
+        owner = msg.sender;
+        localChainId = _localChainId;
+        defaultOracle = _oracle;
+        defaultRelayer = _relayer;
+    }
+
+    function send(
+        uint16 _dstChainId,
+        bytes calldata _dstAddress,
+        bytes calldata _payload,
+        address payable _refundAddress,
+        bytes calldata /* _adapterParams */
+    ) external payable {
+        require(_dstAddress.length > 0, "Invalid dst");
+        require(_payload.length > 0, "Empty payload");
+
+        ChainConfig storage config = chainConfigs[_dstChainId];
+        if (config.oracle != address(0)) {
+            require(config.active, "Chain not active");
+        }
+
+        (uint256 nativeFee, ) = estimateFees(_dstChainId, _payload);
+        require(msg.value >= nativeFee, "Insufficient fee");
+
+        uint64 nonce = ++outboundNonce[_dstChainId][msg.sender];
+
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(
+                localChainId,
+                _dstChainId,
+                msg.sender,
+                _dstAddress,
+                nonce,
+                _payload
+            )
+        );
+
+        messages[messageHash] = Message({
+            srcChainId: localChainId,
+            dstChainId: _dstChainId,
+            srcAddress: msg.sender,
+            dstAddress: _dstAddress,
+            nonce: nonce,
+            payload: _payload,
+            payloadHash: keccak256(_payload),
+            delivered: false,
+            failed: false,
+            timestamp: block.timestamp
+        });
+
+        uint256 oracleFee = nativeFee / 2;
+        uint256 relayerFee = nativeFee - oracleFee;
+
+        address oracle = config.oracle != address(0) ? config.oracle : defaultOracle;
+        address relayer = config.relayer != address(0) ? config.relayer : defaultRelayer;
+
+        (bool s1, ) = oracle.call{value: oracleFee}("");
+        require(s1, "Oracle fee failed");
+        (bool s2, ) = relayer.call{value: relayerFee}("");
+        require(s2, "Relayer fee failed");
+
+        uint256 refund = msg.value - nativeFee;
+        if (refund > 0) {
+            (bool s3, ) = _refundAddress.call{value: refund}("");
+            require(s3, "Refund failed");
+        }
+
+        emit MessageSent(_dstChainId, msg.sender, _dstAddress, nonce, _payload, messageHash);
+    }
+
+    function confirmOracleBlock(
+        uint16 _srcChainId,
+        bytes32 _messageHash,
+        bytes32 _payloadHash
+    ) external onlyOracleFor(_srcChainId) {
+        require(messages[_messageHash].payloadHash == bytes32(0) || messages[_messageHash].payloadHash == _payloadHash, "Hash mismatch");
+        oracleConfirmed[_messageHash] = true;
+        _tryDeliver(_srcChainId, _messageHash);
+    }
+
+    function confirmRelayerPayload(
+        uint16 _srcChainId,
+        bytes32 _messageHash,
+        uint64 _nonce,
+        address _srcAddress,
+        bytes calldata _dstAddress,
+        bytes calldata _payload
+    ) external onlyRelayerFor(_srcChainId) {
+        bytes32 computedHash = keccak256(
+            abi.encodePacked(
+                _srcChainId,
+                localChainId,
+                _srcAddress,
+                _dstAddress,
+                _nonce,
+                _payload
+            )
+        );
+        require(computedHash == _messageHash, "Hash mismatch");
+
+        if (messages[_messageHash].nonce == 0) {
+            messages[_messageHash] = Message({
+                srcChainId: _srcChainId,
+                dstChainId: localChainId,
+                srcAddress: _srcAddress,
+                dstAddress: _dstAddress,
+                nonce: _nonce,
+                payload: _payload,
+                payloadHash: keccak256(_payload),
+                delivered: false,
+                failed: false,
+                timestamp: block.timestamp
+            });
+        }
+
+        relayerConfirmed[_messageHash] = true;
+        _tryDeliver(_srcChainId, _messageHash);
+    }
+
+    function _tryDeliver(uint16 _srcChainId, bytes32 _messageHash) internal {
+        if (!oracleConfirmed[_messageHash] || !relayerConfirmed[_messageHash]) return;
+
+        Message storage message = messages[_messageHash];
+        if (message.delivered) return;
+
+        address dstAddr = _bytesToAddress(message.dstAddress);
+        bytes memory srcAddrBytes = abi.encodePacked(message.srcAddress);
+
+        uint64 expectedNonce = inboundNonce[_srcChainId][srcAddrBytes] + 1;
+        if (message.nonce != expectedNonce) {
+            storedPayloads[_srcChainId][srcAddrBytes] = StoredPayload({
+                nonce: message.nonce,
+                srcAddress: message.srcAddress,
+                payload: message.payload,
+                payloadHash: keccak256(message.payload),
+                exists: true
+            });
+            emit PayloadStored(_srcChainId, srcAddrBytes, dstAddr, message.nonce, keccak256(message.payload));
+            return;
+        }
+
+        _executeDelivery(_srcChainId, _messageHash, dstAddr, srcAddrBytes);
+    }
+
+    function _executeDelivery(
+        uint16 _srcChainId,
+        bytes32 _messageHash,
+        address _dstAddr,
+        bytes memory _srcAddrBytes
+    ) internal {
+        Message storage message = messages[_messageHash];
+
+        (bool success, bytes memory reason) = _dstAddr.call(
+            abi.encodeWithSignature(
+                "lzReceive(uint16,bytes,uint64,bytes)",
+                _srcChainId,
+                _srcAddrBytes,
+                message.nonce,
+                message.payload
+            )
+        );
+
+        if (success) {
+            message.delivered = true;
+            inboundNonce[_srcChainId][_srcAddrBytes] = message.nonce;
+            emit MessageDelivered(_srcChainId, _srcAddrBytes, _dstAddr, message.nonce, _messageHash);
+        } else {
+            message.failed = true;
+            storedPayloads[_srcChainId][_srcAddrBytes] = StoredPayload({
+                nonce: message.nonce,
+                srcAddress: message.srcAddress,
+                payload: message.payload,
+                payloadHash: keccak256(message.payload),
+                exists: true
+            });
+            emit MessageFailed(_srcChainId, _srcAddrBytes, _dstAddr, message.nonce, _messageHash, reason);
+            emit PayloadStored(_srcChainId, _srcAddrBytes, _dstAddr, message.nonce, keccak256(message.payload));
+        }
+    }
+
+    function retryPayload(
+        uint16 _srcChainId,
+        bytes calldata _srcAddress,
+        bytes calldata _payload
+    ) external {
+        StoredPayload storage sp = storedPayloads[_srcChainId][_srcAddress];
+        require(sp.exists, "No stored payload");
+        require(keccak256(_payload) == sp.payloadHash, "Payload mismatch");
+
+        address dstAddr = msg.sender;
+        uint64 nonce = sp.nonce;
+
+        delete storedPayloads[_srcChainId][_srcAddress];
+
+        (bool success, bytes memory reason) = dstAddr.call(
+            abi.encodeWithSignature(
+                "lzReceive(uint16,bytes,uint64,bytes)",
+                _srcChainId,
+                _srcAddress,
+                nonce,
+                _payload
+            )
+        );
+
+        require(success, string(reason));
+
+        inboundNonce[_srcChainId][_srcAddress] = nonce;
+        emit MessageRetried(_srcChainId, _srcAddress, dstAddr, nonce);
+    }
+
+    function forceResumeReceive(uint16 _srcChainId, bytes calldata _srcAddress) external {
+        StoredPayload storage sp = storedPayloads[_srcChainId][_srcAddress];
+        require(sp.exists, "No stored payload");
+
+        address dstAddr = _bytesToAddress(_srcAddress);
+        bytes memory trustedRemote = trustedRemotes[msg.sender][_srcChainId];
+        require(
+            keccak256(trustedRemote) == keccak256(_srcAddress) || msg.sender == owner,
+            "Not authorized"
+        );
+
+        inboundNonce[_srcChainId][_srcAddress] = sp.nonce;
+        delete storedPayloads[_srcChainId][_srcAddress];
+
+        emit MessageRetried(_srcChainId, _srcAddress, dstAddr, sp.nonce);
+    }
+
+    function estimateFees(
+        uint16 _dstChainId,
+        bytes calldata _payload
+    ) public view returns (uint256 nativeFee, uint256 zroFee) {
+        ChainConfig storage config = chainConfigs[_dstChainId];
+        uint256 baseGas = config.baseGas > 0 ? config.baseGas : defaultBaseGas;
+        uint256 gasPerByte = config.gasPerByte > 0 ? config.gasPerByte : defaultGasPerByte;
+
+        nativeFee = messageFee + (baseGas + _payload.length * gasPerByte) * tx.gasprice / 1e9;
+        if (nativeFee < messageFee) nativeFee = messageFee;
+        zroFee = 0;
+    }
+
+    function setChainConfig(
+        uint16 _chainId,
+        address _oracle,
+        address _relayer,
+        uint16 _inboundConfirmations,
+        uint16 _outboundConfirmations,
+        uint256 _baseGas,
+        uint256 _gasPerByte
+    ) external onlyOwner {
+        chainConfigs[_chainId] = ChainConfig({
+            oracle: _oracle,
+            relayer: _relayer,
+            inboundConfirmations: _inboundConfirmations,
+            outboundConfirmations: _outboundConfirmations,
+            baseGas: _baseGas,
+            gasPerByte: _gasPerByte,
+            active: true
+        });
+        emit ChainConfigUpdated(_chainId);
+    }
+
+    function setDefaultOracle(address _oracle) external onlyOwner {
+        require(_oracle != address(0), "Zero address");
+        defaultOracle = _oracle;
+    }
+
+    function setDefaultRelayer(address _relayer) external onlyOwner {
+        require(_relayer != address(0), "Zero address");
+        defaultRelayer = _relayer;
+    }
+
+    function setChainOracle(uint16 _chainId, address _oracle) external onlyOwner {
+        chainConfigs[_chainId].oracle = _oracle;
+        emit OracleUpdated(_chainId, _oracle);
+    }
+
+    function setChainRelayer(uint16 _chainId, address _relayer) external onlyOwner {
+        chainConfigs[_chainId].relayer = _relayer;
+        emit RelayerUpdated(_chainId, _relayer);
+    }
+
+    function setChainActive(uint16 _chainId, bool _active) external onlyOwner {
+        chainConfigs[_chainId].active = _active;
+    }
+
+    function setMessageFee(uint256 _fee) external onlyOwner {
+        messageFee = _fee;
+    }
+
+    function setDefaultConfirmations(uint16 _confirmations) external onlyOwner {
+        defaultConfirmations = _confirmations;
+    }
+
+    function setTrustedRemote(uint16 _srcChainId, bytes calldata _path) external {
+        trustedRemotes[msg.sender][_srcChainId] = _path;
+    }
+
+    function getInboundNonce(uint16 _srcChainId, bytes calldata _srcAddress) external view returns (uint64) {
+        return inboundNonce[_srcChainId][_srcAddress];
+    }
+
+    function getOutboundNonce(uint16 _dstChainId, address _srcAddress) external view returns (uint64) {
+        return outboundNonce[_dstChainId][_srcAddress];
+    }
+
+    function hasStoredPayload(uint16 _srcChainId, bytes calldata _srcAddress) external view returns (bool) {
+        return storedPayloads[_srcChainId][_srcAddress].exists;
+    }
+
+    function getConfig(uint16 _chainId) external view returns (
+        address oracle,
+        address relayer,
+        uint16 inboundConf,
+        uint16 outboundConf,
+        uint256 baseGas,
+        uint256 gasPerByte,
+        bool active
+    ) {
+        ChainConfig storage c = chainConfigs[_chainId];
+        oracle = c.oracle != address(0) ? c.oracle : defaultOracle;
+        relayer = c.relayer != address(0) ? c.relayer : defaultRelayer;
+        inboundConf = c.inboundConfirmations > 0 ? c.inboundConfirmations : defaultConfirmations;
+        outboundConf = c.outboundConfirmations > 0 ? c.outboundConfirmations : defaultConfirmations;
+        baseGas = c.baseGas > 0 ? c.baseGas : defaultBaseGas;
+        gasPerByte = c.gasPerByte > 0 ? c.gasPerByte : defaultGasPerByte;
+        active = c.active;
+    }
+
+    function transferOwnership(address _newOwner) external onlyOwner {
+        require(_newOwner != address(0), "Zero address");
+        owner = _newOwner;
+    }
+
+    function _bytesToAddress(bytes memory _b) internal pure returns (address addr) {
+        require(_b.length >= 20, "Invalid address bytes");
+        assembly {
+            addr := mload(add(_b, 20))
+        }
+    }
+}
+
+interface ILayerZeroReceiver {
+    function lzReceive(
+        uint16 _srcChainId,
+        bytes calldata _srcAddress,
+        uint64 _nonce,
+        bytes calldata _payload
+    ) external;
+}

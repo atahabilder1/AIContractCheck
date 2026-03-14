@@ -1,0 +1,55 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Crowdfunding {
+    // State variables
+    address public owner;
+    uint public goal;
+    uint public amountRaised;
+    uint public deadline;
+    mapping(address => uint) public contributions;
+
+    // Events
+    event Contribution(address indexed contributor, uint amount);
+    event GoalReached(uint amount);
+    event DeadlineReached(uint amount);
+
+    // Constructor
+    constructor(uint _goal, uint _deadline) public {
+        owner = msg.sender;
+        goal = _goal;
+        deadline = _deadline;
+    }
+
+    // Fallback function
+    fallback() external payable {
+        require(msg.value > 0, "Invalid contribution amount");
+        require(contributions[msg.sender] + msg.value <= goal, "Contribution exceeds goal");
+        contributions[msg.sender] += msg.value;
+        amountRaised += msg.value;
+        emit Contribution(msg.sender, msg.value);
+    }
+
+    // Check if goal has been reached
+    function checkGoalReached() public view returns (bool) {
+        return amountRaised >= goal;
+    }
+
+    // Check if deadline has been reached
+    function checkDeadlineReached() public view returns (bool) {
+        return block.timestamp >= deadline;
+    }
+
+    // Refund contributions if goal has not been reached
+    function refund() public {
+        require(checkGoalReached() == false, "Goal has been reached");
+        require(checkDeadlineReached() == false, "Deadline has been reached");
+        uint amount = contributions[msg.sender];
+        contributions[msg.sender] = 0;
+        amountRaised -= amount;
+        payable(msg.sender).transfer(amount);
+        emit Refund(msg.sender, amount);
+    }
+}
+```

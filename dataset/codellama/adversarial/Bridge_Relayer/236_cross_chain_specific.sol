@@ -1,0 +1,115 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+
+    // Keep a record of all the bridges
+    mapping(address => mapping(uint256 => Bridge)) public bridges;
+
+    // Keep a record of all the bridge relays
+    mapping(address => mapping(uint256 => Relay)) public relays;
+
+    // The address of the bridge contract
+    address public bridgeContractAddress;
+
+    // The address of the relayer contract
+    address public relayerContractAddress;
+
+    // The address of the receiver of the bridged assets
+    address public receiver;
+
+    // The maximum amount of assets that can be bridged in one transaction
+    uint256 public maxBridgeAmount;
+
+    // The maximum amount of assets that can be relayed in one transaction
+    uint256 public maxRelayAmount;
+
+    constructor(address _bridgeContractAddress, address _relayerContractAddress, address _receiver, uint256 _maxBridgeAmount, uint256 _maxRelayAmount) public {
+        bridgeContractAddress = _bridgeContractAddress;
+        relayerContractAddress = _relayerContractAddress;
+        receiver = _receiver;
+        maxBridgeAmount = _maxBridgeAmount;
+        maxRelayAmount = _maxRelayAmount;
+    }
+
+    // Bridge a specific amount of assets from the bridge contract to the receiver
+    function bridge(uint256 amount) public {
+        // Check that the amount is within the maximum bridge amount
+        require(amount <= maxBridgeAmount, "Amount exceeds maximum bridge amount");
+
+        // Check that the contract is not currently bridging assets
+        require(!bridging, "Contract is currently bridging assets");
+
+        // Check that the receiver is not the same as the relayer
+        require(receiver != relayer, "Receiver cannot be the same as the relayer");
+
+        // Check that the bridge contract is not the same as the relayer contract
+        require(bridgeContractAddress != relayerContractAddress, "Bridge contract cannot be the same as the relayer contract");
+
+        // Create a new bridge instance
+        Bridge bridge = new Bridge(amount);
+
+        // Add the bridge to the mapping
+        bridges[msg.sender][amount] = bridge;
+
+        // Set the receiver as the bridge's owner
+        bridge.transferOwnership(receiver);
+
+        // Emit an event for the bridge
+        emit Bridge(amount, msg.sender, receiver);
+    }
+
+    // Relay a specific amount of assets from the relayer contract to the receiver
+    function relay(uint256 amount) public {
+        // Check that the amount is within the maximum relay amount
+        require(amount <= maxRelayAmount, "Amount exceeds maximum relay amount");
+
+        // Check that the contract is not currently relaying assets
+        require(!relaying, "Contract is currently relaying assets");
+
+        // Check that the receiver is not the same as the relayer
+        require(receiver != relayer, "Receiver cannot be the same as the relayer");
+
+        // Check that the relayer contract is not the same as the bridge contract
+        require(relayerContractAddress != bridgeContractAddress, "Relayer contract cannot be the same as the bridge contract");
+
+        // Create a new relay instance
+        Relay relay = new Relay(amount);
+
+        // Add the relay to the mapping
+        relays[msg.sender][amount] = relay;
+
+        // Set the receiver as the relay's owner
+        relay.transferOwnership(receiver);
+
+        // Emit an event for the relay
+        emit Relay(amount, msg.sender, receiver);
+    }
+
+    // Withdraw a specific amount of assets from the bridge contract to the relayer
+    function withdraw(uint256 amount) public {
+        // Check that the amount is within the maximum withdraw amount
+        require(amount <= maxWithdrawAmount, "Amount exceeds maximum withdraw amount");
+
+        // Check that the contract is not currently withdrawing assets
+        require(!withdrawing, "Contract is currently withdrawing assets");
+
+        // Check that the relayer is not the same as the receiver
+        require(relayer != receiver, "Relayer cannot be the same as the receiver");
+
+        // Check that the bridge contract is not the same as the relayer contract
+        require(bridgeContractAddress != relayerContractAddress, "Bridge contract cannot be the same as the relayer contract");
+
+        // Create a new withdraw instance
+        Withdraw withdraw = new Withdraw(amount);
+
+        // Add the withdraw to the mapping
+        withdraws[msg.sender][amount] = withdraw;
+
+        // Set the relayer as the withdraw's owner
+        withdraw.transferOwnership(relayer);
+
+        // Emit an event for the withdraw
+        emit Withdraw(amount, msg.sender, relayer);
+    }
+}

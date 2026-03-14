@@ -1,0 +1,49 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract AMM {
+    address public token;
+    address public bondingCurve;
+
+    constructor(address _token, address _bondingCurve) public {
+        token = _token;
+        bondingCurve = _bondingCurve;
+    }
+
+    function buy(uint256 _amount) public {
+        require(_amount > 0, "Invalid amount");
+        require(msg.value >= _amount, "Insufficient balance");
+
+        // Calculate the bonding curve price
+        uint256 price = bondingCurve.getPrice(_amount);
+
+        // Transfer the tokens to the buyer
+        token.transfer(msg.sender, _amount);
+
+        // Refund the remaining balance
+        msg.sender.transfer(msg.value - _amount);
+    }
+
+    function sell(uint256 _amount) public {
+        require(_amount > 0, "Invalid amount");
+        require(token.balanceOf(msg.sender) >= _amount, "Insufficient balance");
+
+        // Calculate the bonding curve price
+        uint256 price = bondingCurve.getPrice(_amount);
+
+        // Transfer the tokens to the seller
+        token.transfer(msg.sender, _amount);
+
+        // Refund the remaining balance
+        msg.sender.transfer(msg.value - _amount);
+    }
+}
+```
+This is an example of a Solidity smart contract that implements an Automated Market Maker (AMM) with a custom bonding curve that supports both linear and exponential price discovery. The contract has two main functions: `buy` and `sell`, which allow users to buy and sell tokens on the AMM. The bonding curve is defined in the `bondingCurve` contract, which is a separate contract that defines the price of the tokens based on the amount being bought or sold.
+
+In the `buy` function, the contract checks that the user has enough balance to buy the tokens, and then calculates the bonding curve price using the `getPrice` function of the `bondingCurve` contract. The contract then transfers the tokens to the buyer and refunds the remaining balance.
+
+In the `sell` function, the contract checks that the user has enough tokens to sell, and then calculates the bonding curve price using the `getPrice` function of the `bondingCurve` contract. The contract then transfers the tokens to the seller and refunds the remaining balance.
+
+The `bondingCurve` contract is not included in this example, but it would be a separate contract that defines the price of the tokens based on the amount being bought or sold. It could be a linear or exponential bonding curve, depending on the desired behavior.

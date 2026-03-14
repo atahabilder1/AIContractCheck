@@ -1,0 +1,109 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    struct Message {
+        uint256 sourceChainId;
+        uint256 destinationChainId;
+        address sender;
+        address recipient;
+        bytes data;
+        uint256 timestamp;
+        bool processed;
+    }
+
+    address public owner;
+    mapping(address => bool) public authorizedRelayers;
+    mapping(bytes32 => Message) public messages;
+    bytes32[] public messageIds;
+    uint256 public messageCount;
+
+    event RelayerAdded(address indexed relayer);
+    event RelayerRemoved(address indexed relayer);
+    event MessageStored(bytes32 indexed messageId, uint256 sourceChainId, uint256 destinationChainId, address sender, address recipient);
+    event MessageProcessed(bytes32 indexed messageId, address indexed relayer);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier onlyRelayer() {
+        require(authorizedRelayers[msg.sender], "Not authorized relayer");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function addRelayer(address _relayer) external onlyOwner {
+        require(_relayer != address(0), "Invalid address");
+        require(!authorizedRelayers[_relayer], "Already authorized");
+        authorizedRelayers[_relayer] = true;
+        emit RelayerAdded(_relayer);
+    }
+
+    function removeRelayer(address _relayer) external onlyOwner {
+        require(authorizedRelayers[_relayer], "Not authorized");
+        authorizedRelayers[_relayer] = false;
+        emit RelayerRemoved(_relayer);
+    }
+
+    function storeMessage(
+        uint256 _sourceChainId,
+        uint256 _destinationChainId,
+        address _sender,
+        address _recipient,
+        bytes calldata _data
+    ) external onlyRelayer returns (bytes32) {
+        bytes32 messageId = keccak256(
+            abi.encodePacked(_sourceChainId, _destinationChainId, _sender, _recipient, _data, block.timestamp, messageCount)
+        );
+
+        require(messages[messageId].timestamp == 0, "Message already exists");
+
+        messages[messageId] = Message({
+            sourceChainId: _sourceChainId,
+            destinationChainId: _destinationChainId,
+            sender: _sender,
+            recipient: _recipient,
+            data: _data,
+            timestamp: block.timestamp,
+            processed: false
+        });
+
+        messageIds.push(messageId);
+        messageCount++;
+
+        emit MessageStored(messageId, _sourceChainId, _destinationChainId, _sender, _recipient);
+        return messageId;
+    }
+
+    function processMessage(bytes32 _messageId) external onlyRelayer {
+        Message storage message = messages[_messageId];
+        require(message.timestamp != 0, "Message does not exist");
+        require(!message.processed, "Already processed");
+
+        message.processed = true;
+
+        (bool success, ) = message.recipient.call(message.data);
+        require(success, "Message forwarding failed");
+
+        emit MessageProcessed(_messageId, msg.sender);
+    }
+
+    function getMessage(bytes32 _messageId) external view returns (Message memory) {
+        require(messages[_messageId].timestamp != 0, "Message does not exist");
+        return messages[_messageId];
+    }
+
+    function getMessageCount() external view returns (uint256) {
+        return messageCount;
+    }
+
+    function transferOwnership(address _newOwner) external onlyOwner {
+        require(_newOwner != address(0), "Invalid address");
+        owner = _newOwner;
+    }
+}

@@ -1,0 +1,40 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleDeFiLending {
+    mapping(address => uint256) public balances;
+    mapping(address => uint256) public loans;
+    uint256 public interestRate = 10; // 10% interest rate
+
+    function deposit() external payable {
+        require(msg.value > 0, "Deposit amount must be greater than 0");
+        balances[msg.sender] += msg.value;
+    }
+
+    function withdraw(uint256 _amount) external {
+        require(balances[msg.sender] >= _amount, "Insufficient balance");
+        require(loans[msg.sender] == 0, "Cannot withdraw while having an active loan");
+        balances[msg.sender] -= _amount;
+        payable(msg.sender).transfer(_amount);
+    }
+
+    function borrow(uint256 _amount) external {
+        require(balances[msg.sender] >= _amount, "Insufficient collateral");
+        require(loans[msg.sender] == 0, "Already have an active loan");
+        loans[msg.sender] += _amount;
+        balances[msg.sender] -= _amount;
+        payable(msg.sender).transfer(_amount);
+    }
+
+    function repay(uint256 _amount) external payable {
+        require(loans[msg.sender] > 0, "No active loan");
+        require(_amount >= loans[msg.sender], "Repayment amount must cover the loan");
+        loans[msg.sender] = 0;
+        uint256 interest = (_amount * interestRate) / 100;
+        uint256 totalRepayment = _amount + interest;
+        require(msg.value >= totalRepayment, "Insufficient repayment amount");
+        balances[msg.sender] += msg.value - totalRepayment;
+    }
+}
+```

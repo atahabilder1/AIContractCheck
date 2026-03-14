@@ -1,0 +1,61 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    address public owner;
+    uint public timelockDuration;
+    uint public emergencyDuration;
+    uint public supermajority;
+
+    mapping(address => uint) public lastOperationTimestamps;
+    mapping(address => bool) public isGuardian;
+
+    constructor(address _owner, uint _timelockDuration, uint _emergencyDuration, uint _supermajority) public {
+        owner = _owner;
+        timelockDuration = _timelockDuration;
+        emergencyDuration = _emergencyDuration;
+        supermajority = _supermajority;
+    }
+
+    function setTimelockDuration(uint _newTimelockDuration) public {
+        require(msg.sender == owner, "Only owner can set timelock duration");
+        timelockDuration = _newTimelockDuration;
+    }
+
+    function setEmergencyDuration(uint _newEmergencyDuration) public {
+        require(msg.sender == owner, "Only owner can set emergency duration");
+        emergencyDuration = _newEmergencyDuration;
+    }
+
+    function setSupermajority(uint _newSupermajority) public {
+        require(msg.sender == owner, "Only owner can set supermajority");
+        supermajority = _newSupermajority;
+    }
+
+    function addGuardian(address _guardian) public {
+        require(msg.sender == owner, "Only owner can add guardians");
+        isGuardian[_guardian] = true;
+    }
+
+    function removeGuardian(address _guardian) public {
+        require(msg.sender == owner, "Only owner can remove guardians");
+        isGuardian[_guardian] = false;
+    }
+
+    function execute(bytes memory _data) public {
+        require(msg.sender == owner, "Only owner can execute");
+        require(block.timestamp > lastOperationTimestamps[msg.sender] + timelockDuration, "Timelock not expired");
+        lastOperationTimestamps[msg.sender] = block.timestamp;
+        _data();
+    }
+
+    function executeEmergency(bytes memory _data) public {
+        require(isGuardian[msg.sender], "Only guardians can execute emergency");
+        require(block.timestamp > lastOperationTimestamps[msg.sender] + emergencyDuration, "Emergency timelock not expired");
+        require(msg.value >= supermajority, "Emergency transaction not approved by supermajority");
+        lastOperationTimestamps[msg.sender] = block.timestamp;
+        _data();
+    }
+}
+```

@@ -1,0 +1,63 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainMessaging {
+    struct Message {
+        address sender;
+        uint256 sourceChainId;
+        uint256 destinationChainId;
+        bytes data;
+    }
+
+    mapping(uint256 => mapping(uint256 => Message)) public messages;
+    mapping(uint256 => uint256) public messageCounts;
+    mapping(uint256 => uint256) public lastProcessedMessage;
+
+    uint256 public gasLimit;
+
+    event MessageSent(uint256 indexed sourceChainId, uint256 indexed destinationChainId, uint256 messageId, address indexed sender);
+    event MessageReceived(uint256 indexed sourceChainId, uint256 indexed destinationChainId, uint256 messageId);
+
+    constructor(uint256 _gasLimit) {
+        gasLimit = _gasLimit;
+    }
+
+    modifier onlyValidChain(uint256 chainId) {
+        require(chainId != 0, "Invalid chain ID");
+        _;
+    }
+
+    function sendMessage(uint256 destinationChainId, bytes memory data) external onlyValidChain(destinationChainId) {
+        uint256 sourceChainId = block.chainid;
+        uint256 messageId = messageCounts[sourceChainId]++;
+
+        messages[sourceChainId][messageId] = Message({
+            sender: msg.sender,
+            sourceChainId: sourceChainId,
+            destinationChainId: destinationChainId,
+            data: data
+        });
+
+        emit MessageSent(sourceChainId, destinationChainId, messageId, msg.sender);
+    }
+
+    function receiveMessage(uint256 sourceChainId, uint256 messageId) external onlyValidChain(sourceChainId) {
+        require(messageId == lastProcessedMessage[sourceChainId] + 1, "Messages must be processed in order");
+
+        Message memory message = messages[sourceChainId][messageId];
+        require(message.sourceChainId != 0, "Message does not exist");
+
+        lastProcessedMessage[sourceChainId] = messageId;
+
+        (bool success,) = address(this).call{gas: gasLimit}(message.data);
+        require(success, "Message execution failed");
+
+        emit MessageReceived(sourceChainId, message.destinationChainId, messageId);
+    }
+
+    function setGasLimit(uint256 newGasLimit) external {
+        gasLimit = newGasLimit;
+    }
+}
+```

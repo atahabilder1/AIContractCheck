@@ -1,0 +1,61 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract ConstantProductAMM {
+    uint256 public reserveA;
+    uint256 public reserveB;
+    uint256 public totalSupply;
+    mapping(address => uint256) public balanceOf;
+
+    event Swap(address indexed sender, uint256 amountAIn, uint256 amountBIn, uint256 amountAOut, uint256 amountBOut);
+    event LiquidityAdded(address indexed provider, uint256 amountA, uint256 amountB, uint256 liquidity);
+    event LiquidityRemoved(address indexed provider, uint256 amountA, uint256 amountB, uint256 liquidity);
+
+    function addLiquidity(uint256 _amountA, uint256 _amountB) external {
+        require(_amountA > 0 && _amountB > 0, "Amounts must be non-zero");
+        uint256 liquidity;
+        if (reserveA == 0 && reserveB == 0) {
+            liquidity = _amountA * _amountB;
+        } else {
+            uint256 liquidityA = (totalSupply * _amountA) / reserveA;
+            uint256 liquidityB = (totalSupply * _amountB) / reserveB;
+            require(liquidityA == liquidityB, "Liquidity mismatch");
+            liquidity = liquidityA;
+        }
+        reserveA += _amountA;
+        reserveB += _amountB;
+        balanceOf[msg.sender] += liquidity;
+        totalSupply += liquidity;
+        emit LiquidityAdded(msg.sender, _amountA, _amountB, liquidity);
+    }
+
+    function removeLiquidity(uint256 _liquidity) external {
+        require(_liquidity > 0, "Liquidity amount must be non-zero");
+        require(balanceOf[msg.sender] >= _liquidity, "Insufficient balance");
+        uint256 amountA = (reserveA * _liquidity) / totalSupply;
+        uint256 amountB = (reserveB * _liquidity) / totalSupply;
+        reserveA -= amountA;
+        reserveB -= amountB;
+        balanceOf[msg.sender] -= _liquidity;
+        totalSupply -= _liquidity;
+        emit LiquidityRemoved(msg.sender, amountA, amountB, _liquidity);
+    }
+
+    function swap(uint256 _amountAIn, uint256 _amountBIn) external {
+        require(_amountAIn > 0 || _amountBIn > 0, "Input amount must be non-zero");
+        uint256 amountAOut;
+        uint256 amountBOut;
+        if (_amountAIn > 0) {
+            amountBOut = (reserveB * _amountAIn) / (reserveA + _amountAIn);
+            require(amountBOut < reserveB, "Insufficient reserve");
+            reserveA += _amountAIn;
+            reserveB -= amountBOut;
+        } else {
+            amountAOut = (reserveA * _amountBIn) / (reserveB + _amountBIn);
+            require(amountAOut < reserveA, "Insufficient reserve");
+            reserveB += _amountBIn;
+            reserveA -= amountAOut;
+        }
+        emit Swap(msg.sender, _amountAIn, _amountBIn, amountAOut, amountBOut);
+    }
+}

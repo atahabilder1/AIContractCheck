@@ -29,10 +29,10 @@ We formulate six research questions to systematically investigate the security l
 In this paper, we present the first large-scale empirical study of security vulnerabilities in LLM-generated smart contracts. Our study makes the following contributions:
 
 \begin{itemize}[leftmargin=*]
-    \item \textbf{Large-Scale Dataset.} We generate 1,500 smart contracts across five LLMs (GPT-4o, Claude~3.5 Sonnet, Gemini~1.5 Pro, GitHub Copilot, CodeLlama-34B), covering 20 contract categories at three complexity levels. This is the largest dataset of LLM-generated smart contracts with security labels to date.
-    \item \textbf{Multi-Tool Analysis Pipeline.} We employ four complementary security analysis tools---Slither, Mythril, Securify2, and Semgrep---with cross-tool deduplication and manual validation, achieving approximately 92\% vulnerability detection coverage.
-    \item \textbf{Vulnerability Taxonomy.} We construct a CWE-mapped taxonomy of \demo{28} vulnerability types specific to LLM-generated smart contracts, identifying three novel patterns (phantom guards, inherited vulnerabilities, context window degradation) absent in human-written code.
-    \item \textbf{Adversarial Prompt Framework.} We design eight categories of adversarial prompts that exploit documented LLM biases (e.g., gas optimization, simplicity) to systematically increase vulnerability rates by \demo{37.2}\%.
+    \item \textbf{Large-Scale Dataset.} We generate 1,800 smart contracts across six LLMs (GPT-4o, Claude~3.5 Sonnet, Gemini~2.5 Flash-Lite, DeepSeek Coder~V2, Qwen~2.5 Coder~32B, CodeLlama-34B), covering 20 contract categories at three complexity levels. This is the largest dataset of LLM-generated smart contracts with security labels to date.
+    \item \textbf{Multi-Tool Analysis Pipeline.} We employ three complementary security analysis tools---Slither, Mythril, and Semgrep---with cross-tool deduplication and manual validation, achieving approximately 92\% vulnerability detection coverage.
+    \item \textbf{Vulnerability Taxonomy.} We construct a CWE-mapped taxonomy of vulnerability types specific to LLM-generated smart contracts, identifying three novel patterns (phantom guards, inherited vulnerabilities, context window degradation).
+    \item \textbf{Adversarial Prompt Framework.} We design eight categories of adversarial prompts that exploit documented LLM biases (e.g., gas optimization, simplicity). Contrary to expectations, adversarial prompts do \emph{not} increase vulnerability rates---we show vulnerabilities are intrinsic to LLM code generation.
     \item \textbf{Cross-LLM Comparison.} We provide statistically rigorous comparisons across LLMs using non-parametric tests with effect size reporting, revealing significant differences in security posture ($p < 0.001$).
 \end{itemize}
 

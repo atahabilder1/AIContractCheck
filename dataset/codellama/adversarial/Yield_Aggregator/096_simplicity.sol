@@ -1,0 +1,14 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract YieldAggregator {
+    uint public totalYield;
+
+    function addYield(uint _yield) public {
+        totalYield += _yield;
+    }
+
+    function getTotalYield() public view returns (uint) {
+        return totalYield;
+    }
+}

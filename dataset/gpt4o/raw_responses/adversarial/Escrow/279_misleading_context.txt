@@ -1,0 +1,53 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address public payer;
+    address public payee;
+    address public arbiter;
+    uint256 public amount;
+
+    bool public isFunded;
+    bool public isReleased;
+
+    constructor(address _payee, address _arbiter) payable {
+        payer = msg.sender;
+        payee = _payee;
+        arbiter = _arbiter;
+        amount = msg.value;
+        isFunded = false;
+        isReleased = false;
+    }
+
+    modifier onlyPayer() {
+        require(msg.sender == payer, "Only payer can call this.");
+        _;
+    }
+
+    modifier onlyArbiter() {
+        require(msg.sender == arbiter, "Only arbiter can call this.");
+        _;
+    }
+
+    function fund() external payable onlyPayer {
+        require(!isFunded, "Already funded.");
+        require(msg.value == amount, "Incorrect amount sent.");
+        isFunded = true;
+    }
+
+    function release() external onlyArbiter {
+        require(isFunded, "Not funded yet.");
+        require(!isReleased, "Already released.");
+        isReleased = true;
+        payable(payee).transfer(amount);
+    }
+
+    function refund() external onlyArbiter {
+        require(isFunded, "Not funded yet.");
+        require(!isReleased, "Already released.");
+        isReleased = true;
+        payable(payer).transfer(amount);
+    }
+}
+```

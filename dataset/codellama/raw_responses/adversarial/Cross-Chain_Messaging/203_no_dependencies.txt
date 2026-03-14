@@ -1,0 +1,35 @@
+
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainMessaging {
+    // The address of the contract on the other chain
+    address otherChainContract;
+
+    // The message that was sent on the other chain
+    string message;
+
+    // The event that will be emitted when a message is received
+    event MessageReceived(string message);
+
+    // Constructor that sets the address of the other chain contract
+    constructor(address _otherChainContract) public {
+        otherChainContract = _otherChainContract;
+    }
+
+    // Function that sends a message to the other chain
+    function sendMessage(string memory _message) public {
+        // Call the other chain contract with the message
+        otherChainContract.call(abi.encodePacked("messageReceived", _message));
+    }
+
+    // Function that receives a message from the other chain
+    function messageReceived(string memory _message) public {
+        // Emit the MessageReceived event with the message
+        emit MessageReceived(_message);
+    }
+}
+```
+
+This contract has a constructor that sets the address of the other chain contract, and two functions: `sendMessage` and `messageReceived`. The `sendMessage` function sends a message to the other chain by calling the `otherChainContract` with the message as an argument. The `messageReceived` function emits the `MessageReceived` event with the message.

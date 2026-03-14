@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleAuction {
+    address payable public highestBidder;
+    uint public highestBid;
+    bool public ended;
+    mapping(address => uint) public bids;
+
+    function bid() public payable {
+        require(msg.value > highestBid, "There already is a higher bid.");
+        if (highestBid != 0) {
+            bids[highestBidder] += highestBid;
+        }
+        highestBidder = payable(msg.sender);
+        highestBid = msg.value;
+    }
+
+    function endAuction() public {
+        require(!ended, "Auction already ended.");
+        ended = true;
+        highestBidder.transfer(highestBid);
+    }
+}

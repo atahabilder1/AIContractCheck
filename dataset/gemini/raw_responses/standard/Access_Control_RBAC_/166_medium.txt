@@ -1,0 +1,155 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract RBAC {
+    address public owner;
+
+    // Mapping of user address to their assigned roles
+    mapping(address => mapping(uint256 => bool)) public userRoles;
+    // Mapping of role ID to role name
+    mapping(uint256 => string) public roleNames;
+    // Mapping of role ID to its parent role ID (for hierarchy)
+    mapping(uint256 => uint256) public roleHierarchy;
+
+    // Role IDs - can be expanded
+    uint256 public constant ROLE_ADMIN = 1;
+    uint256 public constant ROLE_MANAGER = 2;
+    uint256 public constant ROLE_USER = 3;
+
+    // Events
+    event RoleGranted(address indexed user, uint256 roleId);
+    event RoleRevoked(address indexed user, uint256 roleId);
+    event RoleCreated(uint256 roleId, string name, uint256 parentRoleId);
+    event RoleHierarchyUpdated(uint256 roleId, uint256 newParentRoleId);
+
+    constructor() {
+        owner = msg.sender;
+
+        // Initialize default roles
+        _createRole(ROLE_ADMIN, "Admin", 0); // No parent for the top-level role
+        _createRole(ROLE_MANAGER, "Manager", ROLE_ADMIN);
+        _createRole(ROLE_USER, "User", ROLE_MANAGER);
+
+        // Grant the owner the highest role
+        _grantRole(msg.sender, ROLE_ADMIN);
+    }
+
+    // --- Role Management ---
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "RBAC: Caller is not the owner");
+        _;
+    }
+
+    function _createRole(uint256 _roleId, string memory _name, uint256 _parentRoleId) internal {
+        require(_roleId != 0, "RBAC: Role ID cannot be 0");
+        require(bytes(roleNames[_roleId]).length == 0, "RBAC: Role ID already exists");
+        require(bytes(_name).length > 0, "RBAC: Role name cannot be empty");
+
+        roleNames[_roleId] = _name;
+        roleHierarchy[_roleId] = _parentRoleId;
+        emit RoleCreated(_roleId, _name, _parentRoleId);
+    }
+
+    function createRole(uint256 _roleId, string memory _name, uint256 _parentRoleId) public onlyOwner {
+        _createRole(_roleId, _name, _parentRoleId);
+    }
+
+    function updateRoleHierarchy(uint256 _roleId, uint256 _newParentRoleId) public onlyOwner {
+        require(_roleId != 0, "RBAC: Role ID cannot be 0");
+        require(bytes(roleNames[_roleId]).length > 0, "RBAC: Role does not exist");
+        require(_roleId != _newParentRoleId, "RBAC: Cannot set a role as its own parent");
+        // Basic check for circular dependency (can be made more robust)
+        uint256 currentParent = _newParentRoleId;
+        while (currentParent != 0) {
+            require(currentParent != _roleId, "RBAC: Circular dependency detected");
+            currentParent = roleHierarchy[currentParent];
+        }
+
+        roleHierarchy[_roleId] = _newParentRoleId;
+        emit RoleHierarchyUpdated(_roleId, _newParentRoleId);
+    }
+
+    // --- User Role Management ---
+
+    function _grantRole(address _user, uint256 _roleId) internal {
+        require(_user != address(0), "RBAC: Cannot grant role to the zero address");
+        require(_roleId != 0, "RBAC: Role ID cannot be 0");
+        require(bytes(roleNames[_roleId]).length > 0, "RBAC: Role does not exist");
+
+        if (!userRoles[_user][_roleId]) {
+            userRoles[_user][_roleId] = true;
+            emit RoleGranted(_user, _roleId);
+        }
+    }
+
+    function grantRole(address _user, uint256 _roleId) public onlyOwner {
+        _grantRole(_user, _roleId);
+    }
+
+    function revokeRole(address _user, uint256 _roleId) public onlyOwner {
+        require(_user != address(0), "RBAC: Cannot revoke role from the zero address");
+        require(_roleId != 0, "RBAC: Role ID cannot be 0");
+        require(bytes(roleNames[_roleId]).length > 0, "RBAC: Role does not exist");
+
+        if (userRoles[_user][_roleId]) {
+            userRoles[_user][_roleId] = false;
+            emit RoleRevoked(_user, _roleId);
+        }
+    }
+
+    // --- Role Checking ---
+
+    function hasRole(address _user, uint256 _roleId) public view returns (bool) {
+        require(_roleId != 0, "RBAC: Role ID cannot be 0");
+        require(bytes(roleNames[_roleId]).length > 0, "RBAC: Role does not exist");
+
+        return userRoles[_user][_roleId];
+    }
+
+    function hasRoleOrAncestor(address _user, uint256 _roleId) public view returns (bool) {
+        require(_roleId != 0, "RBAC: Role ID cannot be 0");
+        require(bytes(roleNames[_roleId]).length > 0, "RBAC: Role does not exist");
+
+        uint256 currentRoleId = _roleId;
+        while (currentRoleId != 0) {
+            if (userRoles[_user][currentRoleId]) {
+                return true;
+            }
+            currentRoleId = roleHierarchy[currentRoleId];
+        }
+        return false;
+    }
+
+    // --- Role-Based Modifiers ---
+
+    modifier hasRoleModifier(uint256 _roleId) {
+        require(hasRole(msg.sender, _roleId), "RBAC: Caller does not have the required role");
+        _;
+    }
+
+    modifier hasRoleOrAncestorModifier(uint256 _roleId) {
+        require(hasRoleOrAncestor(msg.sender, _roleId), "RBAC: Caller does not have the required role or an ancestor role");
+        _;
+    }
+
+    // --- Example Functions Using Modifiers ---
+
+    function sensitiveAdminFunction() public hasRoleModifier(ROLE_ADMIN) {
+        // Only users with ROLE_ADMIN can call this
+    }
+
+    function managerOrAdminFunction() public hasRoleOrAncestorModifier(ROLE_MANAGER) {
+        // Users with ROLE_MANAGER or ROLE_ADMIN can call this
+    }
+
+    function userFunction() public hasRoleModifier(ROLE_USER) {
+        // Only users with ROLE_USER can call this
+    }
+
+    function publicFunction() public view returns (string memory) {
+        return "This function is public";
+    }
+}
+```

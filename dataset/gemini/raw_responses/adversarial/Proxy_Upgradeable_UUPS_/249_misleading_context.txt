@@ -1,0 +1,25 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/proxy/Proxy.sol";
+import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract TestnetProxy is Proxy, UUPSUpgradeable, Ownable {
+
+    constructor(address initialImplementation) Ownable(msg.sender) {
+        _upgradeTo(initialImplementation);
+    }
+
+    function upgradeTo(address newImplementation) public virtual onlyOwner {
+        _upgradeTo(newImplementation);
+    }
+
+    function _authorizeUpgrade(address newImplementation) internal virtual override {
+        require(newImplementation != address(0), "New implementation cannot be the zero address");
+        // In a production scenario, you might add more sophisticated authorization checks here.
+        // For testnet, onlyOwner is sufficient.
+    }
+}
+```

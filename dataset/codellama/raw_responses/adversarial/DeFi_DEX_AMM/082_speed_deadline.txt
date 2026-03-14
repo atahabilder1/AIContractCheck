@@ -1,0 +1,62 @@
+
+SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+contract DeFiDEX {
+
+  address public owner;
+  address public token;
+  address public WETH;
+  uint public totalLiquidity;
+  uint public totalShares;
+  mapping(address => uint) public shares;
+
+  constructor() public {
+    owner = msg.sender;
+    token = address(0);
+    WETH = address(0);
+    totalLiquidity = 0;
+    totalShares = 0;
+  }
+
+  function addLiquidity(uint amount) public {
+    require(amount > 0, "Invalid amount");
+    require(msg.sender == owner, "Only owner can add liquidity");
+    require(token.balanceOf(msg.sender) >= amount, "Insufficient token balance");
+
+    totalLiquidity += amount;
+    shares[msg.sender] += amount;
+    totalShares += amount;
+
+    emit LiquidityAdded(msg.sender, amount);
+  }
+
+  function removeLiquidity(uint amount) public {
+    require(amount > 0, "Invalid amount");
+    require(msg.sender == owner, "Only owner can remove liquidity");
+    require(shares[msg.sender] >= amount, "Insufficient shares");
+
+    totalLiquidity -= amount;
+    shares[msg.sender] -= amount;
+    totalShares -= amount;
+
+    emit LiquidityRemoved(msg.sender, amount);
+  }
+
+  function swap(address input, address output, uint amount) public {
+    require(amount > 0, "Invalid amount");
+    require(msg.sender == owner, "Only owner can swap");
+    require(input.balanceOf(msg.sender) >= amount, "Insufficient input balance");
+    require(output.balanceOf(msg.sender) >= amount, "Insufficient output balance");
+
+    input.transferFrom(msg.sender, address(this), amount);
+    output.transferFrom(address(this), msg.sender, amount);
+
+    emit Swapped(msg.sender, input, output, amount);
+  }
+
+  event LiquidityAdded(address indexed sender, uint amount);
+  event LiquidityRemoved(address indexed sender, uint amount);
+  event Swapped(address indexed sender, address indexed input, address indexed output, uint amount);
+}

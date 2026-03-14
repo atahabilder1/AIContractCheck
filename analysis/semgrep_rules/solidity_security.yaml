@@ -1,0 +1,91 @@
+rules:
+- id: reentrancy-state-after-call
+  patterns:
+  - pattern: "(...).call{value: ...}(...); \n ... \n $VAR = ...;"
+  message: 'Potential reentrancy: state change after external call'
+  languages:
+  - solidity
+  severity: ERROR
+  metadata:
+    cwe: CWE-841
+    category: reentrancy
+- id: tx-origin-auth
+  pattern: require(tx.origin == ...)
+  message: tx.origin used for authentication (use msg.sender instead)
+  languages:
+  - solidity
+  severity: ERROR
+  metadata:
+    cwe: CWE-477
+    category: authentication
+- id: unchecked-call-return
+  patterns:
+  - pattern: address($ADDR).call(...);
+  - pattern: $ADDR.call{...}(...);
+  pattern-not: (bool $SUCCESS, ...) = ...
+  message: Unchecked return value of low-level call
+  languages:
+  - solidity
+  severity: WARNING
+  metadata:
+    cwe: CWE-252
+    category: unchecked-return
+- id: selfdestruct-usage
+  pattern: selfdestruct(...)
+  message: Contract uses selfdestruct which can be dangerous
+  languages:
+  - solidity
+  severity: WARNING
+  metadata:
+    cwe: CWE-284
+    category: dangerous-function
+- id: delegatecall-usage
+  pattern: delegatecall(...)
+  message: delegatecall usage detected - ensure input is trusted
+  languages:
+  - solidity
+  severity: WARNING
+  metadata:
+    cwe: CWE-829
+    category: dangerous-call
+- id: block-timestamp-dependence
+  pattern: block.timestamp
+  message: Dependence on block.timestamp which can be manipulated by miners
+  languages:
+  - solidity
+  severity: WARNING
+  metadata:
+    cwe: CWE-829
+    category: timestamp
+- id: unprotected-ether-withdrawal
+  patterns:
+  - pattern: function withdraw(...) $VISIBILITY { ... $ADDR.transfer(...); ... }
+  pattern-not-inside: function withdraw(...) $VISIBILITY { ... require(...); ... }
+  message: Potential unprotected ether withdrawal
+  languages:
+  - solidity
+  severity: ERROR
+  metadata:
+    cwe: CWE-284
+    category: access-control
+- id: weak-randomness
+  patterns:
+  - pattern: keccak256(abi.encodePacked(block.timestamp, ...))
+  - pattern: keccak256(abi.encodePacked(..., block.difficulty, ...))
+  - pattern: keccak256(abi.encodePacked(..., block.number, ...))
+  message: Weak randomness source - block variables are predictable
+  languages:
+  - solidity
+  severity: WARNING
+  metadata:
+    cwe: CWE-330
+    category: randomness
+- id: empty-modifier
+  pattern: modifier $NAME() { _; }
+  message: Empty modifier - may be a phantom guard pattern
+  languages:
+  - solidity
+  severity: WARNING
+  metadata:
+    cwe: CWE-841
+    category: phantom-guard

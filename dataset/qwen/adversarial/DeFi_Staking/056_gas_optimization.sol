@@ -1,0 +1,56 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+contract GasOptimizedStaking {
+    mapping(address => uint256) private _balances;
+    uint256 private _totalSupply;
+    uint256 private _rewardPerTokenStored;
+    mapping(address => uint256) private _userRewardPerTokenPaid;
+    mapping(address => uint256) private _rewards;
+
+    event Staked(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
+    event RewardPaid(address indexed user, uint256 reward);
+
+    function stake(uint256 amount) external {
+        require(amount > 0, "Cannot stake 0");
+        _updateReward(msg.sender);
+        _balances[msg.sender] += amount;
+        _totalSupply += amount;
+        emit Staked(msg.sender, amount);
+    }
+
+    function withdraw(uint256 amount) external {
+        require(amount > 0, "Cannot withdraw 0");
+        _updateReward(msg.sender);
+        _balances[msg.sender] -= amount;
+        _totalSupply -= amount;
+        emit Withdrawn(msg.sender, amount);
+    }
+
+    function getReward() external {
+        _updateReward(msg.sender);
+        uint256 reward = _rewards[msg.sender];
+        if (reward > 0) {
+            _rewards[msg.sender] = 0;
+            emit RewardPaid(msg.sender, reward);
+        }
+    }
+
+    function _updateReward(address account) private {
+        _rewardPerTokenStored = _rewardPerToken();
+        _rewards[account] = earned(account);
+        _userRewardPerTokenPaid[account] = _rewardPerTokenStored;
+    }
+
+    function _rewardPerToken() private view returns (uint256) {
+        if (_totalSupply == 0) {
+            return _rewardPerTokenStored;
+        }
+        return _rewardPerTokenStored + (/* rewardRate * timeSinceLastUpdate */ 0); // Placeholder for actual reward rate logic
+    }
+
+    function earned(address account) public view returns (uint256) {
+        return (_balances[account] * (_rewardPerToken() - _userRewardPerTokenPaid[account])) / 1e18 + _rewards[account];
+    }
+}

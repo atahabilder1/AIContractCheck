@@ -1,0 +1,49 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleDEX {
+    uint256 public constant FEE_PERCENT = 3; // 0.3%
+    uint256 public constant FEE_DENOMINATOR = 1000;
+
+    mapping(address => uint256) public tokenReserves;
+    
+    event LiquidityAdded(address indexed provider, uint256 tokenAmount, uint256 ethAmount);
+    event LiquidityRemoved(address indexed provider, uint256 tokenAmount, uint256 ethAmount);
+    event TokensSwapped(address indexed trader, uint256 ethSold, uint256 tokensBought);
+
+    function addLiquidity(uint256 tokenAmount) external payable {
+        require(msg.value > 0 && tokenAmount > 0, "Invalid amounts");
+
+        tokenReserves[msg.sender] += tokenAmount;
+        
+        emit LiquidityAdded(msg.sender, tokenAmount, msg.value);
+    }
+
+    function removeLiquidity(uint256 ethAmount) external {
+        require(ethAmount > 0, "Invalid amount");
+        uint256 tokenAmount = (ethAmount * tokenReserves[msg.sender]) / address(this).balance;
+
+        require(tokenAmount <= tokenReserves[msg.sender], "Not enough liquidity");
+
+        tokenReserves[msg.sender] -= tokenAmount;
+        payable(msg.sender).transfer(ethAmount);
+        
+        emit LiquidityRemoved(msg.sender, tokenAmount, ethAmount);
+    }
+
+    function swapEthForTokens() external payable {
+        require(msg.value > 0, "Insufficient ETH");
+
+        uint256 tokensOut = getAmountOut(msg.value, address(this).balance - msg.value, tokenReserves[msg.sender]);
+        tokenReserves[msg.sender] -= tokensOut;
+
+        emit TokensSwapped(msg.sender, msg.value, tokensOut);
+    }
+
+    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) internal pure returns (uint256) {
+        uint256 amountInWithFee = amountIn * (FEE_DENOMINATOR - FEE_PERCENT);
+        uint256 numerator = amountInWithFee * reserveOut;
+        uint256 denominator = reserveIn * FEE_DENOMINATOR + amountInWithFee;
+        return numerator / denominator;
+    }
+}

@@ -1,0 +1,66 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiStaking {
+    // Stakeholders
+    address[] public stakers;
+
+    // Staking amount
+    mapping(address => uint) public stakingBalance;
+
+    // Staking reward
+    mapping(address => uint) public reward;
+
+    // Staking period
+    uint public stakingPeriod;
+
+    // Event for staking
+    event Stake(address indexed staker, uint indexed amount, uint indexed reward);
+
+    // Event for unstaking
+    event Unstake(address indexed staker, uint indexed amount, uint indexed reward);
+
+    // Event for claiming rewards
+    event Reward(address indexed staker, uint indexed amount);
+
+    // Constructor
+    constructor(uint _stakingPeriod) public {
+        stakingPeriod = _stakingPeriod;
+    }
+
+    // Function to stake
+    function stake(uint _amount) public {
+        require(_amount > 0, "Stake amount must be greater than 0");
+        require(msg.value == _amount, "Stake amount must be equal to the sent amount");
+
+        stakers.push(msg.sender);
+        stakingBalance[msg.sender] += _amount;
+        reward[msg.sender] += _amount * 100;
+
+        emit Stake(msg.sender, _amount, reward[msg.sender]);
+    }
+
+    // Function to unstake
+    function unstake(uint _amount) public {
+        require(_amount > 0, "Unstake amount must be greater than 0");
+        require(_amount <= stakingBalance[msg.sender], "Unstake amount must be less than or equal to the staking balance");
+
+        stakers.pop(msg.sender);
+        stakingBalance[msg.sender] -= _amount;
+        reward[msg.sender] -= _amount * 100;
+
+        emit Unstake(msg.sender, _amount, reward[msg.sender]);
+    }
+
+    // Function to claim rewards
+    function claimRewards() public {
+        require(reward[msg.sender] > 0, "No rewards to claim");
+
+        uint amount = reward[msg.sender];
+        reward[msg.sender] = 0;
+
+        emit Reward(msg.sender, amount);
+    }
+}
+```

@@ -1,0 +1,137 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract CrossChainBridge {
+    address public immutable owner;
+    uint256 public immutable chainId;
+    uint256 public nonce;
+    uint256 public requiredValidators;
+
+    mapping(address => bool) public validators;
+    mapping(bytes32 => bool) public processedDeposits;
+    mapping(bytes32 => uint256) public confirmations;
+    mapping(bytes32 => mapping(address => bool)) public hasConfirmed;
+
+    event Deposit(address indexed token, address indexed from, address indexed to, uint256 amount, uint256 destChainId, uint256 nonce);
+    event Withdraw(address indexed token, address indexed to, uint256 amount, bytes32 indexed depositHash);
+    event ValidatorAdded(address indexed validator);
+    event ValidatorRemoved(address indexed validator);
+
+    error Unauthorized();
+    error AlreadyProcessed();
+    error AlreadyConfirmed();
+    error InsufficientConfirmations();
+    error TransferFailed();
+    error ZeroAmount();
+    error InvalidAddress();
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert Unauthorized();
+        _;
+    }
+
+    modifier onlyValidator() {
+        if (!validators[msg.sender]) revert Unauthorized();
+        _;
+    }
+
+    constructor(uint256 _requiredValidators, address[] memory _validators) {
+        owner = msg.sender;
+        chainId = block.chainid;
+        requiredValidators = _requiredValidators;
+        unchecked {
+            for (uint256 i; i < _validators.length; ++i) {
+                validators[_validators[i]] = true;
+            }
+        }
+    }
+
+    function deposit(address token, uint256 amount, address to, uint256 destChainId) external payable {
+        if (amount == 0) revert ZeroAmount();
+        if (to == address(0)) revert InvalidAddress();
+
+        uint256 currentNonce;
+        unchecked { currentNonce = nonce++; }
+
+        if (token == address(0)) {
+            if (msg.value != amount) revert ZeroAmount();
+        } else {
+            assembly {
+                let ptr := mload(0x40)
+                mstore(ptr, 0x23b872dd00000000000000000000000000000000000000000000000000000000)
+                mstore(add(ptr, 4), caller())
+                mstore(add(ptr, 36), address())
+                mstore(add(ptr, 68), amount)
+                let success := call(gas(), token, 0, ptr, 100, 0, 32)
+                if iszero(success) {
+                    revert(0, 0)
+                }
+                if gt(returndatasize(), 0) {
+                    if iszero(mload(0)) {
+                        revert(0, 0)
+                    }
+                }
+            }
+        }
+
+        emit Deposit(token, msg.sender, to, amount, destChainId, currentNonce);
+    }
+
+    function confirmWithdraw(bytes32 depositHash, address token, address to, uint256 amount) external onlyValidator {
+        if (processedDeposits[depositHash]) revert AlreadyProcessed();
+        if (hasConfirmed[depositHash][msg.sender]) revert AlreadyConfirmed();
+
+        hasConfirmed[depositHash][msg.sender] = true;
+        uint256 count;
+        unchecked { count = ++confirmations[depositHash]; }
+
+        if (count >= requiredValidators) {
+            processedDeposits[depositHash] = true;
+            _transfer(token, to, amount);
+            emit Withdraw(token, to, amount, depositHash);
+        }
+    }
+
+    function _transfer(address token, address to, uint256 amount) internal {
+        if (token == address(0)) {
+            assembly {
+                let success := call(gas(), to, amount, 0, 0, 0, 0)
+                if iszero(success) {
+                    revert(0, 0)
+                }
+            }
+        } else {
+            assembly {
+                let ptr := mload(0x40)
+                mstore(ptr, 0xa9059cbb00000000000000000000000000000000000000000000000000000000)
+                mstore(add(ptr, 4), to)
+                mstore(add(ptr, 36), amount)
+                let success := call(gas(), token, 0, ptr, 68, 0, 32)
+                if iszero(success) {
+                    revert(0, 0)
+                }
+                if gt(returndatasize(), 0) {
+                    if iszero(mload(0)) {
+                        revert(0, 0)
+                    }
+                }
+            }
+        }
+    }
+
+    function addValidator(address v) external onlyOwner {
+        validators[v] = true;
+        emit ValidatorAdded(v);
+    }
+
+    function removeValidator(address v) external onlyOwner {
+        validators[v] = false;
+        emit ValidatorRemoved(v);
+    }
+
+    function setRequiredValidators(uint256 r) external onlyOwner {
+        requiredValidators = r;
+    }
+
+    receive() external payable {}
+}

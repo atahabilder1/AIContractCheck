@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract UUPSUpgradeable {
+    address private _owner;
+    address private _implementation;
+
+    constructor() public {
+        _owner = msg.sender;
+    }
+
+    function implementation() public view returns (address) {
+        return _implementation;
+    }
+
+    function upgradeTo(address newImplementation) public onlyOwner {
+        _implementation = newImplementation;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == _owner, "Only the owner can call this function");
+        _;
+    }
+}

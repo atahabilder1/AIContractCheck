@@ -1,0 +1,25 @@
+SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    address private _owner;
+    uint256 private _delay;
+
+    constructor(address owner, uint256 delay) public {
+        _owner = owner;
+        _delay = delay;
+    }
+
+    function transfer(address recipient, uint256 amount) public {
+        require(msg.sender == _owner, "Only the owner can transfer");
+        require(amount > 0, "Invalid amount");
+        require(recipient != address(0), "Invalid recipient");
+
+        uint256 delay = _delay + (amount * 1000);
+        uint256 releaseTime = block.timestamp + delay;
+
+        _owner.transfer(amount);
+        _delay = releaseTime;
+    }
+}

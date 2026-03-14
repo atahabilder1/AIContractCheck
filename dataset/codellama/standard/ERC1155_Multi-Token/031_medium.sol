@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "https://github.com/OpenZeppelin/openzeppelin-solidity/contracts/token/ERC1155/ERC1155.sol";
+
+contract MyERC1155 is ERC1155 {
+    mapping(uint256 => uint256) public tokenSupplyCaps;
+    mapping(uint256 => uint256) public tokenRoyalties;
+
+    constructor() public ERC1155("MyERC1155", "M1155") {
+        // Set the token supply caps and royalties
+        tokenSupplyCaps[0] = 1000;
+        tokenRoyalties[0] = 10;
+        tokenSupplyCaps[1] = 500;
+        tokenRoyalties[1] = 5;
+        tokenSupplyCaps[2] = 200;
+        tokenRoyalties[2] = 1;
+    }
+
+    function mintBatch(address to, uint256[] memory ids, uint256[] memory amounts) public {
+        require(ids.length == amounts.length, "Length of ids and amounts must be the same");
+        require(to != address(0), "Cannot mint to the zero address");
+        require(ids.length > 0, "Cannot mint an empty batch");
+        require(amounts.length > 0, "Cannot mint an empty batch");
+
+        for (uint256 i = 0; i < ids.length; i++) {
+            require(amounts[i] > 0, "Amount must be greater than 0");
+            require(ids[i] < tokenSupplyCaps[i], "Token supply cap exceeded");
+            _mint(to, ids[i], amounts[i], "");
+        }
+    }
+
+    function _mint(address to, uint256 id, uint256 amount, bytes memory data) internal {
+        super._mint(to, id, amount, data);
+        tokenSupplyCaps[id] = tokenSupplyCaps[id].add(amount);
+        tokenRoyalties[id] = tokenRoyalties[id].add(amount.mul(10));
+    }
+}

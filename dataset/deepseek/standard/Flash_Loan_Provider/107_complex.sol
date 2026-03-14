@@ -1,0 +1,59 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+interface IFlashLoanProvider {
+    function flashLoan(address[] memory tokens, uint256[] memory amounts) external;
+}
+
+contract FlashLoanProvider is IFlashLoanProvider {
+    using SafeMath for uint256;
+
+    address public owner;
+    uint256 public flashLoanFeePercentage;
+
+    event FlashLoan(address indexed token, uint256 amount, uint256 fee);
+    event Deposit(address indexed token, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    constructor(uint256 _flashLoanFeePercentage) {
+        owner = msg.sender;
+        flashLoanFeePercentage = _flashLoanFeePercentage;
+    }
+
+    function setFlashLoanFeePercentage(uint256 _flashLoanFeePercentage) external onlyOwner {
+        flashLoanFeePercentage = _flashLoanFeePercentage;
+    }
+
+    function flashLoan(address[] memory tokens, uint256[] memory amounts) external override {
+        require(tokens.length == amounts.length, "Tokens and amounts length mismatch");
+        for (uint256 i = 0; i < tokens.length; i++) {
+            address token = tokens[i];
+            uint256 amount = amounts[i];
+            require(IERC20(token).balanceOf(address(this)) >= amount, "Insufficient balance");
+            uint256 fee = amount.mul(flashLoanFeePercentage).div(100);
+            uint256 totalAmount = amount.add(fee);
+            IERC20(token).transfer(msg.sender, totalAmount);
+            emit FlashLoan(token, amount, fee);
+        }
+    }
+
+    function deposit(address token, uint256 amount) external {
+        require(IERC20(token).transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        emit Deposit(token, amount);
+    }
+
+    function withdraw(address token, uint256 amount) external onlyOwner {
+        require(IERC20(token).transfer(msg.sender, amount), "Transfer failed");
+    }
+
+    function getBalance(address token) external view returns (uint256) {
+        return IERC20(token).balanceOf(address(this));
+    }
+}

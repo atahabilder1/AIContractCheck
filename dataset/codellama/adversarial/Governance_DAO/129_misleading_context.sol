@@ -1,0 +1,83 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract GovernanceDAO {
+    // Define the struct for proposals
+    struct Proposal {
+        uint id;
+        address proposer;
+        string description;
+        uint voteCount;
+    }
+
+    // Define the struct for votes
+    struct Vote {
+        uint proposalId;
+        address voter;
+        bool inFavor;
+    }
+
+    // Define the state variables for the contract
+    address public owner;
+    mapping(address => bool) public members;
+    mapping(uint => Proposal) public proposals;
+    mapping(uint => Vote) public votes;
+    uint public proposalCount;
+
+    // Constructor
+    constructor() public {
+        owner = msg.sender;
+    }
+
+    // Modifier to check if the caller is the owner
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can call this function");
+        _;
+    }
+
+    // Modifier to check if the caller is a member
+    modifier onlyMember() {
+        require(members[msg.sender], "Only members can call this function");
+        _;
+    }
+
+    // Function to add a new member
+    function addMember(address _newMember) public onlyOwner {
+        members[_newMember] = true;
+    }
+
+    // Function to remove a member
+    function removeMember(address _member) public onlyOwner {
+        members[_member] = false;
+    }
+
+    // Function to submit a new proposal
+    function submitProposal(string memory _description) public onlyMember {
+        proposalCount++;
+        Proposal memory newProposal = Proposal(proposalCount, msg.sender, _description, 0);
+        proposals[proposalCount] = newProposal;
+    }
+
+    // Function to cast a vote on a proposal
+    function vote(uint _proposalId, bool _inFavor) public onlyMember {
+        require(_proposalId > 0 && _proposalId <= proposalCount, "Invalid proposal ID");
+        Vote memory newVote = Vote(_proposalId, msg.sender, _inFavor);
+        votes[_proposalId] = newVote;
+    }
+
+    // Function to get the vote count for a proposal
+    function getVoteCount(uint _proposalId) public view returns (uint) {
+        require(_proposalId > 0 && _proposalId <= proposalCount, "Invalid proposal ID");
+        return proposals[_proposalId].voteCount;
+    }
+
+    // Function to get the vote details for a proposal
+    function getVoteDetails(uint _proposalId) public view returns (Vote[] memory) {
+        require(_proposalId > 0 && _proposalId <= proposalCount, "Invalid proposal ID");
+        Vote[] memory voteDetails = new Vote[](votes[_proposalId].length);
+        for (uint i = 0; i < votes[_proposalId].length; i++) {
+            voteDetails[i] = votes[_proposalId][i];
+        }
+        return voteDetails;
+    }
+}

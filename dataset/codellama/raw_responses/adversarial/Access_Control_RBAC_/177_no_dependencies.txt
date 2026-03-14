@@ -1,0 +1,42 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract AccessControl {
+    // Define roles
+    enum Role {
+        ADMIN,
+        USER,
+        GUEST
+    }
+
+    // Define permissions
+    enum Permission {
+        READ,
+        WRITE,
+        EXECUTE
+    }
+
+    // Define role-based permissions
+    mapping(Role => Permission[]) permissions;
+
+    // Define user-role assignments
+    mapping(address => Role) userRoles;
+
+    // Define user-permission assignments
+    mapping(address => Permission[]) userPermissions;
+
+    // Define functions to set and check permissions
+    function setRole(address user, Role role) public {
+        userRoles[user] = role;
+    }
+
+    function setPermission(address user, Permission permission) public {
+        userPermissions[user].push(permission);
+    }
+
+    function checkPermission(address user, Permission permission) public view returns (bool) {
+        return userPermissions[user].contains(permission);
+    }
+}
+```

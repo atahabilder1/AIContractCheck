@@ -1,0 +1,52 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IStrategy {
+    function deposit(uint256 amount) external;
+    function withdraw(uint256 amount) external;
+    function balanceOf() external view returns (uint256);
+}
+
+contract YieldVault {
+    IERC20 public immutable token;
+    IStrategy public strategy;
+
+    mapping(address => uint256) public shares;
+    uint256 public totalShares;
+
+    constructor(IERC20 _token, IStrategy _strategy) {
+        token = _token;
+        strategy = _strategy;
+    }
+
+    function deposit(uint256 amount) external {
+        uint256 pool = strategy.balanceOf();
+        token.transferFrom(msg.sender, address(this), amount);
+        token.approve(address(strategy), amount);
+        strategy.deposit(amount);
+
+        uint256 currentBalance = strategy.balanceOf();
+        uint256 mintedShares = (totalShares == 0 || pool == 0) ? amount : (amount * totalShares) / pool;
+        shares[msg.sender] += mintedShares;
+        totalShares += mintedShares;
+    }
+
+    function withdraw(uint256 shareAmount) external {
+        require(shares[msg.sender] >= shareAmount, "Insufficient shares");
+        
+        uint256 pool = strategy.balanceOf();
+        uint256 withdrawAmount = (shareAmount * pool) / totalShares;
+
+        shares[msg.sender] -= shareAmount;
+        totalShares -= shareAmount;
+
+        strategy.withdraw(withdrawAmount);
+        token.transfer(msg.sender, withdrawAmount);
+    }
+
+    function balanceOf(address account) external view returns (uint256) {
+        return (shares[account] * strategy.balanceOf()) / totalShares;
+    }
+}
+```

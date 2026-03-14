@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IMessageReceiver {
+    function receiveMessage(address sender, string memory message) external;
+}
+
+contract CrossChainMessenger {
+    address public immutable sourceChainContract;
+
+    constructor(address _sourceChainContract) {
+        sourceChainContract = _sourceChainContract;
+    }
+
+    function sendMessage(string memory message) public {
+        require(sourceChainContract != address(0), "Source chain contract address must be set");
+        IMessageReceiver(sourceChainContract).receiveMessage(msg.sender, message);
+    }
+}

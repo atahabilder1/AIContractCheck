@@ -1,0 +1,34 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address public payer;
+    address public payee;
+    address public escrowAgent;
+    uint public amount;
+
+    constructor(address _payer, address _payee, uint _amount) {
+        escrowAgent = msg.sender;
+        payer = _payer;
+        payee = _payee;
+        amount = _amount;
+    }
+
+    function deposit() external payable {
+        require(msg.sender == payer, "Only payer can deposit funds");
+        require(address(this).balance <= amount, "Cannot deposit more than the agreed amount");
+    }
+
+    function release() external {
+        require(msg.sender == escrowAgent, "Only escrow agent can release funds");
+        require(address(this).balance == amount, "Cannot release funds before full deposit");
+        payable(payee).transfer(amount);
+    }
+
+    function refund() external {
+        require(msg.sender == escrowAgent, "Only escrow agent can refund funds");
+        payable(payer).transfer(address(this).balance);
+    }
+}
+```

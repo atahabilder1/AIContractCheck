@@ -1,0 +1,293 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address to, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+}
+
+interface IUniswapV2Pair {
+    function token0() external view returns (address);
+    function token1() external view returns (address);
+    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
+    function totalSupply() external view returns (uint256);
+    function transfer(address to, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+}
+
+interface IUniswapV2Router {
+    function addLiquidity(
+        address tokenA,
+        address tokenB,
+        uint256 amountADesired,
+        uint256 amountBDesired,
+        uint256 amountAMin,
+        uint256 amountBMin,
+        address to,
+        uint256 deadline
+    ) external returns (uint256 amountA, uint256 amountB, uint256 liquidity);
+
+    function removeLiquidity(
+        address tokenA,
+        address tokenB,
+        uint256 liquidity,
+        uint256 amountAMin,
+        uint256 amountBMin,
+        address to,
+        uint256 deadline
+    ) external returns (uint256 amountA, uint256 amountB);
+
+    function swapExactTokensForTokens(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
+}
+
+interface IMasterChef {
+    function deposit(uint256 pid, uint256 amount) external;
+    function withdraw(uint256 pid, uint256 amount) external;
+    function pendingReward(uint256 pid, address user) external view returns (uint256);
+    function userInfo(uint256 pid, address user) external view returns (uint256 amount, uint256 rewardDebt);
+}
+
+contract AutoCompoundingVault {
+    string public name;
+    string public symbol;
+    uint8 public constant decimals = 18;
+    uint256 public totalSupply;
+    mapping(address => uint256) public balanceOf;
+
+    address public owner;
+    address public immutable lpToken;
+    address public immutable token0;
+    address public immutable token1;
+    address public immutable rewardToken;
+    address public immutable router;
+    address public immutable masterChef;
+    uint256 public immutable poolId;
+
+    uint256 public constant HARVEST_FEE_BPS = 30; // 0.3% caller incentive
+    uint256 public constant MANAGEMENT_FEE_BPS = 200; // 2% management fee
+    uint256 public constant BPS = 10000;
+    uint256 public constant SLIPPAGE_BPS = 9500; // 5% max slippage
+
+    uint256 public lastHarvest;
+    uint256 public minHarvestInterval = 1 hours;
+
+    event Deposit(address indexed user, uint256 lpAmount, uint256 shares);
+    event Withdraw(address indexed user, uint256 shares, uint256 lpAmount);
+    event Harvest(address indexed caller, uint256 rewardHarvested, uint256 lpAdded);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "not owner");
+        _;
+    }
+
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        address _lpToken,
+        address _rewardToken,
+        address _router,
+        address _masterChef,
+        uint256 _poolId
+    ) {
+        name = _name;
+        symbol = _symbol;
+        owner = msg.sender;
+        lpToken = _lpToken;
+        rewardToken = _rewardToken;
+        router = _router;
+        masterChef = _masterChef;
+        poolId = _poolId;
+
+        token0 = IUniswapV2Pair(_lpToken).token0();
+        token1 = IUniswapV2Pair(_lpToken).token1();
+
+        IERC20(_lpToken).approve(_masterChef, type(uint256).max);
+        IERC20(_lpToken).approve(_router, type(uint256).max);
+        IERC20(token0).approve(_router, type(uint256).max);
+        IERC20(token1).approve(_router, type(uint256).max);
+        IERC20(_rewardToken).approve(_router, type(uint256).max);
+    }
+
+    function totalLPStaked() public view returns (uint256) {
+        (uint256 staked, ) = IMasterChef(masterChef).userInfo(poolId, address(this));
+        return staked + IERC20(lpToken).balanceOf(address(this));
+    }
+
+    function pricePerShare() public view returns (uint256) {
+        if (totalSupply == 0) return 1e18;
+        return (totalLPStaked() * 1e18) / totalSupply;
+    }
+
+    function deposit(uint256 _amount) external {
+        require(_amount > 0, "zero amount");
+
+        uint256 totalLP = totalLPStaked();
+        uint256 shares;
+
+        IERC20(lpToken).transferFrom(msg.sender, address(this), _amount);
+
+        if (totalSupply == 0) {
+            shares = _amount;
+        } else {
+            shares = (_amount * totalSupply) / totalLP;
+        }
+
+        require(shares > 0, "zero shares");
+        _mint(msg.sender, shares);
+
+        _stakeAll();
+
+        emit Deposit(msg.sender, _amount, shares);
+    }
+
+    function withdraw(uint256 _shares) external {
+        require(_shares > 0, "zero shares");
+        require(balanceOf[msg.sender] >= _shares, "insufficient shares");
+
+        uint256 lpAmount = (_shares * totalLPStaked()) / totalSupply;
+        _burn(msg.sender, _shares);
+
+        uint256 lpBal = IERC20(lpToken).balanceOf(address(this));
+        if (lpBal < lpAmount) {
+            IMasterChef(masterChef).withdraw(poolId, lpAmount - lpBal);
+        }
+
+        IERC20(lpToken).transfer(msg.sender, lpAmount);
+
+        emit Withdraw(msg.sender, _shares, lpAmount);
+    }
+
+    function harvest() external {
+        require(block.timestamp >= lastHarvest + minHarvestInterval, "too soon");
+        lastHarvest = block.timestamp;
+
+        IMasterChef(masterChef).deposit(poolId, 0);
+
+        uint256 rewardBal = IERC20(rewardToken).balanceOf(address(this));
+        if (rewardBal == 0) return;
+
+        uint256 callerFee = (rewardBal * HARVEST_FEE_BPS) / BPS;
+        uint256 mgmtFee = (rewardBal * MANAGEMENT_FEE_BPS) / BPS;
+
+        if (callerFee > 0) {
+            IERC20(rewardToken).transfer(msg.sender, callerFee);
+        }
+        if (mgmtFee > 0) {
+            IERC20(rewardToken).transfer(owner, mgmtFee);
+        }
+
+        uint256 remaining = IERC20(rewardToken).balanceOf(address(this));
+        if (remaining == 0) return;
+
+        uint256 lpAdded = _compoundRewards(remaining);
+
+        _stakeAll();
+
+        emit Harvest(msg.sender, rewardBal, lpAdded);
+    }
+
+    function _compoundRewards(uint256 rewardAmount) internal returns (uint256) {
+        uint256 half = rewardAmount / 2;
+        uint256 otherHalf = rewardAmount - half;
+
+        uint256 token0Before = IERC20(token0).balanceOf(address(this));
+        uint256 token1Before = IERC20(token1).balanceOf(address(this));
+
+        if (rewardToken != token0) {
+            _swap(half, rewardToken, token0);
+        }
+        if (rewardToken != token1) {
+            _swap(otherHalf, rewardToken, token1);
+        }
+
+        uint256 token0Amt = IERC20(token0).balanceOf(address(this)) - token0Before;
+        uint256 token1Amt = IERC20(token1).balanceOf(address(this)) - token1Before;
+
+        if (rewardToken == token0) {
+            token0Amt = half;
+        }
+        if (rewardToken == token1) {
+            token1Amt = otherHalf;
+        }
+
+        if (token0Amt == 0 || token1Amt == 0) return 0;
+
+        (, , uint256 liquidity) = IUniswapV2Router(router).addLiquidity(
+            token0,
+            token1,
+            token0Amt,
+            token1Amt,
+            (token0Amt * SLIPPAGE_BPS) / BPS,
+            (token1Amt * SLIPPAGE_BPS) / BPS,
+            address(this),
+            block.timestamp
+        );
+
+        return liquidity;
+    }
+
+    function _swap(uint256 amountIn, address from, address to) internal {
+        if (amountIn == 0 || from == to) return;
+
+        address[] memory path = new address[](2);
+        path[0] = from;
+        path[1] = to;
+
+        IUniswapV2Router(router).swapExactTokensForTokens(
+            amountIn,
+            0,
+            path,
+            address(this),
+            block.timestamp
+        );
+    }
+
+    function _stakeAll() internal {
+        uint256 lpBal = IERC20(lpToken).balanceOf(address(this));
+        if (lpBal > 0) {
+            IMasterChef(masterChef).deposit(poolId, lpBal);
+        }
+    }
+
+    function _mint(address to, uint256 amount) internal {
+        totalSupply += amount;
+        balanceOf[to] += amount;
+        emit Transfer(address(0), to, amount);
+    }
+
+    function _burn(address from, uint256 amount) internal {
+        balanceOf[from] -= amount;
+        totalSupply -= amount;
+        emit Transfer(from, address(0), amount);
+    }
+
+    function setMinHarvestInterval(uint256 _interval) external onlyOwner {
+        minHarvestInterval = _interval;
+    }
+
+    function recoverToken(address _token) external onlyOwner {
+        require(_token != lpToken, "cannot recover LP");
+        uint256 bal = IERC20(_token).balanceOf(address(this));
+        if (bal > 0) {
+            IERC20(_token).transfer(owner, bal);
+        }
+    }
+
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "zero address");
+        owner = newOwner;
+    }
+}

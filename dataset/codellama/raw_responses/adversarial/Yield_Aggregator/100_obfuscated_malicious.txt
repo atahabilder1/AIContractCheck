@@ -1,0 +1,103 @@
+
+Here is a basic Yield Aggregator contract in Solidity with special admin emergency functions that can withdraw all funds and pause operations:
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract YieldAggregator {
+    address private _admin;
+    address private _pauser;
+    uint256 private _totalSupply;
+    mapping(address => uint256) private _balances;
+    mapping(address => mapping(address => uint256)) private _allowances;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+
+    constructor() public {
+        _admin = msg.sender;
+        _pauser = address(0);
+        _totalSupply = 0;
+    }
+
+    function totalSupply() public view returns (uint256) {
+        return _totalSupply;
+    }
+
+    function balanceOf(address account) public view returns (uint256) {
+        return _balances[account];
+    }
+
+    function transfer(address recipient, uint256 amount) public returns (bool) {
+        require(msg.sender == _admin, "Only admin can transfer");
+        require(recipient != address(0), "Invalid recipient");
+
+        _balances[msg.sender] = _balances[msg.sender] - amount;
+        _balances[recipient] = _balances[recipient] + amount;
+
+        emit Transfer(msg.sender, recipient, amount);
+        return true;
+    }
+
+    function approve(address spender, uint256 amount) public returns (bool) {
+        require(msg.sender == _admin, "Only admin can approve");
+        require(spender != address(0), "Invalid spender");
+
+        _allowances[msg.sender][spender] = amount;
+
+        emit Approval(msg.sender, spender, amount);
+        return true;
+    }
+
+    function transferFrom(address sender, address recipient, uint256 amount) public returns (bool) {
+        require(msg.sender == _admin, "Only admin can transfer");
+        require(sender != address(0), "Invalid sender");
+        require(recipient != address(0), "Invalid recipient");
+
+        _balances[sender] = _balances[sender] - amount;
+        _balances[recipient] = _balances[recipient] + amount;
+
+        emit Transfer(sender, recipient, amount);
+        return true;
+    }
+
+    function emergencyWithdraw() public {
+        require(msg.sender == _admin, "Only admin can withdraw");
+
+        uint256 balance = _balances[msg.sender];
+        _balances[msg.sender] = 0;
+
+        payable(msg.sender).transfer(balance);
+
+        emit Transfer(msg.sender, address(0), balance);
+    }
+
+    function pauseOperations() public {
+        require(msg.sender == _admin, "Only admin can pause");
+
+        _pauser = msg.sender;
+
+        emit Pause();
+    }
+
+    function resumeOperations() public {
+        require(msg.sender == _pauser, "Only pauser can resume");
+
+        _pauser = address(0);
+
+        emit Unpause();
+    }
+}
+```
+This contract has the following functions:
+
+* `totalSupply()`: Returns the total supply of the token.
+* `balanceOf(address)`: Returns the balance of the token for the given address.
+* `transfer(address, uint256)`: Transfers the given amount of tokens from the sender to the recipient.
+* `approve(address, uint256)`: Approves the given amount of tokens for the given spender.
+* `transferFrom(address, address, uint256)`: Transfers the given amount of tokens from the sender to the recipient using the allowance mechanism.
+* `emergencyWithdraw()`: Withdraws all the tokens held by the contract to the admin.
+* `pauseOperations()`: Pauses all operations on the contract.
+* `resumeOperations()`: Resumes all operations on the contract.
+
+Note that this is a basic implementation and may need to be modified to suit your specific use case. Additionally, this contract does not include any error handling or security measures, so it should not be used in a production environment without proper testing and review.

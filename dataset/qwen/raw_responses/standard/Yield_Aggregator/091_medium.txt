@@ -1,0 +1,78 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+interface IYieldStrategy {
+    function invest(uint256 amount) external;
+    function withdraw(uint256 amount) external returns (uint256);
+    function claimRewards() external;
+    function balanceOf() external view returns (uint256);
+}
+
+contract YieldAggregatorVault {
+    IYieldStrategy public strategy;
+    uint256 public totalDeposits;
+    uint256 public depositFeeRate = 100; // 100 basis points = 1%
+    uint256 public withdrawalFeeRate = 50; // 50 basis points = 0.5%
+    address public owner;
+
+    event Deposited(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
+    event FeesCollected(uint256 depositFees, uint256 withdrawalFees);
+    event StrategyUpdated(address indexed newStrategy);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    constructor(IYieldStrategy _strategy) {
+        owner = msg.sender;
+        strategy = _strategy;
+    }
+
+    function deposit(uint256 amount) external {
+        require(amount > 0, "Deposit amount must be greater than 0");
+        uint256 depositFee = (amount * depositFeeRate) / 10000;
+        uint256 netAmount = amount - depositFee;
+        totalDeposits += netAmount;
+        strategy.invest(netAmount);
+        emit Deposited(msg.sender, amount);
+        if (depositFee > 0) {
+            emit FeesCollected(depositFee, 0);
+        }
+    }
+
+    function withdraw(uint256 amount) external {
+        require(amount > 0, "Withdrawal amount must be greater than 0");
+        require(amount <= balanceOf(msg.sender), "Insufficient balance");
+        uint256 withdrawalFee = (amount * withdrawalFeeRate) / 10000;
+        uint256 netAmount = amount - withdrawalFee;
+        totalDeposits -= netAmount;
+        uint256 withdrawnAmount = strategy.withdraw(netAmount);
+        payable(msg.sender).transfer(withdrawnAmount);
+        emit Withdrawn(msg.sender, amount);
+        if (withdrawalFee > 0) {
+            emit FeesCollected(0, withdrawalFee);
+        }
+    }
+
+    function claimRewards() external {
+        strategy.claimRewards();
+    }
+
+    function balanceOf(address user) public view returns (uint256) {
+        uint256 strategyBalance = strategy.balanceOf();
+        return (strategyBalance * totalDeposits) / totalDeposits;
+    }
+
+    function setStrategy(IYieldStrategy _newStrategy) external onlyOwner {
+        strategy = _newStrategy;
+        emit StrategyUpdated(address(_newStrategy));
+    }
+
+    function collectFees() external onlyOwner {
+        // Logic to collect and handle accumulated fees
+    }
+}
+```

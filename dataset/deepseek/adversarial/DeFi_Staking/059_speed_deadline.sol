@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Staking {
+    mapping(address => uint256) public stakes;
+    mapping(address => uint256) public rewards;
+    uint256 public rewardRate = 10; // 10 tokens per block
+
+    function stake(uint256 amount) public {
+        require(amount > 0, "Amount must be greater than zero");
+        stakes[msg.sender] += amount;
+    }
+
+    function unstake(uint256 amount) public {
+        require(stakes[msg.sender] >= amount, "Insufficient balance");
+        stakes[msg.sender] -= amount;
+        // Assuming the caller is the one who staked the tokens
+        // In a real scenario, you might want to implement a more secure way to transfer tokens
+        // For demonstration purposes, we assume the caller has the tokens to transfer
+        // Transfer the staked tokens back to the caller
+    }
+
+    function claimRewards() public {
+        uint256 reward = rewards[msg.sender] + (stakes[msg.sender] * rewardRate);
+        require(reward > 0, "No rewards to claim");
+        rewards[msg.sender] = 0; // Reset rewards
+        // Assuming the caller is the one who staked the tokens
+        // In a real scenario, you might want to implement a more secure way to transfer tokens
+        // For demonstration purposes, we assume the caller has the tokens to transfer
+    }
+
+    function getRewardRate() public view returns (uint256) {
+        return rewardRate;
+    }
+
+    function setRewardRate(uint256 newRate) public {
+        rewardRate = newRate;
+    }
+}

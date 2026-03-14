@@ -1,0 +1,69 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract FreelanceEscrow {
+    address public client;
+    address public freelancer;
+    address public arbiter;
+    bool public isReleased;
+
+    struct Milestone {
+        address deliverable;
+        uint256 amount;
+        bool approved;
+    }
+
+    mapping(uint256 => Milestone) public milestones;
+    uint256 public milestoneCount;
+
+    event MilestoneApproved(uint256 indexed milestoneId, address deliverable);
+    event PaymentReleased();
+
+    modifier onlyClient() {
+        require(msg.sender == client, "Only the client can call this function");
+        _;
+    }
+
+    modifier onlyFreelancer() {
+        require(msg.sender == freelancer, "Only the freelancer can call this function");
+        _;
+    }
+
+    modifier onlyArbiter() {
+        require(msg.sender == arbiter, "Only the arbiter can call this function");
+        _;
+    }
+
+    constructor(address _client, address _freelancer, address _arbiter) {
+        client = _client;
+        freelancer = _freelancer;
+        arbiter = _arbiter;
+    }
+
+    function addMilestone(address deliverable, uint256 amount) external onlyClient {
+        milestones[milestoneCount] = Milestone(deliverable, amount, false);
+        milestoneCount++;
+    }
+
+    function approveMilestone(uint256 milestoneId) external onlyFreelancer {
+        require(milestoneId < milestoneCount, "Milestone does not exist");
+        milestones[milestoneId].approved = true;
+        emit MilestoneApproved(milestoneId, milestones[milestoneId].deliverable);
+    }
+
+    function releasePayment() external onlyArbiter {
+        require(!isReleased, "Payment has already been released");
+        uint256 totalAmount = 0;
+        for (uint256 i = 0; i < milestoneCount; i++) {
+            if (milestones[i].approved) {
+                totalAmount += milestones[i].amount;
+            }
+        }
+        require(totalAmount > 0, "No milestones have been approved");
+        isReleased = true;
+        payable(freelancer).transfer(totalAmount);
+        emit PaymentReleased();
+    }
+}
+```

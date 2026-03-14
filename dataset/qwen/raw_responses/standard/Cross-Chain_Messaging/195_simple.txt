@@ -1,0 +1,24 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainMessenger {
+    event MessageSent(uint256 indexed nonce, address indexed sender, bytes message);
+    event MessageReceived(uint256 indexed nonce, address indexed sender, bytes message);
+
+    mapping(uint256 => bool) public noncesUsed;
+
+    uint256 public nonce;
+
+    function sendMessage(bytes memory message) external {
+        emit MessageSent(nonce, msg.sender, message);
+        nonce++;
+    }
+
+    function receiveMessage(uint256 _nonce, address _sender, bytes memory message) external {
+        require(!noncesUsed[_nonce], "Nonce already used");
+        noncesUsed[_nonce] = true;
+        emit MessageReceived(_nonce, _sender, message);
+    }
+}
+```

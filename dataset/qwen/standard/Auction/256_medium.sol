@@ -1,0 +1,88 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Auction {
+    enum AuctionType { English, Dutch }
+
+    struct AuctionData {
+        uint256 id;
+        address payable seller;
+        uint256 startingPrice;
+        uint256 reservePrice;
+        uint256 currentPrice;
+        uint256 startTime;
+        uint256 endTime;
+        uint256 bidIncrement;
+        AuctionType auctionType;
+        address payable highestBidder;
+        bool ended;
+    }
+
+    mapping(uint256 => AuctionData) public auctions;
+    uint256 public auctionCounter;
+
+    event AuctionCreated(uint256 indexed id, address seller, uint256 startingPrice, uint256 reservePrice, uint256 startTime, uint256 endTime, uint256 bidIncrement, AuctionType auctionType);
+    event BidPlaced(uint256 indexed id, address bidder, uint256 amount);
+    event AuctionEnded(uint256 indexed id, address winner, uint256 amount);
+
+    function createAuction(uint256 _startingPrice, uint256 _reservePrice, uint256 _startTime, uint256 _endTime, uint256 _bidIncrement, AuctionType _auctionType) external {
+        require(_startTime < _endTime, "Start time must be before end time");
+        require(_startingPrice > 0, "Starting price must be greater than zero");
+        require(_reservePrice > 0, "Reserve price must be greater than zero");
+        require(_bidIncrement > 0, "Bid increment must be greater than zero");
+
+        AuctionData storage auction = auctions[auctionCounter];
+        auction.id = auctionCounter;
+        auction.seller = payable(msg.sender);
+        auction.startingPrice = _startingPrice;
+        auction.reservePrice = _reservePrice;
+        auction.currentPrice = _auctionType == AuctionType.English ? _startingPrice : _startingPrice;
+        auction.startTime = _startTime;
+        auction.endTime = _endTime;
+        auction.bidIncrement = _bidIncrement;
+        auction.auctionType = _auctionType;
+
+        emit AuctionCreated(auction.id, auction.seller, auction.startingPrice, auction.reservePrice, auction.startTime, auction.endTime, auction.bidIncrement, auction.auctionType);
+
+        auctionCounter++;
+    }
+
+    function placeBid(uint256 _auctionId) external payable {
+        AuctionData storage auction = auctions[_auctionId];
+        require(!auction.ended, "Auction has already ended");
+        require(block.timestamp >= auction.startTime && block.timestamp <= auction.endTime, "Auction is not active");
+        require(msg.value > 0, "Bid value must be greater than zero");
+
+        if (auction.auctionType == AuctionType.English) {
+            require(msg.value > auction.currentPrice + auction.bidIncrement, "Bid must be higher than current price plus bid increment");
+            if (auction.highestBidder != address(0)) {
+                payable(auction.highestBidder).transfer(auction.currentPrice);
+            }
+            auction.currentPrice = msg.value;
+        } else if (auction.auctionType == AuctionType.Dutch) {
+            require(msg.value >= auction.currentPrice, "Bid must be at least current price");
+            auction.currentPrice -= auction.bidIncrement;
+        }
+
+        auction.highestBidder = payable(msg.sender);
+        emit BidPlaced(_auctionId, msg.sender, msg.value);
+    }
+
+    function endAuction(uint256 _auctionId) external {
+        AuctionData storage auction = auctions[_auctionId];
+        require(block.timestamp > auction.endTime, "Auction has not ended yet");
+        require(!auction.ended, "Auction has already been ended");
+
+        if (auction.currentPrice >= auction.reservePrice && auction.highestBidder != address(0)) {
+            auction.seller.transfer(auction.currentPrice);
+            emit AuctionEnded(_auctionId, auction.highestBidder, auction.currentPrice);
+        } else {
+            if (auction.highestBidder != address(0)) {
+                payable(auction.highestBidder).transfer(auction.currentPrice);
+            }
+            emit AuctionEnded(_auctionId, address(0), 0);
+        }
+
+        auction.ended = true;
+    }
+}

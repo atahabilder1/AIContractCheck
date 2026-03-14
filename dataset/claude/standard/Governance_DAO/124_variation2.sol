@@ -1,0 +1,209 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract MultiSigGovernance {
+    struct Proposal {
+        uint256 id;
+        address proposer;
+        string description;
+        bytes callData;
+        address target;
+        uint256 value;
+        uint256 tokenVotesFor;
+        uint256 tokenVotesAgainst;
+        uint256 councilApprovals;
+        uint256 councilRejections;
+        uint256 createdAt;
+        uint256 votingDeadline;
+        bool executed;
+        bool canceled;
+    }
+
+    address public admin;
+    uint256 public proposalCount;
+    uint256 public votingPeriod = 3 days;
+    uint256 public tokenVoteQuorum = 1000e18;
+    uint256 public councilQuorum = 3;
+    uint256 public totalCouncilMembers;
+
+    mapping(uint256 => Proposal) public proposals;
+    mapping(address => uint256) public tokenBalances;
+    mapping(address => bool) public isCouncilMember;
+    mapping(uint256 => mapping(address => bool)) public hasVotedToken;
+    mapping(uint256 => mapping(address => bool)) public hasVotedCouncil;
+
+    event ProposalCreated(uint256 indexed id, address indexed proposer, string description);
+    event TokenVoteCast(uint256 indexed id, address indexed voter, bool support, uint256 weight);
+    event CouncilVoteCast(uint256 indexed id, address indexed member, bool support);
+    event ProposalExecuted(uint256 indexed id);
+    event ProposalCanceled(uint256 indexed id);
+    event CouncilMemberAdded(address indexed member);
+    event CouncilMemberRemoved(address indexed member);
+    event TokensDeposited(address indexed holder, uint256 amount);
+    event TokensWithdrawn(address indexed holder, uint256 amount);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not admin");
+        _;
+    }
+
+    modifier onlyCouncil() {
+        require(isCouncilMember[msg.sender], "Not council member");
+        _;
+    }
+
+    constructor(address[] memory initialCouncil) {
+        admin = msg.sender;
+        for (uint256 i = 0; i < initialCouncil.length; i++) {
+            require(initialCouncil[i] != address(0), "Zero address");
+            require(!isCouncilMember[initialCouncil[i]], "Duplicate council member");
+            isCouncilMember[initialCouncil[i]] = true;
+            totalCouncilMembers++;
+            emit CouncilMemberAdded(initialCouncil[i]);
+        }
+    }
+
+    function depositTokens() external payable {
+        require(msg.value > 0, "No value");
+        tokenBalances[msg.sender] += msg.value;
+        emit TokensDeposited(msg.sender, msg.value);
+    }
+
+    function withdrawTokens(uint256 amount) external {
+        require(tokenBalances[msg.sender] >= amount, "Insufficient balance");
+        tokenBalances[msg.sender] -= amount;
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+        emit TokensWithdrawn(msg.sender, amount);
+    }
+
+    function addCouncilMember(address member) external onlyAdmin {
+        require(member != address(0), "Zero address");
+        require(!isCouncilMember[member], "Already council member");
+        isCouncilMember[member] = true;
+        totalCouncilMembers++;
+        emit CouncilMemberAdded(member);
+    }
+
+    function removeCouncilMember(address member) external onlyAdmin {
+        require(isCouncilMember[member], "Not council member");
+        isCouncilMember[member] = false;
+        totalCouncilMembers--;
+        emit CouncilMemberRemoved(member);
+    }
+
+    function createProposal(
+        string calldata description,
+        address target,
+        uint256 value,
+        bytes calldata callData
+    ) external returns (uint256) {
+        require(tokenBalances[msg.sender] > 0 || isCouncilMember[msg.sender], "No voting power");
+
+        uint256 id = proposalCount++;
+        Proposal storage p = proposals[id];
+        p.id = id;
+        p.proposer = msg.sender;
+        p.description = description;
+        p.target = target;
+        p.value = value;
+        p.callData = callData;
+        p.createdAt = block.timestamp;
+        p.votingDeadline = block.timestamp + votingPeriod;
+
+        emit ProposalCreated(id, msg.sender, description);
+        return id;
+    }
+
+    function castTokenVote(uint256 proposalId, bool support) external {
+        Proposal storage p = proposals[proposalId];
+        require(block.timestamp <= p.votingDeadline, "Voting ended");
+        require(!p.canceled, "Proposal canceled");
+        require(!hasVotedToken[proposalId][msg.sender], "Already voted");
+        require(tokenBalances[msg.sender] > 0, "No tokens");
+
+        hasVotedToken[proposalId][msg.sender] = true;
+        uint256 weight = tokenBalances[msg.sender];
+
+        if (support) {
+            p.tokenVotesFor += weight;
+        } else {
+            p.tokenVotesAgainst += weight;
+        }
+
+        emit TokenVoteCast(proposalId, msg.sender, support, weight);
+    }
+
+    function castCouncilVote(uint256 proposalId, bool support) external onlyCouncil {
+        Proposal storage p = proposals[proposalId];
+        require(block.timestamp <= p.votingDeadline, "Voting ended");
+        require(!p.canceled, "Proposal canceled");
+        require(!hasVotedCouncil[proposalId][msg.sender], "Already voted");
+
+        hasVotedCouncil[proposalId][msg.sender] = true;
+
+        if (support) {
+            p.councilApprovals++;
+        } else {
+            p.councilRejections++;
+        }
+
+        emit CouncilVoteCast(proposalId, msg.sender, support);
+    }
+
+    function executeProposal(uint256 proposalId) external {
+        Proposal storage p = proposals[proposalId];
+        require(block.timestamp > p.votingDeadline, "Voting not ended");
+        require(!p.executed, "Already executed");
+        require(!p.canceled, "Proposal canceled");
+        require(p.tokenVotesFor > p.tokenVotesAgainst, "Token vote failed");
+        require(p.tokenVotesFor >= tokenVoteQuorum, "Token quorum not met");
+        require(p.councilApprovals >= councilQuorum, "Council quorum not met");
+        require(p.councilApprovals > p.councilRejections, "Council rejected");
+
+        p.executed = true;
+
+        if (p.target != address(0)) {
+            (bool success, ) = p.target.call{value: p.value}(p.callData);
+            require(success, "Execution failed");
+        }
+
+        emit ProposalExecuted(proposalId);
+    }
+
+    function cancelProposal(uint256 proposalId) external {
+        Proposal storage p = proposals[proposalId];
+        require(msg.sender == p.proposer || msg.sender == admin, "Not authorized");
+        require(!p.executed, "Already executed");
+        require(!p.canceled, "Already canceled");
+
+        p.canceled = true;
+        emit ProposalCanceled(proposalId);
+    }
+
+    function setVotingPeriod(uint256 newPeriod) external onlyAdmin {
+        require(newPeriod >= 1 days && newPeriod <= 30 days, "Invalid period");
+        votingPeriod = newPeriod;
+    }
+
+    function setTokenVoteQuorum(uint256 newQuorum) external onlyAdmin {
+        tokenVoteQuorum = newQuorum;
+    }
+
+    function setCouncilQuorum(uint256 newQuorum) external onlyAdmin {
+        require(newQuorum > 0 && newQuorum <= totalCouncilMembers, "Invalid quorum");
+        councilQuorum = newQuorum;
+    }
+
+    function getProposal(uint256 proposalId) external view returns (Proposal memory) {
+        return proposals[proposalId];
+    }
+
+    function isProposalPassing(uint256 proposalId) external view returns (bool tokenPass, bool councilPass) {
+        Proposal storage p = proposals[proposalId];
+        tokenPass = p.tokenVotesFor > p.tokenVotesAgainst && p.tokenVotesFor >= tokenVoteQuorum;
+        councilPass = p.councilApprovals >= councilQuorum && p.councilApprovals > p.councilRejections;
+    }
+
+    receive() external payable {}
+}

@@ -1,0 +1,28 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Capped.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract CappedPermitToken is ERC20, ERC20Capped, ERC20Permit, Ownable {
+    uint256 private constant MAX_SUPPLY = 1_000_000_000 * 10 ** 18;
+
+    constructor()
+        ERC20("CappedPermitToken", "CPT")
+        ERC20Capped(MAX_SUPPLY)
+        ERC20Permit("CappedPermitToken")
+        Ownable(msg.sender)
+    {
+        _mint(msg.sender, MAX_SUPPLY);
+    }
+
+    function _update(
+        address from,
+        address to,
+        uint256 value
+    ) internal virtual override(ERC20, ERC20Capped) {
+        super._update(from, to, value);
+    }
+}

@@ -1,0 +1,390 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract IsolatedLendingPool is Ownable {
+    using SafeMath for uint256;
+
+    struct Market {
+        IERC20 collateralToken;
+        IERC20 borrowToken;
+        uint256 collateralFactor; // Percentage of collateral value that can be borrowed
+        uint256 liquidationThreshold; // Minimum collateralization ratio before liquidation
+        uint256 liquidationPenalty; // Penalty for liquidating a position
+        uint256 interestRateModel; // Address of the interest rate model for this market
+    }
+
+    struct Position {
+        uint256 collateralAmount;
+        uint256 borrowAmount;
+    }
+
+    mapping(address => mapping(address => Market)) public markets;
+    mapping(address => mapping(address => Position)) public userPositions;
+    mapping(address => mapping(address => uint256)) public depositedCollateral;
+    mapping(address => mapping(address => uint256)) public borrowedAmount;
+
+    address[] public marketsCollateralTokens;
+    address[] public marketsBorrowTokens;
+
+    event MarketCreated(
+        address indexed collateralToken,
+        address indexed borrowToken,
+        uint256 collateralFactor,
+        uint256 liquidationThreshold,
+        uint256 liquidationPenalty,
+        address interestRateModel
+    );
+    event CollateralDeposited(address indexed user, address indexed token, uint256 amount);
+    event CollateralWithdrawn(address indexed user, address indexed token, uint256 amount);
+    event Borrowed(address indexed user, address indexed token, uint256 amount);
+    event Repaid(address indexed user, address indexed token, uint256 amount);
+    event LiquidationOccurred(
+        address indexed liquidator,
+        address indexed user,
+        address indexed collateralToken,
+        address indexed borrowToken,
+        uint256 collateralSeized,
+        uint256 debtRepaid
+    );
+
+    modifier onlyMarketExists(address collateralToken, address borrowToken) {
+        require(
+            address(markets[collateralToken][borrowToken]) != address(0),
+            "Market does not exist"
+        );
+        _;
+    }
+
+    modifier onlyMarketDoesNotExist(address collateralToken, address borrowToken) {
+        require(
+            address(markets[collateralToken][borrowToken]) == address(0),
+            "Market already exists"
+        );
+        _;
+    }
+
+    function createMarket(
+        address collateralToken,
+        address borrowToken,
+        uint256 collateralFactor,
+        uint256 liquidationThreshold,
+        uint256 liquidationPenalty,
+        address interestRateModel
+    ) external onlyOwner onlyMarketDoesNotExist(collateralToken, borrowToken) {
+        require(collateralFactor <= 10000, "Collateral factor must be <= 10000");
+        require(liquidationThreshold <= 10000, "Liquidation threshold must be <= 10000");
+        require(liquidationPenalty < 10000, "Liquidation penalty must be < 10000");
+        require(interestRateModel != address(0), "Invalid interest rate model address");
+
+        markets[collateralToken][borrowToken] = Market({
+            collateralToken: IERC20(collateralToken),
+            borrowToken: IERC20(borrowToken),
+            collateralFactor: collateralFactor,
+            liquidationThreshold: liquidationThreshold,
+            liquidationPenalty: liquidationPenalty,
+            interestRateModel: interestRateModel
+        });
+
+        // Track unique collateral and borrow tokens for easier iteration if needed
+        bool collateralTokenExists = false;
+        for (uint i = 0; i < marketsCollateralTokens.length; i++) {
+            if (marketsCollateralTokens[i] == collateralToken) {
+                collateralTokenExists = true;
+                break;
+            }
+        }
+        if (!collateralTokenExists) {
+            marketsCollateralTokens.push(collateralToken);
+        }
+
+        bool borrowTokenExists = false;
+        for (uint i = 0; i < marketsBorrowTokens.length; i++) {
+            if (marketsBorrowTokens[i] == borrowToken) {
+                borrowTokenExists = true;
+                break;
+            }
+        }
+        if (!borrowTokenExists) {
+            marketsBorrowTokens.push(borrowToken);
+        }
+
+        emit MarketCreated(
+            collateralToken,
+            borrowToken,
+            collateralFactor,
+            liquidationThreshold,
+            liquidationPenalty,
+            interestRateModel
+        );
+    }
+
+    function depositCollateral(address collateralToken, uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        require(
+            address(markets[collateralToken][address(0)]) != address(0) ||
+            address(markets[address(0)][collateralToken]) != address(0),
+            "No market exists for this collateral token"
+        );
+
+        IERC20(collateralToken).transferFrom(msg.sender, address(this), amount);
+
+        // Determine which market this collateral belongs to.
+        // This requires a way to look up markets based on collateral token.
+        // For simplicity, we'll assume a direct mapping or a lookup function.
+        // In a real-world scenario, you'd likely have a more robust market registry.
+        address borrowToken = address(0);
+        bool foundMarket = false;
+        for (uint i = 0; i < marketsCollateralTokens.length; i++) {
+            for (uint j = 0; j < marketsBorrowTokens.length; j++) {
+                if (address(markets[marketsCollateralTokens[i]][marketsBorrowTokens[j]]) != address(0) &&
+                    markets[marketsCollateralTokens[i]][marketsBorrowTokens[j]].collateralToken == IERC20(collateralToken)) {
+                    borrowToken = marketsBorrowTokens[j];
+                    foundMarket = true;
+                    break;
+                }
+            }
+            if (foundMarket) break;
+        }
+
+        require(foundMarket, "No market found for this collateral token as collateral");
+
+        userPositions[msg.sender][borrowToken].collateralAmount = userPositions[msg.sender][borrowToken]
+            .collateralAmount
+            .add(amount);
+        depositedCollateral[msg.sender][collateralToken] = depositedCollateral[msg.sender][collateralToken].add(amount);
+
+        emit CollateralDeposited(msg.sender, collateralToken, amount);
+    }
+
+    function withdrawCollateral(address collateralToken, uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+
+        // Determine the borrow token associated with this collateral token
+        address borrowToken = address(0);
+        bool foundMarket = false;
+        for (uint i = 0; i < marketsCollateralTokens.length; i++) {
+            for (uint j = 0; j < marketsBorrowTokens.length; j++) {
+                if (address(markets[marketsCollateralTokens[i]][marketsBorrowTokens[j]]) != address(0) &&
+                    markets[marketsCollateralTokens[i]][marketsBorrowTokens[j]].collateralToken == IERC20(collateralToken)) {
+                    borrowToken = marketsBorrowTokens[j];
+                    foundMarket = true;
+                    break;
+                }
+            }
+            if (foundMarket) break;
+        }
+
+        require(foundMarket, "No market found for this collateral token as collateral");
+
+        require(
+            depositedCollateral[msg.sender][collateralToken] >= amount,
+            "Insufficient collateral deposited"
+        );
+
+        uint256 currentBorrowAmount = borrowedAmount[msg.sender][borrowToken];
+        uint256 collateralValue = calculateCollateralValue(msg.sender, collateralToken, borrowToken);
+        uint256 maxWithdrawAmount = calculateMaxWithdrawAmount(
+            msg.sender,
+            collateralToken,
+            borrowToken,
+            currentBorrowAmount
+        );
+
+        require(amount <= maxWithdrawAmount, "Withdrawal would exceed borrowing limits");
+
+        userPositions[msg.sender][borrowToken].collateralAmount = userPositions[msg.sender][borrowToken]
+            .collateralAmount
+            .sub(amount);
+        depositedCollateral[msg.sender][collateralToken] = depositedCollateral[msg.sender][collateralToken].sub(amount);
+
+        IERC20(collateralToken).transfer(msg.sender, amount);
+
+        emit CollateralWithdrawn(msg.sender, collateralToken, amount);
+    }
+
+    function borrow(address borrowToken, uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+
+        // Determine the collateral token associated with this borrow token
+        address collateralToken = address(0);
+        bool foundMarket = false;
+        for (uint i = 0; i < marketsCollateralTokens.length; i++) {
+            for (uint j = 0; j < marketsBorrowTokens.length; j++) {
+                if (address(markets[marketsCollateralTokens[i]][marketsBorrowTokens[j]]) != address(0) &&
+                    markets[marketsCollateralTokens[i]][marketsBorrowTokens[j]].borrowToken == IERC20(borrowToken)) {
+                    collateralToken = marketsCollateralTokens[i];
+                    foundMarket = true;
+                    break;
+                }
+            }
+            if (foundMarket) break;
+        }
+
+        require(foundMarket, "No market found for this borrow token");
+
+        uint256 currentBorrowAmount = borrowedAmount[msg.sender][borrowToken];
+        uint256 collateralValue = calculateCollateralValue(msg.sender, collateralToken, borrowToken);
+        uint256 maxBorrowAmount = calculateMaxBorrowAmount(
+            msg.sender,
+            collateralToken,
+            borrowToken,
+            currentBorrowAmount
+        );
+
+        require(
+            currentBorrowAmount.add(amount) <= maxBorrowAmount,
+            "Borrowing amount exceeds borrowing limits"
+        );
+
+        // TODO: Implement interest accrual logic using the interestRateModel
+        // For now, we assume no interest for simplicity in this core structure.
+
+        borrowedAmount[msg.sender][borrowToken] = borrowedAmount[msg.sender][borrowToken].add(amount);
+        userPositions[msg.sender][borrowToken].borrowAmount = userPositions[msg.sender][borrowToken]
+            .borrowAmount
+            .add(amount);
+
+        IERC20(borrowToken).transfer(msg.sender, amount);
+
+        emit Borrowed(msg.sender, borrowToken, amount);
+    }
+
+    function repay(address borrowToken, uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+
+        // Determine the collateral token associated with this borrow token
+        address collateralToken = address(0);
+        bool foundMarket = false;
+        for (uint i = 0; i < marketsCollateralTokens.length; i++) {
+            for (uint j = 0; j < marketsBorrowTokens.length; j++) {
+                if (address(markets[marketsCollateralTokens[i]][marketsBorrowTokens[j]]) != address(0) &&
+                    markets[marketsCollateralTokens[i]][marketsBorrowTokens[j]].borrowToken == IERC20(borrowToken)) {
+                    collateralToken = marketsCollateralTokens[i];
+                    foundMarket = true;
+                    break;
+                }
+            }
+            if (foundMarket) break;
+        }
+
+        require(foundMarket, "No market found for this borrow token");
+
+        uint256 currentBorrowAmount = borrowedAmount[msg.sender][borrowToken];
+        uint256 amountToRepay = amount < currentBorrowAmount ? amount : currentBorrowAmount;
+
+        IERC20(borrowToken).transferFrom(msg.sender, address(this), amountToRepay);
+
+        borrowedAmount[msg.sender][borrowToken] = borrowedAmount[msg.sender][borrowToken].sub(amountToRepay);
+        userPositions[msg.sender][borrowToken].borrowAmount = userPositions[msg.sender][borrowToken]
+            .borrowAmount
+            .sub(amountToRepay);
+
+        emit Repaid(msg.sender, borrowToken, amountToRepay);
+    }
+
+    function liquidate(
+        address user,
+        address collateralToken,
+        address borrowToken
+    ) external {
+        require(
+            address(markets[collateralToken][borrowToken]) != address(0),
+            "Market does not exist"
+        );
+
+        uint256 currentBorrowAmount = borrowedAmount[user][borrowToken];
+        require(currentBorrowAmount > 0, "User has no outstanding debt in this market");
+
+        uint256 collateralValue = calculateCollateralValue(user, collateralToken, borrowToken);
+        uint256 liquidationThreshold = markets[collateralToken][borrowToken].liquidationThreshold;
+
+        // Check if collateralization ratio is below liquidation threshold
+        // (collateralValue * 10000) / currentBorrowAmount < liquidationThreshold
+        require(
+            collateralValue.mul(10000) < currentBorrowAmount.mul(liquidationThreshold),
+            "User is not underwater or is not eligible for liquidation"
+        );
+
+        uint256 liquidationPenalty = markets[collateralToken][borrowToken].liquidationPenalty;
+        uint256 collateralToLiquidate = collateralValue.mul(liquidationPenalty).div(10000);
+        uint256 borrowAmountToRepay = (currentBorrowAmount * collateralToLiquidate) / collateralValue; // Proportionally repay debt
+
+        // Ensure we don't liquidate more than available collateral or debt
+        collateralToLiquidate = collateralToLiquidate > userPositions[user][borrowToken].collateralAmount
+            ? userPositions[user][borrowToken].collateralAmount
+            : collateralToLiquidate;
+        borrowAmountToRepay = borrowAmountToRepay > currentBorrowAmount
+            ? currentBorrowAmount
+            : borrowAmountToRepay;
+
+        // Transfer collateral from user to liquidator
+        userPositions[user][borrowToken].collateralAmount = userPositions[user][borrowToken]
+            .collateralAmount
+            .sub(collateralToLiquidate);
+        depositedCollateral[user][collateralToken] = depositedCollateral[user][collateralToken].sub(
+            collateralToLiquidate
+        );
+        IERC20(collateralToken).transfer(msg.sender, collateralToLiquidate);
+
+        // Repay the debt from the pool's perspective (user pays back to the pool)
+        borrowedAmount[user][borrowToken] = borrowedAmount[user][borrowToken].sub(borrowAmountToRepay);
+        userPositions[user][borrowToken].borrowAmount = userPositions[user][borrowToken].borrowAmount.sub(
+            borrowAmountToRepay
+        );
+
+        // The liquidator pays back the debt to the pool.
+        // In a more complex system, the liquidator would pay the pool, and the pool would burn the debt.
+        // For simplicity, we assume the liquidator effectively repays the debt to the pool.
+        // The actual token transfer from liquidator to pool would be handled by a separate repay function call or mechanism.
+
+        emit LiquidationOccurred(
+            msg.sender,
+            user,
+            collateralToken,
+            borrowToken,
+            collateralToLiquidate,
+            borrowAmountToRepay
+        );
+    }
+
+    function calculateCollateralValue(
+        address user,
+        address collateralToken,
+        address borrowToken
+    ) internal view returns (uint256) {
+        // TODO: Implement token price oracle integration
+        // This function should return the value of collateral in terms of the borrow token's value.
+        // For now, we assume a 1:1 ratio for simplicity.
+        uint256 collateralAmount = userPositions[user][borrowToken].collateralAmount;
+        if (collateralAmount == 0) return 0;
+
+        // Placeholder for price oracle. In a real system, this would fetch prices.
+        // For example: uint256 collateralPriceInBorrowToken = IOracle(priceOracle).getPrice(collateralToken, borrowToken);
+        uint256 collateralPriceInBorrowToken = 1e18; // Assume 1 collateral token = 1e18 borrow token units
+        uint256 borrowTokenDecimals = IERC20(borrowToken).decimals();
+
+        return collateralAmount.mul(collateralPriceInBorrowToken).div(10**borrowTokenDecimals);
+    }
+
+    function calculateBorrowingPower(
+        address user,
+        address collateralToken,
+        address borrowToken
+    ) internal view returns (uint256) {
+        uint256 collateralValue = calculateCollateralValue(user, collateralToken, borrowToken);
+        uint256 collateralFactor = markets[collateralToken][borrowToken].collateralFactor;
+        // Borrowing power is limited by collateral factor.
+        // (collateralValue * collateralFactor) / 10000
+        return collateralValue.mul(collateralFactor).div(10000);
+    }
+
+    function calculateMaxWithdrawAmount(
+        address user,
+        address collateralToken,
+        address borrowToken,
+        uint256 currentBorrowAmount

@@ -1,0 +1,144 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+interface IERC20 {
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
+contract GasOptimizedAMM {
+    IERC20 public immutable tokenA;
+    IERC20 public immutable tokenB;
+
+    uint256 public reserveA;
+    uint256 public reserveB;
+
+    uint256 constant FEE_DENOMINATOR = 1000;
+    uint256 public feeNumerator = 3; // 0.3% fee
+
+    event Swap(address indexed sender, uint256 amountAIn, uint256 amountBIn, uint256 amountAOut, uint256 amountBOut, address indexed to);
+    event LiquidityAdded(address indexed provider, uint256 amountA, uint256 amountB, uint256 liquidityMinted);
+    event LiquidityRemoved(address indexed provider, uint256 amountA, uint256 amountB, uint256 liquidityBurned);
+
+    constructor(address _tokenA, address _tokenB) {
+        require(_tokenA != _tokenB, "Same tokens");
+        tokenA = IERC20(_tokenA);
+        tokenB = IERC20(_tokenB);
+    }
+
+    modifier ensure(uint256 deadline) {
+        require(block.timestamp <= deadline, "Expired");
+        _;
+    }
+
+    function addLiquidity(uint256 amountADesired, uint256 amountBDesired, uint256 amountAMin, uint256 amountBMin) external returns (uint256 liquidity) {
+        (uint256 _reserveA, uint256 _reserveB) = (reserveA, reserveB);
+        if (_reserveA == 0 && _reserveB == 0) {
+            liquidity = Math.sqrt(amountADesired * amountBDesired);
+            require(liquidity > 0, "Zero liquidity");
+            reserveA += amountADesired;
+            reserveB += amountBDesired;
+            tokenA.transferFrom(msg.sender, address(this), amountADesired);
+            tokenB.transferFrom(msg.sender, address(this), amountBDesired);
+            emit LiquidityAdded(msg.sender, amountADesired, amountBDesired, liquidity);
+        } else {
+            uint256 amountBOptimal = Math.mulDiv(amountADesired, _reserveB, _reserveA);
+            if (amountBOptimal <= amountBDesired) {
+                require(amountBOptimal >= amountBMin, "Insufficient B amount");
+                require(amountADesired >= amountAMin, "Insufficient A amount");
+                uint256 liquidityMinted = Math.mulDiv(amountADesired, _reserveA + _reserveB, _reserveA);
+                require(liquidityMinted > 0, "Zero liquidity");
+                reserveA += amountADesired;
+                reserveB += amountBOptimal;
+                tokenA.transferFrom(msg.sender, address(this), amountADesired);
+                tokenB.transferFrom(msg.sender, address(this), amountBOptimal);
+                emit LiquidityAdded(msg.sender, amountADesired, amountBOptimal, liquidityMinted);
+                return liquidityMinted;
+            } else {
+                uint256 amountAOptimal = Math.mulDiv(amountBDesired, _reserveA, _reserveB);
+                require(amountAOptimal <= amountADesired, "Invalid A amount");
+                require(amountAOptimal >= amountAMin, "Insufficient A amount");
+                require(amountBDesired >= amountBMin, "Insufficient B amount");
+                uint256 liquidityMinted = Math.mulDiv(amountBDesired, _reserveA + _reserveB, _reserveB);
+                require(liquidityMinted > 0, "Zero liquidity");
+                reserveA += amountAOptimal;
+                reserveB += amountBDesired;
+                tokenA.transferFrom(msg.sender, address(this), amountAOptimal);
+                tokenB.transferFrom(msg.sender, address(this), amountBDesired);
+                emit LiquidityAdded(msg.sender, amountAOptimal, amountBDesired, liquidityMinted);
+                return liquidityMinted;
+            }
+        }
+    }
+
+    function removeLiquidity(uint256 liquidity) external {
+        uint256 _reserveA = reserveA;
+        uint256 _reserveB = reserveB;
+        uint256 totalSupply = _reserveA + _reserveB;
+        uint256 amountA = Math.mulDiv(liquidity, _reserveA, totalSupply);
+        uint256 amountB = Math.mulDiv(liquidity, _reserveB, totalSupply);
+        require(amountA > 0 && amountB > 0, "Zero liquidity");
+        reserveA -= amountA;
+        reserveB -= amountB;
+        tokenA.transfer(msg.sender, amountA);
+        tokenB.transfer(msg.sender, amountB);
+        emit LiquidityRemoved(msg.sender, amountA, amountB, liquidity);
+    }
+
+    function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external ensure(deadline) {
+        require(path.length == 2, "Invalid path");
+        require(path[0] == address(tokenA) && path[1] == address(tokenB), "Invalid path tokens");
+        uint256 amountInWithFee = Math.mulDiv(amountIn, FEE_DENOMINATOR - feeNumerator, FEE_DENOMINATOR);
+        uint256 amountOut = getAmountOut(amountInWithFee, reserveA, reserveB);
+        require(amountOut >= amountOutMin, "Insufficient output amount");
+        reserveA += amountIn;
+        reserveB -= amountOut;
+        tokenA.transferFrom(msg.sender, address(this), amountIn);
+        tokenB.transfer(to, amountOut);
+        emit Swap(msg.sender, amountIn, 0, 0, amountOut, to);
+    }
+
+    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) internal pure returns (uint256 amountOut) {
+        require(amountIn > 0, "Insufficient input amount");
+        require(reserveIn > 0 && reserveOut > 0, "Invalid reserves");
+        uint256 amountInWithFee = Math.mulDiv(amountIn, FEE_DENOMINATOR - feeNumerator, FEE_DENOMINATOR);
+        uint256 numerator = Math.mulDiv(amountInWithFee, reserveOut, FEE_DENOMINATOR);
+        uint256 denominator = reserveIn + amountInWithFee;
+        amountOut = numerator / denominator;
+    }
+}
+
+library Math {
+    function mulDiv(uint256 x, uint256 y, uint256 z) internal pure returns (uint256) {
+        (uint256 l, uint256 h) = fullMul(x, y);
+        require(h == 0 || (h == 1 && l < z), "Math: mulDiv overflow");
+        return l / z;
+    }
+
+    function fullMul(uint256 x, uint256 y) internal pure returns (uint256 l, uint256 h) {
+        uint256 mm = mulmod(x, y, type(uint256).max);
+        l = x * y;
+        h = mm - l;
+        if (mm < l) h -= 1;
+    }
+
+    function sqrt(uint256 y) internal pure returns (uint256 z) {
+        if (y > 3) {
+            z = y;
+            uint256 x = y / 2 + 1;
+            while (x < z) {
+                z = x;
+                x = (y / x + x) / 2;
+            }
+        } else if (y != 0) {
+            z = 1;
+        }
+    }
+}
+```

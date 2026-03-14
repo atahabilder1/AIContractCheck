@@ -1,0 +1,105 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/common/ERC2981.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
+
+contract RevealableNFT is ERC721, ERC2981, Ownable {
+    using Strings for uint256;
+
+    uint256 public constant MAX_SUPPLY = 10000;
+    uint256 public constant WHITELIST_PRICE = 0.05 ether;
+    uint256 public constant PUBLIC_PRICE = 0.08 ether;
+    uint256 public constant MAX_PER_WALLET = 5;
+
+    uint256 private _nextTokenId;
+    bytes32 public merkleRoot;
+    string private _baseTokenURI;
+    string private _hiddenMetadataURI;
+    bool public revealed;
+    bool public whitelistMintOpen;
+    bool public publicMintOpen;
+
+    mapping(address => uint256) public mintedCount;
+
+    constructor(
+        string memory hiddenMetadataURI,
+        bytes32 _merkleRoot,
+        address royaltyReceiver,
+        uint96 royaltyFeeNumerator
+    ) ERC721("RevealableNFT", "RNFT") Ownable(msg.sender) {
+        _hiddenMetadataURI = hiddenMetadataURI;
+        merkleRoot = _merkleRoot;
+        _setDefaultRoyalty(royaltyReceiver, royaltyFeeNumerator);
+    }
+
+    function whitelistMint(uint256 quantity, bytes32[] calldata proof) external payable {
+        require(whitelistMintOpen, "Whitelist mint closed");
+        require(msg.value >= WHITELIST_PRICE * quantity, "Insufficient payment");
+        require(MerkleProof.verify(proof, merkleRoot, keccak256(abi.encodePacked(msg.sender))), "Invalid proof");
+        _mintInternal(quantity);
+    }
+
+    function publicMint(uint256 quantity) external payable {
+        require(publicMintOpen, "Public mint closed");
+        require(msg.value >= PUBLIC_PRICE * quantity, "Insufficient payment");
+        _mintInternal(quantity);
+    }
+
+    function _mintInternal(uint256 quantity) private {
+        require(quantity > 0, "Zero quantity");
+        require(mintedCount[msg.sender] + quantity <= MAX_PER_WALLET, "Exceeds max per wallet");
+        require(_nextTokenId + quantity <= MAX_SUPPLY, "Exceeds max supply");
+
+        mintedCount[msg.sender] += quantity;
+        for (uint256 i = 0; i < quantity; i++) {
+            _safeMint(msg.sender, _nextTokenId);
+            _nextTokenId++;
+        }
+    }
+
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        _requireOwned(tokenId);
+        if (!revealed) {
+            return _hiddenMetadataURI;
+        }
+        return string.concat(_baseTokenURI, tokenId.toString(), ".json");
+    }
+
+    function reveal(string memory baseURI) external onlyOwner {
+        revealed = true;
+        _baseTokenURI = baseURI;
+    }
+
+    function setMerkleRoot(bytes32 _merkleRoot) external onlyOwner {
+        merkleRoot = _merkleRoot;
+    }
+
+    function setWhitelistMintOpen(bool open) external onlyOwner {
+        whitelistMintOpen = open;
+    }
+
+    function setPublicMintOpen(bool open) external onlyOwner {
+        publicMintOpen = open;
+    }
+
+    function setDefaultRoyalty(address receiver, uint96 feeNumerator) external onlyOwner {
+        _setDefaultRoyalty(receiver, feeNumerator);
+    }
+
+    function totalSupply() external view returns (uint256) {
+        return _nextTokenId;
+    }
+
+    function withdraw() external onlyOwner {
+        (bool success, ) = msg.sender.call{value: address(this).balance}("");
+        require(success, "Withdraw failed");
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721, ERC2981) returns (bool) {
+        return super.supportsInterface(interfaceId);
+    }
+}

@@ -1,0 +1,41 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiStaking {
+    // Staking pool for the DeFi token
+    mapping(address => uint) public stakingPool;
+
+    // DeFi token contract address
+    address public deFiToken;
+
+    // Staking event
+    event Staked(address indexed staker, uint indexed amount, uint indexed timestamp);
+
+    constructor(address _deFiToken) public {
+        deFiToken = _deFiToken;
+    }
+
+    // Function to stake DeFi tokens
+    function stake(uint _amount) external {
+        require(msg.sender == tx.origin, "Only EOA can stake");
+        require(_amount > 0, "Invalid amount");
+        require(deFiToken.transferFrom(msg.sender, address(this), _amount), "Transfer failed");
+        stakingPool[msg.sender] += _amount;
+        emit Staked(msg.sender, _amount, block.timestamp);
+    }
+
+    // Function to withdraw staked DeFi tokens
+    function withdraw(uint _amount) external {
+        require(msg.sender == tx.origin, "Only EOA can withdraw");
+        require(_amount > 0, "Invalid amount");
+        require(stakingPool[msg.sender] >= _amount, "Insufficient balance");
+        stakingPool[msg.sender] -= _amount;
+        deFiToken.transfer(msg.sender, _amount);
+        emit Staked(msg.sender, _amount, block.timestamp);
+    }
+
+    // Function to get the current balance of a staker
+    function getStakingBalance(address _staker) external view returns (uint) {
+        return stakingPool[_staker];
+    }
+}

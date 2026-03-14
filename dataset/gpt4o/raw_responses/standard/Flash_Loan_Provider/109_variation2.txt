@@ -1,0 +1,78 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract FlashLoanProvider {
+    struct LiquidityProvider {
+        uint256 providedAmount;
+        uint256 feeShare;
+    }
+
+    mapping(address => LiquidityProvider) public liquidityProviders;
+    address[] public providerAddresses;
+    uint256 public totalLiquidity;
+    uint256 public totalFeesCollected;
+
+    uint256 public constant FEE_PERCENTAGE = 1; // 0.1% fee
+
+    modifier onlyProvider() {
+        require(liquidityProviders[msg.sender].providedAmount > 0, "Not a liquidity provider");
+        _;
+    }
+
+    function provideLiquidity() external payable {
+        if (liquidityProviders[msg.sender].providedAmount == 0) {
+            providerAddresses.push(msg.sender);
+        }
+        liquidityProviders[msg.sender].providedAmount += msg.value;
+        totalLiquidity += msg.value;
+    }
+
+    function withdrawLiquidity(uint256 amount) external onlyProvider {
+        require(liquidityProviders[msg.sender].providedAmount >= amount, "Insufficient liquidity");
+        liquidityProviders[msg.sender].providedAmount -= amount;
+        totalLiquidity -= amount;
+        payable(msg.sender).transfer(amount);
+    }
+
+    function executeFlashLoan(address borrower, uint256 amount) external {
+        require(amount <= address(this).balance, "Insufficient pool balance");
+        uint256 fee = (amount * FEE_PERCENTAGE) / 1000;
+        uint256 totalRepayment = amount + fee;
+
+        (bool success, ) = borrower.call{value: amount}("");
+        require(success, "Flash loan transfer failed");
+
+        (success, ) = msg.sender.call{value: totalRepayment}("");
+        require(success, "Repayment failed");
+
+        totalFeesCollected += fee;
+        distributeFees();
+    }
+
+    function distributeFees() internal {
+        for (uint256 i = 0; i < providerAddresses.length; i++) {
+            address provider = providerAddresses[i];
+            if (liquidityProviders[provider].providedAmount > 0) {
+                uint256 providerShare = (liquidityProviders[provider].providedAmount * totalFeesCollected) / totalLiquidity;
+                liquidityProviders[provider].feeShare += providerShare;
+            }
+        }
+        totalFeesCollected = 0;
+    }
+
+    function withdrawFees() external onlyProvider {
+        uint256 fees = liquidityProviders[msg.sender].feeShare;
+        require(fees > 0, "No fees to withdraw");
+        liquidityProviders[msg.sender].feeShare = 0;
+        payable(msg.sender).transfer(fees);
+    }
+
+    function getProviderDetails(address provider) external view returns (uint256 providedAmount, uint256 feeShare) {
+        LiquidityProvider memory lp = liquidityProviders[provider];
+        return (lp.providedAmount, lp.feeShare);
+    }
+
+    receive() external payable {}
+}
+```

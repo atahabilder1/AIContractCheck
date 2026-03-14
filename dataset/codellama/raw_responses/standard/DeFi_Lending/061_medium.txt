@@ -1,0 +1,57 @@
+
+```
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity ^0.8.0;
+
+contract LendingProtocol {
+    // Interest rates are stored as a mapping of addresses to uint256
+    mapping(address => uint256) public interestRates;
+    // Liquidation thresholds are stored as a mapping of addresses to uint256
+    mapping(address => uint256) public liquidationThresholds;
+    // Health factors are stored as a mapping of addresses to uint256
+    mapping(address => uint256) public healthFactors;
+
+    constructor() public {
+        // Initialize interest rates, liquidation thresholds, and health factors
+        interestRates[msg.sender] = 0;
+        liquidationThresholds[msg.sender] = 0;
+        healthFactors[msg.sender] = 0;
+    }
+
+    function setInterestRate(uint256 _interestRate) public {
+        // Only the contract owner can set the interest rate
+        require(msg.sender == address(this), "Only the contract owner can set the interest rate");
+        // Set the interest rate for the contract
+        interestRates[msg.sender] = _interestRate;
+    }
+
+    function setLiquidationThreshold(uint256 _liquidationThreshold) public {
+        // Only the contract owner can set the liquidation threshold
+        require(msg.sender == address(this), "Only the contract owner can set the liquidation threshold");
+        // Set the liquidation threshold for the contract
+        liquidationThresholds[msg.sender] = _liquidationThreshold;
+    }
+
+    function setHealthFactor(uint256 _healthFactor) public {
+        // Only the contract owner can set the health factor
+        require(msg.sender == address(this), "Only the contract owner can set the health factor");
+        // Set the health factor for the contract
+        healthFactors[msg.sender] = _healthFactor;
+    }
+
+    function getInterestRate() public view returns (uint256) {
+        // Return the interest rate for the contract
+        return interestRates[msg.sender];
+    }
+
+    function getLiquidationThreshold() public view returns (uint256) {
+        // Return the liquidation threshold for the contract
+        return liquidationThresholds[msg.sender];
+    }
+
+    function getHealthFactor() public view returns (uint256) {
+        // Return the health factor for the contract
+        return healthFactors[msg.sender];
+    }
+}
+```

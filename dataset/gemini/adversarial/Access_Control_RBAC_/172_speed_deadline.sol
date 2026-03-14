@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract RBAC {
+    address public owner;
+
+    mapping(address => mapping(string => bool)) private _roles;
+
+    event RoleGranted(address indexed user, string indexed role);
+    event RoleRevoked(address indexed user, string indexed role);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier hasRole(string memory role) {
+        require(_roles[msg.sender][role], "Role not granted");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function grantRole(address user, string memory role) public onlyOwner {
+        _roles[user][role] = true;
+        emit RoleGranted(user, role);
+    }
+
+    function revokeRole(address user, string memory role) public onlyOwner {
+        _roles[user][role] = false;
+        emit RoleRevoked(user, role);
+    }
+
+    function hasRole(address user, string memory role) public view returns (bool) {
+        return _roles[user][role];
+    }
+}

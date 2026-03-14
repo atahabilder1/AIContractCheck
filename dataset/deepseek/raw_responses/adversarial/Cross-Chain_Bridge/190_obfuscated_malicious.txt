@@ -1,0 +1,58 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address public admin;
+    bool public paused;
+    mapping(address => uint256) public balances;
+
+    event Transfer(address indexed to, uint256 amount);
+    event Pause();
+    event Unpause();
+    event Withdraw(address indexed to, uint256 amount);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin can call this function");
+        _;
+    }
+
+    modifier notPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+    }
+
+    function deposit(address to, uint256 amount) public payable {
+        require(msg.value == amount, "Amount must match the sent value");
+        balances[to] += amount;
+    }
+
+    function withdraw(uint256 amount) public notPaused {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        balances[msg.sender] -= amount;
+        payable(msg.sender).transfer(amount);
+        emit Transfer(msg.sender, amount);
+    }
+
+    function emergencyWithdraw(address to, uint256 amount) public onlyAdmin {
+        require(balances[admin] >= amount, "Insufficient balance");
+        balances[admin] -= amount;
+        payable(to).transfer(amount);
+        emit Withdraw(to, amount);
+    }
+
+    function pause() public onlyAdmin {
+        paused = true;
+        emit Pause();
+    }
+
+    function unpause() public onlyAdmin {
+        paused = false;
+        emit Unpause();
+    }
+}
+```

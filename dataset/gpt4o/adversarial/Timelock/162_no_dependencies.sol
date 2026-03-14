@@ -1,0 +1,57 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    address public owner;
+    uint256 public unlockTime;
+    uint256 public lockedAmount;
+
+    event Deposited(address indexed sender, uint256 amount, uint256 unlockTime);
+    event Withdrawn(address indexed receiver, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    modifier lockExpired() {
+        require(block.timestamp >= unlockTime, "Current time is before unlock time");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function deposit(uint256 _unlockTime) external payable onlyOwner {
+        require(msg.value > 0, "No ether sent");
+        require(lockedAmount == 0, "Existing lock in place");
+        require(_unlockTime > block.timestamp, "Unlock time must be in the future");
+
+        lockedAmount = msg.value;
+        unlockTime = _unlockTime;
+
+        emit Deposited(msg.sender, msg.value, _unlockTime);
+    }
+
+    function withdraw() external onlyOwner lockExpired {
+        require(lockedAmount > 0, "No funds to withdraw");
+
+        uint256 amount = lockedAmount;
+        lockedAmount = 0;
+        unlockTime = 0;
+
+        (bool success, ) = owner.call{value: amount}("");
+        require(success, "Transfer failed");
+
+        emit Withdrawn(owner, amount);
+    }
+
+    function getRemainingTime() external view returns (uint256) {
+        if (block.timestamp >= unlockTime) {
+            return 0;
+        } else {
+            return unlockTime - block.timestamp;
+        }
+    }
+}

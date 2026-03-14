@@ -1,0 +1,107 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    address public owner;
+    uint256 public constant MIN_DELAY = 1 days;
+    uint256 public constant MAX_DELAY = 30 days;
+    uint256 public constant GRACE_PERIOD = 14 days;
+
+    mapping(bytes32 => bool) public queuedTransactions;
+
+    event TransactionQueued(
+        bytes32 indexed txHash,
+        address indexed target,
+        uint256 value,
+        bytes data,
+        uint256 executeAfter
+    );
+    event TransactionExecuted(
+        bytes32 indexed txHash,
+        address indexed target,
+        uint256 value,
+        bytes data
+    );
+    event TransactionCancelled(bytes32 indexed txHash);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Timelock: caller is not the owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function queueTransaction(
+        address target,
+        uint256 value,
+        bytes calldata data,
+        uint256 executeAfter
+    ) external onlyOwner returns (bytes32) {
+        require(
+            executeAfter >= block.timestamp + MIN_DELAY,
+            "Timelock: delay too short"
+        );
+        require(
+            executeAfter <= block.timestamp + MAX_DELAY,
+            "Timelock: delay too long"
+        );
+
+        bytes32 txHash = keccak256(abi.encode(target, value, data, executeAfter));
+        require(!queuedTransactions[txHash], "Timelock: transaction already queued");
+
+        queuedTransactions[txHash] = true;
+
+        emit TransactionQueued(txHash, target, value, data, executeAfter);
+        return txHash;
+    }
+
+    function cancelTransaction(
+        address target,
+        uint256 value,
+        bytes calldata data,
+        uint256 executeAfter
+    ) external onlyOwner {
+        bytes32 txHash = keccak256(abi.encode(target, value, data, executeAfter));
+        require(queuedTransactions[txHash], "Timelock: transaction not queued");
+
+        queuedTransactions[txHash] = false;
+
+        emit TransactionCancelled(txHash);
+    }
+
+    function executeTransaction(
+        address target,
+        uint256 value,
+        bytes calldata data,
+        uint256 executeAfter
+    ) external payable onlyOwner returns (bytes memory) {
+        bytes32 txHash = keccak256(abi.encode(target, value, data, executeAfter));
+        require(queuedTransactions[txHash], "Timelock: transaction not queued");
+        require(block.timestamp >= executeAfter, "Timelock: too early");
+        require(
+            block.timestamp <= executeAfter + GRACE_PERIOD,
+            "Timelock: transaction expired"
+        );
+
+        queuedTransactions[txHash] = false;
+
+        (bool success, bytes memory result) = target.call{value: value}(data);
+        require(success, "Timelock: transaction execution failed");
+
+        emit TransactionExecuted(txHash, target, value, data);
+        return result;
+    }
+
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "Timelock: new owner is zero address");
+        emit OwnershipTransferred(owner, newOwner);
+        owner = newOwner;
+    }
+
+    receive() external payable {}
+}
+```

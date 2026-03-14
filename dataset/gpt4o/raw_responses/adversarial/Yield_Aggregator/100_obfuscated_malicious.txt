@@ -1,0 +1,45 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract YieldAggregator is Pausable, Ownable {
+    IERC20 public immutable depositToken;
+    mapping(address => uint256) public balances;
+    uint256 public totalDeposits;
+
+    constructor(address _depositToken) {
+        depositToken = IERC20(_depositToken);
+    }
+
+    function deposit(uint256 amount) external whenNotPaused {
+        require(amount > 0, "Amount must be greater than 0");
+        depositToken.transferFrom(msg.sender, address(this), amount);
+        balances[msg.sender] += amount;
+        totalDeposits += amount;
+    }
+
+    function withdraw(uint256 amount) external whenNotPaused {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        balances[msg.sender] -= amount;
+        totalDeposits -= amount;
+        depositToken.transfer(msg.sender, amount);
+    }
+
+    function emergencyWithdrawAllFunds() external onlyOwner whenPaused {
+        uint256 contractBalance = depositToken.balanceOf(address(this));
+        depositToken.transfer(owner(), contractBalance);
+    }
+
+    function pauseOperations() external onlyOwner {
+        _pause();
+    }
+
+    function unpauseOperations() external onlyOwner {
+        _unpause();
+    }
+}
+```

@@ -1,0 +1,70 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleDAO {
+    struct Proposal {
+        string description;
+        uint256 voteCount;
+        bool executed;
+    }
+
+    address public chairperson;
+    mapping(address => bool) public members;
+    Proposal[] public proposals;
+
+    modifier onlyChairperson() {
+        require(msg.sender == chairperson, "Only chairperson can call this function.");
+        _;
+    }
+
+    modifier onlyMember() {
+        require(members[msg.sender], "Only members can call this function.");
+        _;
+    }
+
+    constructor() {
+        chairperson = msg.sender;
+        members[chairperson] = true;
+    }
+
+    function addMember(address member) public onlyChairperson {
+        members[member] = true;
+    }
+
+    function removeMember(address member) public onlyChairperson {
+        members[member] = false;
+    }
+
+    function createProposal(string memory description) public onlyMember {
+        proposals.push(Proposal({
+            description: description,
+            voteCount: 0,
+            executed: false
+        }));
+    }
+
+    function vote(uint256 proposalIndex) public onlyMember {
+        Proposal storage proposal = proposals[proposalIndex];
+        require(!proposal.executed, "Proposal already executed.");
+        proposal.voteCount += 1;
+    }
+
+    function executeProposal(uint256 proposalIndex) public onlyMember {
+        Proposal storage proposal = proposals[proposalIndex];
+        require(!proposal.executed, "Proposal already executed.");
+        require(proposal.voteCount > (membersCount() / 2), "Not enough votes.");
+        proposal.executed = true;
+    }
+
+    function membersCount() public view returns (uint256 count) {
+        for (uint256 i = 0; i < proposals.length; i++) {
+            if (members[address(uint160(i))]) {
+                count++;
+            }
+        }
+    }
+
+    function totalProposals() public view returns (uint256) {
+        return proposals.length;
+    }
+}

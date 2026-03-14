@@ -1,0 +1,43 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract TestnetRBAC {
+    mapping(address => uint256) private _roles;
+
+    uint256 constant ROLE_ADMIN = 1 << 0;
+    uint256 constant ROLE_OPERATOR = 1 << 1;
+    uint256 constant ROLE_USER = 1 << 2;
+
+    address public owner;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    modifier hasRole(uint256 _role) {
+        require((_roles[msg.sender] & _role) != 0, "Role not granted");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+        _roles[msg.sender] |= ROLE_ADMIN; // Grant owner admin role
+    }
+
+    function grantRole(address _user, uint256 _role) public onlyOwner {
+        _roles[_user] |= _role;
+    }
+
+    function revokeRole(address _user, uint256 _role) public onlyOwner {
+        _roles[_user] &= ~_role;
+    }
+
+    function getUserRoles(address _user) public view returns (uint256) {
+        return _roles[_user];
+    }
+
+    function isUserInRole(address _user, uint256 _role) public view returns (bool) {
+        return (_roles[_user] & _role) != 0;
+    }
+}

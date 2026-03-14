@@ -1,0 +1,26 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract RBAC {
+    struct Role {
+        address[] members;
+        mapping(address => bool) hasRole;
+    }
+
+    mapping(string => Role) private roles;
+
+    function addRole(string memory roleName, address member) public {
+        roles[roleName].members.push(member);
+        roles[roleName].hasRole[member] = true;
+    }
+
+    function removeRole(string memory roleName, address member) public {
+        roles[roleName].hasRole[member] = false;
+    }
+
+    function hasRole(string memory roleName, address member) public view returns (bool) {
+        return roles[roleName].hasRole[member];
+    }
+}
+```

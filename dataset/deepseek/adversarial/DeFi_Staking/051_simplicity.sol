@@ -1,0 +1,18 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Staking {
+    mapping(address => uint256) public stakes;
+    mapping(address => uint256) public rewards;
+    uint256 public rewardRate = 10; // 10% annual reward rate
+
+    function stake(uint256 amount) public {
+        stakes[msg.sender] += amount;
+    }
+
+    function claimReward() public {
+        uint256 reward = (stakes[msg.sender] * rewardRate) / 100;
+        rewards[msg.sender] += reward;
+        stakes[msg.sender] = 0;
+    }
+}

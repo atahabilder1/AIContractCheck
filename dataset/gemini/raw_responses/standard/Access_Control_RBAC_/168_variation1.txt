@@ -1,0 +1,77 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract RoleBasedAccessControlWithExpiration {
+    address public admin;
+
+    struct RoleInfo {
+        bool granted;
+        uint256 expirationTimestamp;
+    }
+
+    mapping(address => mapping(string => RoleInfo)) private _roleInfo;
+    uint256 public roleDuration; // Duration in seconds for which a role is valid
+
+    event RoleGranted(address indexed user, string indexed role, uint256 expirationTimestamp);
+    event RoleRevoked(address indexed user, string indexed role);
+    event RoleRenewed(address indexed user, string indexed role, uint256 expirationTimestamp);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Caller is not the admin");
+        _;
+    }
+
+    modifier roleIsActive(address _user, string memory _role) {
+        require(_roleInfo[_user][_role].granted, "Role not granted");
+        require(block.timestamp <= _roleInfo[_user][_role].expirationTimestamp, "Role has expired");
+        _;
+    }
+
+    constructor(address _admin, uint256 _roleDuration) {
+        require(_admin != address(0), "Admin address cannot be zero");
+        admin = _admin;
+        roleDuration = _roleDuration;
+    }
+
+    function grantRole(address _user, string memory _role) public onlyAdmin {
+        uint256 expirationTimestamp = block.timestamp + roleDuration;
+        _roleInfo[_user][_role] = RoleInfo({
+            granted: true,
+            expirationTimestamp: expirationTimestamp
+        });
+        emit RoleGranted(_user, _role, expirationTimestamp);
+    }
+
+    function revokeRole(address _user, string memory _role) public onlyAdmin {
+        require(_roleInfo[_user][_role].granted, "Role not granted");
+        delete _roleInfo[_user][_role];
+        emit RoleRevoked(_user, _role);
+    }
+
+    function renewRole(address _user, string memory _role) public onlyAdmin {
+        require(_roleInfo[_user][_role].granted, "Role not granted");
+        require(block.timestamp <= _roleInfo[_user][_role].expirationTimestamp, "Cannot renew an expired role. Grant it again.");
+        uint256 newExpirationTimestamp = block.timestamp + roleDuration;
+        _roleInfo[_user][_role].expirationTimestamp = newExpirationTimestamp;
+        emit RoleRenewed(_user, _role, newExpirationTimestamp);
+    }
+
+    function hasRole(address _user, string memory _role) public view returns (bool) {
+        return _roleInfo[_user][_role].granted && block.timestamp <= _roleInfo[_user][_role].expirationTimestamp;
+    }
+
+    function getRoleExpiration(address _user, string memory _role) public view returns (uint256) {
+        return _roleInfo[_user][_role].expirationTimestamp;
+    }
+
+    function setAdmin(address _newAdmin) public onlyAdmin {
+        require(_newAdmin != address(0), "New admin address cannot be zero");
+        admin = _newAdmin;
+    }
+
+    function setRoleDuration(uint256 _newRoleDuration) public onlyAdmin {
+        roleDuration = _newRoleDuration;
+    }
+}
+```

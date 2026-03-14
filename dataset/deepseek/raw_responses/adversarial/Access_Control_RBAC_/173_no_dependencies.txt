@@ -1,0 +1,42 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract AccessControl {
+    // Define a struct to represent a role
+    struct Role {
+        address admin;
+        mapping(address => bool) members;
+    }
+
+    // Mapping from role name to role
+    mapping(string => Role) private roles;
+
+    // Modifier to check if the caller is an admin
+    modifier onlyAdmin(string memory role) {
+        require(roles[role].admin == msg.sender, "AccessControl: Not an admin");
+        _;
+    }
+
+    // Modifier to check if the caller has a specific role
+    modifier onlyRole(string memory role) {
+        require(roles[role].members[msg.sender], "AccessControl: Not a member of this role");
+        _;
+    }
+
+    // Function to add a new role
+    function addRole(string memory role, address admin) public {
+        roles[role].admin = admin;
+    }
+
+    // Function to add a member to a role
+    function addMember(string memory role, address member) public onlyAdmin(role) {
+        roles[role].members[member] = true;
+    }
+
+    // Function to remove a member from a role
+    function removeMember(string memory role, address member) public onlyAdmin(role) {
+        roles[role].members[member] = false;
+    }
+}
+```

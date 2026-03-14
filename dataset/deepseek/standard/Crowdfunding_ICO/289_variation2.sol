@@ -1,0 +1,63 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract Crowdfunding is Ownable {
+    AggregatorV3Interface internal ethPriceFeed;
+    IERC20 internal stablecoin;
+    uint256 public targetAmount;
+    uint256 public totalRaised;
+    uint256 public conversionRate;
+
+    mapping(address => uint256) public contributions;
+
+    event ContributionReceived(address indexed contributor, uint256 amount);
+    event CampaignSuccessful();
+    event CampaignFailed();
+
+    constructor(address _ethPriceFeed, address _stablecoin, uint256 _targetAmount) {
+        ethPriceFeed = AggregatorV3Interface(_ethPriceFeed);
+        stablecoin = IERC20(_stablecoin);
+        targetAmount = _targetAmount;
+    }
+
+    receive() external payable {
+        uint256 ethAmount = msg.value;
+        uint256 stablecoinAmount = ethAmount * conversionRate;
+        contributions[msg.sender] += stablecoinAmount;
+        totalRaised += stablecoinAmount;
+        emit ContributionReceived(msg.sender, stablecoinAmount);
+        if (totalRaised >= targetAmount) {
+            emit CampaignSuccessful();
+        }
+    }
+
+    function contributeWithStablecoin(uint256 stablecoinAmount) external {
+        require(stablecoin.transferFrom(msg.sender, address(this), stablecoinAmount), "Transfer failed");
+        contributions[msg.sender] += stablecoinAmount;
+        totalRaised += stablecoinAmount;
+        emit ContributionReceived(msg.sender, stablecoinAmount);
+        if (totalRaised >= targetAmount) {
+            emit CampaignSuccessful();
+        }
+    }
+
+    function withdraw() external onlyOwner {
+        require(totalRaised >= targetAmount, "Campaign failed");
+        payable(owner()).transfer(address(this).balance);
+        stablecoin.transfer(owner(), stablecoin.balanceOf(address(this)));
+        emit CampaignSuccessful();
+    }
+
+    function getConversionRate() public view returns (uint256) {
+        (, int256 price, , , ) = ethPriceFeed.latestRoundData();
+        return uint256(price);
+    }
+
+    function setConversionRate(uint256 _conversionRate) external onlyOwner {
+        conversionRate = _conversionRate;
+    }
+}

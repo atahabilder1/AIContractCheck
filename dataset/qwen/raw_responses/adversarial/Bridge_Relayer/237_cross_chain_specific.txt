@@ -1,0 +1,34 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    address public owner;
+    mapping(bytes32 => bool) public processedMessages;
+
+    event MessageProcessed(bytes32 indexed messageId, address indexed destination, uint256 amount);
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    function relayMessage(bytes32 messageId, address destination, uint256 amount) external onlyOwner {
+        require(!processedMessages[messageId], "Message already processed");
+        processedMessages[messageId] = true;
+
+        // Simulate sending tokens or executing action on the destination chain
+        // In a real-world scenario, this would involve interacting with another contract or system
+        emit MessageProcessed(messageId, destination, amount);
+    }
+
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "Invalid address");
+        owner = newOwner;
+    }
+}
+```

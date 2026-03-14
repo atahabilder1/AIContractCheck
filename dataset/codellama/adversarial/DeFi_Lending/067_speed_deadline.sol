@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiLending {
+    // Variables
+    address public owner;
+    mapping (address => uint) public balances;
+    uint public totalSupply;
+
+    // Events
+    event Deposit(address indexed from, uint amount);
+    event Withdrawal(address indexed to, uint amount);
+
+    // Modifiers
+    modifier onlyOwner {
+        require(msg.sender == owner, "Only the contract owner can perform this action");
+        _;
+    }
+
+    // Constructor
+    constructor() public {
+        owner = msg.sender;
+        totalSupply = 0;
+    }
+
+    // Functions
+    function deposit(uint amount) public {
+        require(amount > 0, "Deposit amount must be greater than 0");
+        balances[msg.sender] += amount;
+        totalSupply += amount;
+        emit Deposit(msg.sender, amount);
+    }
+
+    function withdraw(uint amount) public {
+        require(amount > 0, "Withdrawal amount must be greater than 0");
+        require(amount <= balances[msg.sender], "Withdrawal amount exceeds balance");
+        balances[msg.sender] -= amount;
+        totalSupply -= amount;
+        emit Withdrawal(msg.sender, amount);
+    }
+
+    function transfer(address to, uint amount) public {
+        require(amount > 0, "Transfer amount must be greater than 0");
+        require(amount <= balances[msg.sender], "Transfer amount exceeds balance");
+        balances[msg.sender] -= amount;
+        balances[to] += amount;
+    }
+}

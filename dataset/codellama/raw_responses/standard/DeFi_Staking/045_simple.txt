@@ -1,0 +1,36 @@
+
+pragma solidity ^0.8.0;
+
+contract Staking {
+    address public owner;
+    mapping(address => uint256) public balances;
+    mapping(address => uint256) public rewards;
+    uint256 public totalRewards;
+    uint256 public rewardRate;
+
+    constructor() public {
+        owner = msg.sender;
+        totalRewards = 0;
+        rewardRate = 100; // 100% reward rate
+    }
+
+    function deposit(uint256 amount) public {
+        require(amount > 0, "Invalid amount");
+        balances[msg.sender] += amount;
+        totalRewards += amount * rewardRate;
+    }
+
+    function withdraw(uint256 amount) public {
+        require(amount > 0, "Invalid amount");
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        balances[msg.sender] -= amount;
+        totalRewards -= amount * rewardRate;
+    }
+
+    function claimRewards() public {
+        require(rewards[msg.sender] > 0, "No rewards available");
+        uint256 reward = rewards[msg.sender];
+        rewards[msg.sender] = 0;
+        msg.sender.transfer(reward);
+    }
+}

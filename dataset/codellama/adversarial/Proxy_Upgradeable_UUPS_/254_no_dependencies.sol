@@ -1,0 +1,20 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Proxy {
+    address private _implementation;
+
+    constructor(address implementation) public {
+        _implementation = implementation;
+    }
+
+    fallback() external {
+        (bool success, bytes memory returndata) = _implementation.delegatecall(msg.data);
+        require(success, "Proxy::fallback: call to implementation failed");
+        return returndata;
+    }
+
+    function upgradeTo(address newImplementation) external {
+        _implementation = newImplementation;
+    }
+}

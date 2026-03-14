@@ -1,0 +1,181 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract SemiFungibleERC1155 is ERC1155, Ownable {
+    struct SerialInfo {
+        uint256 tokenId;
+        uint256 serialNumber;
+        address owner;
+        bool exists;
+    }
+
+    // tokenId => next serial number to mint
+    mapping(uint256 => uint256) public nextSerial;
+
+    // tokenId => total minted count
+    mapping(uint256 => uint256) public totalMinted;
+
+    // tokenId => serialNumber => owner
+    mapping(uint256 => mapping(uint256 => address)) public serialOwner;
+
+    // owner => tokenId => list of serial numbers owned
+    mapping(address => mapping(uint256 => uint256[])) private _ownedSerials;
+
+    // tokenId => serialNumber => index in _ownedSerials array
+    mapping(uint256 => mapping(uint256 => uint256)) private _serialIndex;
+
+    // tokenId => metadata URI override
+    mapping(uint256 => string) private _tokenURIs;
+
+    event SerialMinted(uint256 indexed tokenId, uint256 serialNumber, address indexed to);
+    event SerialTransferred(uint256 indexed tokenId, uint256 serialNumber, address indexed from, address indexed to);
+
+    constructor(string memory baseURI) ERC1155(baseURI) Ownable(msg.sender) {}
+
+    function mint(address to, uint256 tokenId, uint256 amount, bytes memory data) external onlyOwner {
+        uint256 startSerial = nextSerial[tokenId];
+
+        for (uint256 i = 0; i < amount; i++) {
+            uint256 serial = startSerial + i;
+            serialOwner[tokenId][serial] = to;
+            _ownedSerials[to][tokenId].push(serial);
+            _serialIndex[tokenId][serial] = _ownedSerials[to][tokenId].length - 1;
+            emit SerialMinted(tokenId, serial, to);
+        }
+
+        nextSerial[tokenId] = startSerial + amount;
+        totalMinted[tokenId] += amount;
+
+        _mint(to, tokenId, amount, data);
+    }
+
+    function mintBatch(
+        address to,
+        uint256[] memory tokenIds,
+        uint256[] memory amounts,
+        bytes memory data
+    ) external onlyOwner {
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            uint256 tokenId = tokenIds[i];
+            uint256 amount = amounts[i];
+            uint256 startSerial = nextSerial[tokenId];
+
+            for (uint256 j = 0; j < amount; j++) {
+                uint256 serial = startSerial + j;
+                serialOwner[tokenId][serial] = to;
+                _ownedSerials[to][tokenId].push(serial);
+                _serialIndex[tokenId][serial] = _ownedSerials[to][tokenId].length - 1;
+                emit SerialMinted(tokenId, serial, to);
+            }
+
+            nextSerial[tokenId] = startSerial + amount;
+            totalMinted[tokenId] += amount;
+        }
+
+        _mintBatch(to, tokenIds, amounts, data);
+    }
+
+    function transferSerial(
+        address from,
+        address to,
+        uint256 tokenId,
+        uint256 serialNumber,
+        bytes memory data
+    ) external {
+        require(
+            from == msg.sender || isApprovedForAll(from, msg.sender),
+            "Not authorized"
+        );
+        require(serialOwner[tokenId][serialNumber] == from, "Serial not owned by sender");
+        require(to != address(0), "Transfer to zero address");
+
+        _removeSerialFromOwner(from, tokenId, serialNumber);
+
+        serialOwner[tokenId][serialNumber] = to;
+        _ownedSerials[to][tokenId].push(serialNumber);
+        _serialIndex[tokenId][serialNumber] = _ownedSerials[to][tokenId].length - 1;
+
+        safeTransferFrom(from, to, tokenId, 1, data);
+
+        emit SerialTransferred(tokenId, serialNumber, from, to);
+    }
+
+    function transferSerialBatch(
+        address from,
+        address to,
+        uint256 tokenId,
+        uint256[] memory serialNumbers,
+        bytes memory data
+    ) external {
+        require(
+            from == msg.sender || isApprovedForAll(from, msg.sender),
+            "Not authorized"
+        );
+        require(to != address(0), "Transfer to zero address");
+
+        for (uint256 i = 0; i < serialNumbers.length; i++) {
+            uint256 serial = serialNumbers[i];
+            require(serialOwner[tokenId][serial] == from, "Serial not owned by sender");
+
+            _removeSerialFromOwner(from, tokenId, serial);
+
+            serialOwner[tokenId][serial] = to;
+            _ownedSerials[to][tokenId].push(serial);
+            _serialIndex[tokenId][serial] = _ownedSerials[to][tokenId].length - 1;
+
+            emit SerialTransferred(tokenId, serial, from, to);
+        }
+
+        safeTransferFrom(from, to, tokenId, serialNumbers.length, data);
+    }
+
+    function serialsOf(address owner, uint256 tokenId) external view returns (uint256[] memory) {
+        return _ownedSerials[owner][tokenId];
+    }
+
+    function serialCount(address owner, uint256 tokenId) external view returns (uint256) {
+        return _ownedSerials[owner][tokenId].length;
+    }
+
+    function getSerialInfo(uint256 tokenId, uint256 serialNumber) external view returns (SerialInfo memory) {
+        address owner = serialOwner[tokenId][serialNumber];
+        return SerialInfo({
+            tokenId: tokenId,
+            serialNumber: serialNumber,
+            owner: owner,
+            exists: owner != address(0)
+        });
+    }
+
+    function setTokenURI(uint256 tokenId, string memory tokenURI) external onlyOwner {
+        _tokenURIs[tokenId] = tokenURI;
+    }
+
+    function uri(uint256 tokenId) public view override returns (string memory) {
+        string memory tokenURI = _tokenURIs[tokenId];
+        if (bytes(tokenURI).length > 0) {
+            return tokenURI;
+        }
+        return super.uri(tokenId);
+    }
+
+    function _removeSerialFromOwner(address owner, uint256 tokenId, uint256 serialNumber) private {
+        uint256[] storage serials = _ownedSerials[owner][tokenId];
+        uint256 index = _serialIndex[tokenId][serialNumber];
+        uint256 lastIndex = serials.length - 1;
+
+        if (index != lastIndex) {
+            uint256 lastSerial = serials[lastIndex];
+            serials[index] = lastSerial;
+            _serialIndex[tokenId][lastSerial] = index;
+        }
+
+        serials.pop();
+        delete _serialIndex[tokenId][serialNumber];
+    }
+}
+```

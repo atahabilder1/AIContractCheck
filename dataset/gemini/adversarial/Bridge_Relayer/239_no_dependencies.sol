@@ -1,0 +1,57 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+
+    address public owner;
+    mapping(uint256 => bool) public processedMessages;
+    uint256 public messageCounter;
+
+    event MessageRelayed(
+        uint256 indexed messageId,
+        address indexed sender,
+        address indexed recipient,
+        bytes data
+    );
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Caller is not the owner");
+        _;
+    }
+
+    function relayMessage(
+        address _recipient,
+        bytes calldata _data
+    ) external {
+        messageCounter++;
+        uint256 currentMessageId = messageCounter;
+
+        // In a real-world scenario, you would implement more robust message processing and validation here.
+        // This includes checking signatures, chain IDs, potential replay attacks, etc.
+        // For this standalone example, we'll simply mark it as processed.
+
+        processedMessages[currentMessageId] = true;
+
+        emit MessageRelayed(
+            currentMessageId,
+            msg.sender,
+            _recipient,
+            _data
+        );
+    }
+
+    function setOwner(address _newOwner) external onlyOwner {
+        owner = _newOwner;
+    }
+
+    // In a real bridge, you'd likely have functions to:
+    // 1. Lock/mint tokens on one chain.
+    // 2. Receive messages from the other chain.
+    // 3. Verify messages (e.g., using signatures from validators).
+    // 4. Unlock/burn tokens on the destination chain based on verified messages.
+    // This contract is a simplified representation of the relayer's role in forwarding messages.
+}

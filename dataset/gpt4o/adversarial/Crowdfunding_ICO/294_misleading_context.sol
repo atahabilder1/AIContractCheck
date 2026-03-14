@@ -1,0 +1,82 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract TestnetCrowdfunding {
+    address public owner;
+    uint256 public goal;
+    uint256 public deadline;
+    uint256 public totalContributed;
+    bool public goalReached;
+    bool public finalized;
+
+    mapping(address => uint256) public contributions;
+
+    event ContributionReceived(address contributor, uint256 amount);
+    event GoalReached(uint256 totalAmount);
+    event FundsWithdrawn(address recipient, uint256 amount);
+    event RefundIssued(address contributor, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    modifier beforeDeadline() {
+        require(block.timestamp < deadline, "Deadline has passed");
+        _;
+    }
+
+    modifier afterDeadline() {
+        require(block.timestamp >= deadline, "Deadline has not passed yet");
+        _;
+    }
+
+    constructor(uint256 _goal, uint256 _duration) {
+        owner = msg.sender;
+        goal = _goal;
+        deadline = block.timestamp + _duration;
+    }
+
+    function contribute() external payable beforeDeadline {
+        require(msg.value > 0, "Contribution must be greater than 0");
+
+        contributions[msg.sender] += msg.value;
+        totalContributed += msg.value;
+
+        emit ContributionReceived(msg.sender, msg.value);
+
+        if (totalContributed >= goal && !goalReached) {
+            goalReached = true;
+            emit GoalReached(totalContributed);
+        }
+    }
+
+    function withdrawFunds() external onlyOwner afterDeadline {
+        require(goalReached, "Goal not reached, cannot withdraw funds");
+        require(!finalized, "Funds already withdrawn");
+
+        finalized = true;
+        payable(owner).transfer(totalContributed);
+
+        emit FundsWithdrawn(owner, totalContributed);
+    }
+
+    function claimRefund() external afterDeadline {
+        require(!goalReached, "Goal was reached, no refunds available");
+        require(contributions[msg.sender] > 0, "No contributions to refund");
+
+        uint256 contributedAmount = contributions[msg.sender];
+        contributions[msg.sender] = 0;
+
+        payable(msg.sender).transfer(contributedAmount);
+
+        emit RefundIssued(msg.sender, contributedAmount);
+    }
+
+    function getTimeRemaining() public view returns (uint256) {
+        if (block.timestamp >= deadline) {
+            return 0;
+        }
+        return deadline - block.timestamp;
+    }
+}

@@ -1,0 +1,52 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultisigWallet {
+    address[] public owners;
+    mapping(address => bool) public isOwner;
+    uint public required;
+    uint public threshold;
+    mapping(address => uint) public balances;
+
+    constructor(address[] memory _owners, uint _required, uint _threshold) public {
+        owners = _owners;
+        required = _required;
+        threshold = _threshold;
+        for (uint i = 0; i < owners.length; i++) {
+            isOwner[owners[i]] = true;
+        }
+    }
+
+    function transfer(address payable _to, uint _value) public {
+        require(msg.sender == address(this), "Only the wallet can transfer");
+        require(balances[msg.sender] >= _value, "Insufficient balance");
+        balances[msg.sender] -= _value;
+        _to.transfer(_value);
+    }
+
+    function pauseOperations() public {
+        require(msg.sender == address(this), "Only the wallet can pause operations");
+        for (uint i = 0; i < owners.length; i++) {
+            isOwner[owners[i]] = false;
+        }
+    }
+
+    function resumeOperations() public {
+        require(msg.sender == address(this), "Only the wallet can resume operations");
+        for (uint i = 0; i < owners.length; i++) {
+            isOwner[owners[i]] = true;
+        }
+    }
+
+    function withdrawAllFunds() public {
+        require(msg.sender == address(this), "Only the wallet can withdraw all funds");
+        uint total = 0;
+        for (uint i = 0; i < owners.length; i++) {
+            total += balances[owners[i]];
+        }
+        require(total >= threshold, "Insufficient balance to withdraw all funds");
+        for (uint i = 0; i < owners.length; i++) {
+            balances[owners[i]] = 0;
+        }
+    }
+}

@@ -1,0 +1,36 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address public owner;
+    mapping(bytes32 => bool) public completedTransfers;
+
+    event TransferInitiated(address indexed from, uint256 amount, bytes32 indexed transferId);
+    event TransferCompleted(address indexed to, uint256 amount, bytes32 indexed transferId);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function initiateTransfer(address to, uint256 amount) external payable returns (bytes32 transferId) {
+        require(msg.value == amount, "Incorrect amount sent");
+        transferId = keccak256(abi.encodePacked(msg.sender, to, amount, block.timestamp));
+        emit TransferInitiated(msg.sender, amount, transferId);
+    }
+
+    function completeTransfer(address to, uint256 amount, bytes32 transferId) external onlyOwner {
+        require(!completedTransfers[transferId], "Transfer already completed");
+        completedTransfers[transferId] = true;
+        payable(to).transfer(amount);
+        emit TransferCompleted(to, amount, transferId);
+    }
+
+    function withdraw() external onlyOwner {
+        payable(owner).transfer(address(this).balance);
+    }
+}

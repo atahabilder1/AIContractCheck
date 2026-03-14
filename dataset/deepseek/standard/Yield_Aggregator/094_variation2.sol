@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IDeFiStrategy {
+    function apy() external view returns (uint256);
+    function deposit(uint256 amount) external;
+    function withdraw(uint256 amount) external;
+}
+
+contract YieldAggregator {
+    IDeFiStrategy[] public strategies;
+    uint256 public lastStrategyIndex;
+
+    event StrategyChanged(address indexed newStrategy);
+
+    constructor(IDeFiStrategy[] memory _strategies) {
+        strategies = _strategies;
+        lastStrategyIndex = 0;
+    }
+
+    function setNextStrategy() internal {
+        uint256 currentAPY = strategies[lastStrategyIndex].apy();
+        uint256 nextAPY = 0;
+        uint256 nextIndex = 0;
+
+        for (uint256 i = 0; i < strategies.length; i++) {
+            if (strategies[i].apy() > nextAPY) {
+                nextAPY = strategies[i].apy();
+                nextIndex = i;
+            }
+        }
+
+        lastStrategyIndex = nextIndex;
+        emit StrategyChanged(address(strategies[lastStrategyIndex]));
+    }
+
+    function deposit(uint256 amount) external {
+        strategies[lastStrategyIndex].deposit(amount);
+    }
+
+    function withdraw(uint256 amount) external {
+        strategies[lastStrategyIndex].withdraw(amount);
+    }
+
+    function triggerRotation() external {
+        setNextStrategy();
+    }
+}

@@ -1,0 +1,42 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract RBAC {
+    struct Role {
+        address[] members;
+        mapping(address => bool) hasRole;
+    }
+
+    mapping(bytes32 => Role) private roles;
+
+    event RoleAdded(bytes32 indexed role);
+    event RoleRemoved(bytes32 indexed role);
+    event RoleGranted(bytes32 indexed role, address indexed member);
+    event RoleRevoked(bytes32 indexed role, address indexed member);
+
+    function addRole(bytes32 role) public {
+        require(!hasRole(role, msg.sender), "RBAC: Already has role");
+        roles[role].members.push(msg.sender);
+        roles[role].hasRole[msg.sender] = true;
+        emit RoleGranted(role, msg.sender);
+        emit RoleAdded(role);
+    }
+
+    function removeRole(bytes32 role) public {
+        require(hasRole(role, msg.sender), "RBAC: Does not have role");
+        for (uint256 i = 0; i < roles[role].members.length; i++) {
+            if (roles[role].members[i] == msg.sender) {
+                roles[role].members[i] = roles[role].members[roles[role].members.length - 1];
+                roles[role].members.pop();
+                roles[role].hasRole[msg.sender] = false;
+                emit RoleRevoked(role, msg.sender);
+                emit RoleRemoved(role);
+                break;
+            }
+        }
+    }
+
+    function hasRole(bytes32 role, address member) public view returns (bool) {
+        return roles[role].hasRole[member];
+    }
+}

@@ -1,0 +1,168 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address public owner;
+    address public relayer;
+    uint256 public nonce;
+    uint256 public fee;
+
+    mapping(bytes32 => bool) public processedTransactions;
+    mapping(address => bool) public supportedTokens;
+
+    event Deposit(
+        address indexed token,
+        address indexed sender,
+        address indexed recipient,
+        uint256 amount,
+        uint256 destinationChainId,
+        uint256 nonce
+    );
+
+    event Withdrawal(
+        address indexed token,
+        address indexed recipient,
+        uint256 amount,
+        uint256 sourceChainId,
+        bytes32 transactionHash
+    );
+
+    event RelayerUpdated(address indexed oldRelayer, address indexed newRelayer);
+    event FeeUpdated(uint256 oldFee, uint256 newFee);
+    event TokenAdded(address indexed token);
+    event TokenRemoved(address indexed token);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier onlyRelayer() {
+        require(msg.sender == relayer, "Not relayer");
+        _;
+    }
+
+    constructor(address _relayer, uint256 _fee) {
+        owner = msg.sender;
+        relayer = _relayer;
+        fee = _fee;
+    }
+
+    function addToken(address token) external onlyOwner {
+        supportedTokens[token] = true;
+        emit TokenAdded(token);
+    }
+
+    function removeToken(address token) external onlyOwner {
+        supportedTokens[token] = false;
+        emit TokenRemoved(token);
+    }
+
+    function setRelayer(address _relayer) external onlyOwner {
+        emit RelayerUpdated(relayer, _relayer);
+        relayer = _relayer;
+    }
+
+    function setFee(uint256 _fee) external onlyOwner {
+        emit FeeUpdated(fee, _fee);
+        fee = _fee;
+    }
+
+    function deposit(
+        address token,
+        address recipient,
+        uint256 amount,
+        uint256 destinationChainId
+    ) external payable {
+        require(supportedTokens[token], "Token not supported");
+        require(amount > 0, "Amount must be > 0");
+        require(msg.value >= fee, "Insufficient fee");
+
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
+
+        nonce++;
+
+        emit Deposit(token, msg.sender, recipient, amount, destinationChainId, nonce);
+    }
+
+    function depositETH(
+        address recipient,
+        uint256 destinationChainId
+    ) external payable {
+        require(msg.value > fee, "Insufficient amount");
+        uint256 amount = msg.value - fee;
+
+        nonce++;
+
+        emit Deposit(address(0), msg.sender, recipient, amount, destinationChainId, nonce);
+    }
+
+    function withdraw(
+        address token,
+        address recipient,
+        uint256 amount,
+        uint256 sourceChainId,
+        bytes32 sourceTransactionHash
+    ) external onlyRelayer {
+        require(!processedTransactions[sourceTransactionHash], "Already processed");
+
+        processedTransactions[sourceTransactionHash] = true;
+
+        if (token == address(0)) {
+            (bool success, ) = recipient.call{value: amount}("");
+            require(success, "ETH transfer failed");
+        } else {
+            IERC20(token).transfer(recipient, amount);
+        }
+
+        emit Withdrawal(token, recipient, amount, sourceChainId, sourceTransactionHash);
+    }
+
+    function batchWithdraw(
+        address[] calldata tokens,
+        address[] calldata recipients,
+        uint256[] calldata amounts,
+        uint256[] calldata sourceChainIds,
+        bytes32[] calldata sourceTransactionHashes
+    ) external onlyRelayer {
+        require(
+            tokens.length == recipients.length &&
+            tokens.length == amounts.length &&
+            tokens.length == sourceChainIds.length &&
+            tokens.length == sourceTransactionHashes.length,
+            "Array length mismatch"
+        );
+
+        for (uint256 i = 0; i < tokens.length; i++) {
+            if (processedTransactions[sourceTransactionHashes[i]]) {
+                continue;
+            }
+
+            processedTransactions[sourceTransactionHashes[i]] = true;
+
+            if (tokens[i] == address(0)) {
+                (bool success, ) = recipients[i].call{value: amounts[i]}("");
+                require(success, "ETH transfer failed");
+            } else {
+                IERC20(tokens[i]).transfer(recipients[i], amounts[i]);
+            }
+
+            emit Withdrawal(tokens[i], recipients[i], amounts[i], sourceChainIds[i], sourceTransactionHashes[i]);
+        }
+    }
+
+    function withdrawFees(address payable to) external onlyOwner {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No fees to withdraw");
+        (bool success, ) = to.call{value: balance}("");
+        require(success, "Transfer failed");
+    }
+
+    receive() external payable {}
+}
+
+interface IERC20 {
+    function transfer(address to, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}

@@ -1,0 +1,107 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+}
+
+contract WrappedTokenBridge {
+    string public name;
+    string public symbol;
+    uint8 public decimals;
+    IERC20 public immutable underlyingToken;
+
+    mapping(address => uint256) public balances;
+    mapping(address => mapping(address => uint256)) public allowances;
+
+    uint256 public totalSupply;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+    event Deposit(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
+
+    constructor(string memory _name, string memory _symbol, uint8 _decimals, address _underlyingToken) {
+        name = _name;
+        symbol = _symbol;
+        decimals = _decimals;
+        underlyingToken = IERC20(_underlyingToken);
+    }
+
+    function deposit(uint256 amount) public {
+        require(amount > 0, "Amount must be greater than zero");
+        uint256 balanceBefore = underlyingToken.balanceOf(address(this));
+        require(underlyingToken.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        uint256 balanceAfter = underlyingToken.balanceOf(address(this));
+        require(balanceAfter == balanceBefore + amount, "Invalid deposit amount");
+
+        if (balances[msg.sender] == 0) {
+            totalSupply++;
+        }
+        balances[msg.sender] += amount;
+
+        emit Deposit(msg.sender, amount);
+        emit Transfer(address(0), msg.sender, amount);
+    }
+
+    function withdraw(uint256 amount) public {
+        require(amount > 0, "Amount must be greater than zero");
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+
+        uint256 balanceBefore = underlyingToken.balanceOf(address(this));
+        require(underlyingToken.transfer(msg.sender, amount), "Transfer failed");
+        uint256 balanceAfter = underlyingToken.balanceOf(address(this));
+        require(balanceAfter == balanceBefore - amount, "Invalid withdraw amount");
+
+        balances[msg.sender] -= amount;
+        if (balances[msg.sender] == 0) {
+            totalSupply--;
+        }
+
+        emit Withdraw(msg.sender, amount);
+        emit Transfer(msg.sender, address(0), amount);
+    }
+
+    function approve(address spender, uint256 amount) public returns (bool) {
+        allowances[msg.sender][spender] = amount;
+        emit Approval(msg.sender, spender, amount);
+        return true;
+    }
+
+    function transfer(address to, uint256 amount) public returns (bool) {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        balances[msg.sender] -= amount;
+        balances[to] += amount;
+        emit Transfer(msg.sender, to, amount);
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) public returns (bool) {
+        require(balances[from] >= amount, "Insufficient balance");
+        require(allowances[from][msg.sender] >= amount, "Allowance exceeded");
+
+        balances[from] -= amount;
+        balances[to] += amount;
+        allowances[from][msg.sender] -= amount;
+
+        emit Transfer(from, to, amount);
+        return true;
+    }
+
+    function totalSupply() public view returns (uint256) {
+        return totalSupply;
+    }
+
+    function balanceOf(address account) public view returns (uint256) {
+        return balances[account];
+    }
+
+    function allowance(address owner, address spender) public view returns (uint256) {
+        return allowances[owner][spender];
+    }
+}

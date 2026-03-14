@@ -1,0 +1,64 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleDAO {
+    address public owner;
+    uint256 public proposalCount;
+
+    struct Proposal {
+        string description;
+        uint256 amount;
+        address payable recipient;
+        uint256 votes;
+        bool executed;
+    }
+
+    mapping(uint256 => Proposal) public proposals;
+    mapping(address => bool) public voters;
+
+    event ProposalCreated(uint256 proposalId, string description, uint256 amount, address recipient);
+    event Voted(uint256 proposalId, address voter);
+    event ProposalExecuted(uint256 proposalId);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    modifier onlyVoters() {
+        require(voters[msg.sender], "Not a voter");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function addVoter(address voter) public onlyOwner {
+        voters[voter] = true;
+    }
+
+    function createProposal(string memory description, uint256 amount, address payable recipient) public onlyOwner {
+        proposals[proposalCount] = Proposal(description, amount, recipient, 0, false);
+        emit ProposalCreated(proposalCount, description, amount, recipient);
+        proposalCount++;
+    }
+
+    function vote(uint256 proposalId) public onlyVoters {
+        Proposal storage proposal = proposals[proposalId];
+        require(!proposal.executed, "Proposal already executed");
+        proposal.votes += 1;
+        emit Voted(proposalId, msg.sender);
+    }
+
+    function executeProposal(uint256 proposalId) public onlyOwner {
+        Proposal storage proposal = proposals[proposalId];
+        require(!proposal.executed, "Proposal already executed");
+        require(proposal.votes > 0, "No votes for this proposal");
+        proposal.recipient.transfer(proposal.amount);
+        proposal.executed = true;
+        emit ProposalExecuted(proposalId);
+    }
+}
+```

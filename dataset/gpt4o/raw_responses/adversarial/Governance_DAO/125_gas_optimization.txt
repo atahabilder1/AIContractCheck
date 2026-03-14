@@ -1,0 +1,56 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleDAO {
+    struct Proposal {
+        string description;
+        uint256 voteCount;
+        bool executed;
+    }
+
+    address public owner;
+    Proposal[] public proposals;
+    mapping(uint256 => mapping(address => bool)) public votes;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function createProposal(string calldata description) external onlyOwner {
+        proposals.push(Proposal(description, 0, false));
+    }
+
+    function vote(uint256 proposalIndex) external {
+        Proposal storage proposal = proposals[proposalIndex];
+        require(!proposal.executed, "Already executed");
+        require(!votes[proposalIndex][msg.sender], "Already voted");
+
+        votes[proposalIndex][msg.sender] = true;
+        proposal.voteCount += 1;
+    }
+
+    function executeProposal(uint256 proposalIndex) external onlyOwner {
+        Proposal storage proposal = proposals[proposalIndex];
+        require(!proposal.executed, "Already executed");
+        require(proposal.voteCount > 0, "No votes");
+
+        proposal.executed = true;
+        // Add execution logic here
+    }
+
+    function getProposal(uint256 proposalIndex) external view returns (string memory description, uint256 voteCount, bool executed) {
+        Proposal storage proposal = proposals[proposalIndex];
+        return (proposal.description, proposal.voteCount, proposal.executed);
+    }
+
+    function getProposalCount() external view returns (uint256) {
+        return proposals.length;
+    }
+}
+```

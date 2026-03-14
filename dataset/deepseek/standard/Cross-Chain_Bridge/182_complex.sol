@@ -1,0 +1,100 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transfer(address to, uint256 value) external returns (bool);
+    function approve(address spender, uint256 value) external returns (bool);
+}
+
+interface IMessenger {
+    function sendMessage(bytes32 messageHash, bytes memory message) external;
+    function receiveMessage(bytes32 messageHash, bytes memory message) external;
+}
+
+contract CrossChainBridge {
+    using SafeMath for uint256;
+
+    IERC20 public token;
+    IMessenger public messenger;
+    uint256 public messageNonce;
+    mapping(uint256 => bool) public processedMessages;
+    uint256 public constant MAX_MESSAGE_RATE = 10;
+    uint256 public constant EMERGENCY_WITHDRAWAL_DELAY = 7 days;
+
+    address public owner;
+    bool public paused;
+    mapping(address => uint256) public lastSentBlock;
+
+    event MessageSent(bytes32 indexed messageHash, address indexed to, uint256 value);
+    event MessageReceived(bytes32 indexed messageHash, address indexed from, uint256 value);
+    event EmergencyWithdrawal(address indexed to, uint256 value);
+    event Paused();
+    event Unpaused();
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
+    modifier whenPaused() {
+        require(paused, "Contract is not paused");
+        _;
+    }
+
+    constructor(address _token, address _messenger) {
+        token = IERC20(_token);
+        messenger = IMessenger(_messenger);
+        owner = msg.sender;
+    }
+
+    function sendMessage(address to, uint256 value, bytes32 messageHash) internal whenNotPaused {
+        require(processedMessages[uint256(messageHash)] == false, "Message already processed");
+        require(to != address(0), "Invalid recipient address");
+        require(token.balanceOf(address(this)) >= value, "Insufficient balance");
+        require(block.number.sub(lastSentBlock[msg.sender]) >= 10, "Rate limit exceeded");
+
+        token.transfer(to, value);
+        lastSentBlock[msg.sender] = block.number;
+        processedMessages[uint256(messageHash)] = true;
+        messenger.sendMessage(messageHash, abi.encodePacked(to, value));
+
+        emit MessageSent(messageHash, to, value);
+    }
+
+    function receiveMessage(bytes32 messageHash, address from, uint256 value, bytes memory proof) public {
+        require(processedMessages[uint256(messageHash)] == false, "Message already processed");
+        require(verifyMerkleProof(messageHash, proof), "Invalid merkle proof");
+
+        processedMessages[uint256(messageHash)] = true;
+        token.transferFrom(from, address(this), value);
+
+        emit MessageReceived(messageHash, from, value);
+    }
+
+    function verifyMerkleProof(bytes32 root, bytes memory proof) internal pure returns (bool) {
+        // Implement merkle proof verification logic here
+        // This is a placeholder and should be replaced with actual implementation
+        return true;
+    }
+
+    function emergencyWithdraw(address to, uint256 value) public onlyOwner whenPaused {
+        require(block.timestamp >= lastSentBlock[msg.sender].add(EMERGENCY_WITHDRAWAL_DELAY), "Emergency withdrawal delay not met");
+        token.transfer(to, value);
+        emit EmergencyWithdrawal(to, value);
+    }
+
+    function pause() public onlyOwner {
+        paused = true;
+        emit Paused();
+    }
+
+    function unpause() public onlyOwner {
+        paused = false;
+        emit Unpaused();
+    }
+}

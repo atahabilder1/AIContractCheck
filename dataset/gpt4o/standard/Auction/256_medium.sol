@@ -1,0 +1,106 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Auction {
+    enum AuctionType { English, Dutch }
+    enum AuctionState { Active, Ended }
+
+    struct AuctionItem {
+        address payable seller;
+        AuctionType auctionType;
+        AuctionState state;
+        uint256 reservePrice;
+        uint256 highestBid;
+        address payable highestBidder;
+        uint256 startBlock;
+        uint256 endBlock;
+        uint256 decrement;
+        uint256 bidIncrement;
+    }
+
+    mapping(uint256 => AuctionItem) public auctions;
+    uint256 public auctionCount;
+
+    event AuctionCreated(uint256 indexed auctionId, AuctionType auctionType);
+    event BidPlaced(uint256 indexed auctionId, address bidder, uint256 amount);
+    event AuctionEnded(uint256 indexed auctionId, address winner, uint256 amount);
+    event BidRefunded(address bidder, uint256 amount);
+
+    modifier onlyActiveAuction(uint256 auctionId) {
+        require(auctions[auctionId].state == AuctionState.Active, "Auction is not active");
+        require(block.number >= auctions[auctionId].startBlock, "Auction has not started yet");
+        require(block.number <= auctions[auctionId].endBlock, "Auction has already ended");
+        _;
+    }
+
+    function createEnglishAuction(uint256 reservePrice, uint256 bidIncrement, uint256 duration) external {
+        auctionCount++;
+        auctions[auctionCount] = AuctionItem({
+            seller: payable(msg.sender),
+            auctionType: AuctionType.English,
+            state: AuctionState.Active,
+            reservePrice: reservePrice,
+            highestBid: 0,
+            highestBidder: payable(address(0)),
+            startBlock: block.number,
+            endBlock: block.number + duration,
+            decrement: 0,
+            bidIncrement: bidIncrement
+        });
+        emit AuctionCreated(auctionCount, AuctionType.English);
+    }
+
+    function createDutchAuction(uint256 reservePrice, uint256 startPrice, uint256 decrement, uint256 duration) external {
+        auctionCount++;
+        auctions[auctionCount] = AuctionItem({
+            seller: payable(msg.sender),
+            auctionType: AuctionType.Dutch,
+            state: AuctionState.Active,
+            reservePrice: reservePrice,
+            highestBid: startPrice,
+            highestBidder: payable(address(0)),
+            startBlock: block.number,
+            endBlock: block.number + duration,
+            decrement: decrement,
+            bidIncrement: 0
+        });
+        emit AuctionCreated(auctionCount, AuctionType.Dutch);
+    }
+
+    function placeBid(uint256 auctionId) external payable onlyActiveAuction(auctionId) {
+        AuctionItem storage auction = auctions[auctionId];
+        if (auction.auctionType == AuctionType.English) {
+            require(msg.value >= auction.highestBid + auction.bidIncrement, "Insufficient bid");
+            if (auction.highestBidder != address(0)) {
+                auction.highestBidder.transfer(auction.highestBid);
+                emit BidRefunded(auction.highestBidder, auction.highestBid);
+            }
+            auction.highestBid = msg.value;
+            auction.highestBidder = payable(msg.sender);
+        } else {
+            uint256 currentPrice = auction.highestBid - (auction.decrement * (block.number - auction.startBlock));
+            require(msg.value >= currentPrice, "Bid lower than current price");
+            auction.highestBid = msg.value;
+            auction.highestBidder = payable(msg.sender);
+            endAuction(auctionId);
+        }
+        emit BidPlaced(auctionId, msg.sender, msg.value);
+    }
+
+    function endAuction(uint256 auctionId) public onlyActiveAuction(auctionId) {
+        AuctionItem storage auction = auctions[auctionId];
+        require(block.number >= auction.endBlock || auction.auctionType == AuctionType.Dutch, "Auction not yet ended");
+
+        auction.state = AuctionState.Ended;
+        if (auction.highestBid >= auction.reservePrice) {
+            auction.seller.transfer(auction.highestBid);
+            emit AuctionEnded(auctionId, auction.highestBidder, auction.highestBid);
+        } else {
+            if (auction.highestBidder != address(0)) {
+                auction.highestBidder.transfer(auction.highestBid);
+                emit BidRefunded(auction.highestBidder, auction.highestBid);
+            }
+            emit AuctionEnded(auctionId, address(0), 0);
+        }
+    }
+}

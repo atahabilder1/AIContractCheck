@@ -1,0 +1,67 @@
+
+Here is an example of a vault contract that auto-compounds LP rewards from a Uniswap-style pool back into the same position:
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Vault {
+    address public pool;
+    address public tokenA;
+    address public tokenB;
+    uint256 public rewardPerShare;
+    uint256 public totalSupply;
+
+    constructor(address _pool, address _tokenA, address _tokenB) {
+        pool = _pool;
+        tokenA = _tokenA;
+        tokenB = _tokenB;
+        rewardPerShare = 0;
+        totalSupply = 0;
+    }
+
+    function addLiquidity(uint256 _amount) public {
+        require(msg.sender == pool, "Only the pool can add liquidity");
+        require(_amount > 0, "Amount must be greater than 0");
+
+        uint256 _tokenAAmount = _amount.mul(10**18).div(getTokenPrice(tokenA));
+        uint256 _tokenBAmount = _amount.mul(10**18).div(getTokenPrice(tokenB));
+
+        // Add liquidity to the pool
+        pool.addLiquidity(tokenA, _tokenAAmount, tokenB, _tokenBAmount);
+
+        // Update rewardPerShare and totalSupply
+        rewardPerShare = getRewardPerShare();
+        totalSupply = getTotalSupply();
+    }
+
+    function getRewardPerShare() public view returns (uint256) {
+        return pool.getRewardPerShare(tokenA, tokenB);
+    }
+
+    function getTotalSupply() public view returns (uint256) {
+        return pool.getTotalSupply(tokenA, tokenB);
+    }
+
+    function compoundRewards() public {
+        require(msg.sender == pool, "Only the pool can compound rewards");
+
+        // Get the current reward per share
+        uint256 _rewardPerShare = getRewardPerShare();
+
+        // Calculate the reward for the current position
+        uint256 _reward = _rewardPerShare.mul(totalSupply).div(10**18);
+
+        // Transfer the reward to the pool
+        pool.transfer(tokenA, _reward);
+
+        // Update rewardPerShare and totalSupply
+        rewardPerShare = getRewardPerShare();
+        totalSupply = getTotalSupply();
+    }
+}
+```
+This contract has three main functions: `addLiquidity`, `getRewardPerShare`, and `compoundRewards`. The `addLiquidity` function allows the pool to add liquidity to the contract, and the `getRewardPerShare` function calculates the current reward per share. The `compoundRewards` function compounds the rewards by transferring the reward to the pool and updating the `rewardPerShare` and `totalSupply` variables.
+
+The contract also has two public variables: `pool`, which is the address of the Uniswap-style pool, and `tokenA` and `tokenB`, which are the addresses of the two tokens in the pool.
+
+Note that this is just an example and may need to be modified to fit your specific use case. Additionally, you will need to ensure that the pool is set up correctly and that the rewards are being distributed correctly.

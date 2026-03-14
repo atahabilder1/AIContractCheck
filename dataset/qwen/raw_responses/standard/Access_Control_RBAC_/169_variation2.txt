@@ -1,0 +1,50 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+contract PermissionSystem {
+    enum PermissionLevel { None, Basic, Advanced, Admin }
+
+    mapping(address => uint256) public reputationScore;
+    mapping(address => PermissionLevel) public userPermissions;
+
+    event PermissionUpdated(address indexed user, PermissionLevel newPermission);
+
+    modifier requiresPermission(PermissionLevel requiredLevel) {
+        require(userPermissions[msg.sender] >= requiredLevel, "Insufficient permissions");
+        _;
+    }
+
+    function updateReputation(address user, uint256 score) external {
+        reputationScore[user] = score;
+        updatePermission(user);
+    }
+
+    function updatePermission(address user) private {
+        PermissionLevel newPermission;
+        if (reputationScore[user] >= 1000) {
+            newPermission = PermissionLevel.Admin;
+        } else if (reputationScore[user] >= 500) {
+            newPermission = PermissionLevel.Advanced;
+        } else if (reputationScore[user] >= 100) {
+            newPermission = PermissionLevel.Basic;
+        } else {
+            newPermission = PermissionLevel.None;
+        }
+        userPermissions[user] = newPermission;
+        emit PermissionUpdated(user, newPermission);
+    }
+
+    function performBasicAction() external requiresPermission(PermissionLevel.Basic) {
+        // Basic action logic here
+    }
+
+    function performAdvancedAction() external requiresPermission(PermissionLevel.Advanced) {
+        // Advanced action logic here
+    }
+
+    function performAdminAction() external requiresPermission(PermissionLevel.Admin) {
+        // Admin action logic here
+    }
+}
+```

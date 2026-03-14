@@ -1,0 +1,104 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract UUPSUpgradeableProxy {
+    bytes32 private constant _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+    bytes32 private constant _ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+
+    constructor(address _logic, bytes memory _data) payable {
+        assert(_IMPLEMENTATION_SLOT == bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1));
+        assert(_ADMIN_SLOT == bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1));
+        _setImplementation(_logic);
+        if (_data.length > 0) {
+            (bool success, ) = _logic.delegatecall(_data);
+            require(success);
+        }
+    }
+
+    modifier ifAdmin() {
+        if (msg.sender == _getAdmin()) {
+            _;
+        } else {
+            _fallback();
+        }
+    }
+
+    receive() external payable virtual {
+        _fallback();
+    }
+
+    fallback() external payable virtual {
+        _fallback();
+    }
+
+    function _fallback() internal virtual {
+        address _impl = _getImplementation();
+        require(_impl != address(0));
+        assembly {
+            calldatacopy(0, 0, calldatasize())
+            let result := delegatecall(gas(), _impl, 0, calldatasize(), 0, 0)
+            returndatacopy(0, 0, returndatasize())
+            switch result
+            case 0 { revert(0, returndatasize()) }
+            default { return(0, returndatasize()) }
+        }
+    }
+
+    function _setImplementation(address newImplementation) internal virtual {
+        require(isContract(newImplementation), "ERC1967: new implementation is not a contract");
+        bytes32 slot = _IMPLEMENTATION_SLOT;
+        assembly {
+            sstore(slot, newImplementation)
+        }
+    }
+
+    function _getImplementation() internal view virtual returns (address impl) {
+        bytes32 slot = _IMPLEMENTATION_SLOT;
+        assembly {
+            impl := sload(slot)
+        }
+    }
+
+    function _setAdmin(address newAdmin) internal virtual {
+        bytes32 slot = _ADMIN_SLOT;
+        assembly {
+            sstore(slot, newAdmin)
+        }
+    }
+
+    function _getAdmin() internal view virtual returns (address admin) {
+        bytes32 slot = _ADMIN_SLOT;
+        assembly {
+            admin := sload(slot)
+        }
+    }
+
+    function changeAdmin(address newAdmin) external ifAdmin {
+        require(newAdmin != address(0), "ERC1967: new admin is the zero address");
+        _setAdmin(newAdmin);
+    }
+
+    function upgradeTo(address newImplementation) external ifAdmin {
+        _upgradeToAndCall(newImplementation, bytes(""));
+    }
+
+    function upgradeToAndCall(address newImplementation, bytes memory data) external payable ifAdmin {
+        _upgradeToAndCall(newImplementation, data);
+    }
+
+    function _upgradeToAndCall(address newImplementation, bytes memory data) internal virtual {
+        _setImplementation(newImplementation);
+        if (data.length > 0) {
+            (bool success, ) = newImplementation.delegatecall(data);
+            require(success);
+        }
+    }
+
+    function isContract(address account) internal view returns (bool) {
+        uint256 size;
+        assembly { size := extcodesize(account) }
+        return size > 0;
+    }
+}
+```

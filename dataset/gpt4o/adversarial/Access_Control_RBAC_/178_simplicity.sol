@@ -1,0 +1,42 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract AccessControl {
+    mapping(address => mapping(bytes32 => bool)) private roles;
+    mapping(bytes32 => bytes32) private adminRoles;
+
+    event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender);
+    event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender);
+
+    modifier onlyRole(bytes32 role) {
+        require(hasRole(role, msg.sender), "AccessControl: sender does not have role");
+        _;
+    }
+
+    constructor() {
+        // Default admin role is 0x00
+        adminRoles[0x00] = 0x00;
+    }
+
+    function grantRole(bytes32 role, address account) public onlyRole(getRoleAdmin(role)) {
+        roles[account][role] = true;
+        emit RoleGranted(role, account, msg.sender);
+    }
+
+    function revokeRole(bytes32 role, address account) public onlyRole(getRoleAdmin(role)) {
+        roles[account][role] = false;
+        emit RoleRevoked(role, account, msg.sender);
+    }
+
+    function hasRole(bytes32 role, address account) public view returns (bool) {
+        return roles[account][role];
+    }
+
+    function getRoleAdmin(bytes32 role) public view returns (bytes32) {
+        return adminRoles[role];
+    }
+
+    function setRoleAdmin(bytes32 role, bytes32 adminRole) public onlyRole(adminRoles[role]) {
+        adminRoles[role] = adminRole;
+    }
+}

@@ -1,0 +1,63 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
+
+contract DynamicERC1155 is ERC1155, Ownable {
+    using Strings for uint256;
+
+    string private _baseURI;
+    mapping(uint256 => string) private _tokenURIs;
+    mapping(uint256 => uint256[]) private _craftingRequirements;
+
+    constructor(string memory uri) ERC1155("") {
+        _baseURI = uri;
+    }
+
+    function uri(uint256 _tokenId) public view override returns (string memory) {
+        return bytes(_tokenURIs[_tokenId]).length > 0 ? _tokenURIs[_tokenId] : string(abi.encodePacked(_baseURI, _tokenId.toString()));
+    }
+
+    function setBaseURI(string memory newBaseURI) external onlyOwner {
+        _baseURI = newBaseURI;
+    }
+
+    function setTokenURI(uint256 _tokenId, string memory _uri) external onlyOwner {
+        _tokenURIs[_tokenId] = _uri;
+    }
+
+    function setCraftingRequirements(uint256 _newTokenId, uint256[] memory _requiredTokenIds) external onlyOwner {
+        _craftingRequirements[_newTokenId] = _requiredTokenIds;
+    }
+
+    function craft(uint256 _newTokenId, uint256 _amount) external {
+        require(_craftingRequirements[_newTokenId].length > 0, "Crafting requirements not set");
+
+        for (uint256 i = 0; i < _craftingRequirements[_newTokenId].length; i++) {
+            uint256 requiredTokenId = _craftingRequirements[_newTokenId][i];
+            _burn(msg.sender, requiredTokenId, _amount);
+        }
+
+        _mint(msg.sender, _newTokenId, _amount, "");
+    }
+
+    function batchCraft(uint256[] memory _newTokenIds, uint256[] memory _amounts) external {
+        require(_newTokenIds.length == _amounts.length, "Mismatched arrays");
+
+        for (uint256 i = 0; i < _newTokenIds.length; i++) {
+            craft(_newTokenIds[i], _amounts[i]);
+        }
+    }
+
+    function mint(address _to, uint256 _id, uint256 _amount, bytes memory _data) external onlyOwner {
+        _mint(_to, _id, _amount, _data);
+    }
+
+    function mintBatch(address _to, uint256[] memory _ids, uint256[] memory _amounts, bytes memory _data) external onlyOwner {
+        _mintBatch(_to, _ids, _amounts, _data);
+    }
+}
+```

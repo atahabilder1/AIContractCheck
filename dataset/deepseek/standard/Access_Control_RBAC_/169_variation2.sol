@@ -1,0 +1,29 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+abstract contract PermissionSystem {
+    mapping(address => uint256) public permissions;
+
+    function setPermission(address user, uint256 level) internal virtual {
+        permissions[user] = level;
+    }
+
+    modifier onlyAdmin() {
+        require(permissions[msg.sender] >= 10, "Permission: Admin required");
+        _;
+    }
+
+    modifier onlyUser() {
+        require(permissions[msg.sender] >= 1, "Permission: User required");
+        _;
+    }
+
+    modifier onlyModerator() {
+        require(permissions[msg.sender] >= 5, "Permission: Moderator required");
+        _;
+    }
+
+    function updatePermissions(address user, uint256 newLevel) external onlyAdmin {
+        setPermission(user, newLevel);
+    }
+}

@@ -1,0 +1,76 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract RoleBasedAccessControl {
+    struct Role {
+        mapping(address => bool) members;
+        uint256 memberCount;
+    }
+
+    mapping(bytes32 => Role) private roles;
+    mapping(address => bytes32[]) private userRoles;
+
+    event RoleAdded(bytes32 indexed role);
+    event RoleRemoved(bytes32 indexed role);
+    event MemberAdded(bytes32 indexed role, address indexed member);
+    event MemberRemoved(bytes32 indexed role, address indexed member);
+
+    modifier onlyRole(bytes32 role) {
+        require(isMember(role, msg.sender), "RBAC: Caller does not have the required role");
+        _;
+    }
+
+    function addRole(bytes32 role) external {
+        require(!roleExists(role), "RBAC: Role already exists");
+        emit RoleAdded(role);
+    }
+
+    function removeRole(bytes32 role) external {
+        require(roleExists(role), "RBAC: Role does not exist");
+        require(roles[role].memberCount == 0, "RBAC: Role still has members");
+        emit RoleRemoved(role);
+        delete roles[role];
+    }
+
+    function addMember(bytes32 role, address member) external onlyRole(bytes32(keccak256("ADMIN_ROLE"))) {
+        require(roleExists(role), "RBAC: Role does not exist");
+        require(!isMember(role, member), "RBAC: Member already has the role");
+        roles[role].members[member] = true;
+        roles[role].memberCount++;
+        userRoles[member].push(role);
+        emit MemberAdded(role, member);
+    }
+
+    function removeMember(bytes32 role, address member) external onlyRole(bytes32(keccak256("ADMIN_ROLE"))) {
+        require(roleExists(role), "RBAC: Role does not exist");
+        require(isMember(role, member), "RBAC: Member does not have the role");
+        roles[role].members[member] = false;
+        roles[role].memberCount--;
+        removeUserRole(member, role);
+        emit MemberRemoved(role, member);
+    }
+
+    function isMember(bytes32 role, address member) public view returns (bool) {
+        return roles[role].members[member];
+    }
+
+    function roleExists(bytes32 role) public view returns (bool) {
+        return roles[role].memberCount > 0 || roles[role].members[msg.sender];
+    }
+
+    function getUserRoles(address user) external view returns (bytes32[] memory) {
+        return userRoles[user];
+    }
+
+    function removeUserRole(address user, bytes32 role) internal {
+        bytes32[] storage rolesList = userRoles[user];
+        uint256 length = rolesList.length;
+        for (uint256 i = 0; i < length; i++) {
+            if (rolesList[i] == role) {
+                rolesList[i] = rolesList[length - 1];
+                rolesList.pop();
+                break;
+            }
+        }
+    }
+}

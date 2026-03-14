@@ -1,0 +1,45 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "https://github.com/aave/aave-protocol/blob/master/contracts/flashloan/FlashLoanReceiverBase.sol";
+import "https://github.com/aave/aave-protocol/blob/master/contracts/interfaces/ILendingPoolAddressesProvider.sol";
+import "https://github.com/aave/aave-protocol/blob/master/contracts/interfaces/ILendingPool.sol";
+
+contract FlashLoanProvider is FlashLoanReceiverBase {
+    ILendingPoolAddressesProvider public lendingPoolAddressesProvider;
+
+    constructor(address _provider) {
+        lendingPoolAddressesProvider = ILendingPoolAddressesProvider(_provider);
+    }
+
+    function executeOperation(
+        address _asset,
+        uint256 _amount,
+        uint256 _fee,
+        bytes calldata _params
+    ) external override returns (bool) {
+        // Implement your flash loan logic here
+        // For example, let's just transfer the flash loan amount back to the caller
+        (address receiver, uint256 amount) = abi.decode(_params, (address, uint256));
+        require(msg.sender == address(lendingPool), "Invalid lender");
+        require(_amount + _fee <= address(this).balance, "Not enough funds to repay the flash loan");
+
+        // Transfer the funds back to the receiver
+        (bool success, ) = receiver.call{value: amount}("");
+        require(success, "Transfer failed");
+
+        // Return true if the repayment was successful
+        return true;
+    }
+
+    function requestFlashLoan(address _receiver, uint256 _amount) public {
+        address lendingPoolAddress = lendingPoolAddressesProvider.getLendingPool();
+        ILendingPool lendingPool = ILendingPool(lendingPoolAddress);
+
+        // 0% flash loan fee for simplicity
+        bytes memory data = abi.encode(_receiver, _amount);
+        lendingPool.flashLoan(address(this), _receiver, _amount, data);
+    }
+
+    receive() external payable {}
+}

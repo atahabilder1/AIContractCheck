@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract WrappedToken is ERC20, Ownable {
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) {
+        // No initial supply, tokens will be minted against underlying assets
+    }
+
+    /**
+     * @dev Mints new wrapped tokens. Only the owner can call this.
+     * @param to The address to mint tokens to.
+     * @param amount The amount of tokens to mint.
+     */
+    function mint(address to, uint256 amount) public onlyOwner {
+        _mint(to, amount);
+    }
+
+    /**
+     * @dev Burns wrapped tokens. The caller must approve the transfer of these tokens first.
+     * @param from The address from which to burn tokens.
+     * @param amount The amount of tokens to burn.
+     */
+    function burn(address from, uint256 amount) public {
+        _burn(from, amount);
+    }
+
+    /**
+     * @dev Burns wrapped tokens from the caller's account.
+     * @param amount The amount of tokens to burn.
+     */
+    function burnFrom(address account, uint256 amount) public {
+        _burnFrom(account, amount);
+    }
+}

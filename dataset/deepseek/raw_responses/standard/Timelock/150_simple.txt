@@ -1,0 +1,35 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    struct TimelockedTransaction {
+        address target;
+        uint256 value;
+        bytes data;
+        uint256 executionTime;
+    }
+
+    mapping(uint256 => TimelockedTransaction) public queuedTransactions;
+    uint256 public queueIndex;
+    uint256 public delay;
+
+    constructor(uint256 _delay) {
+        require(_delay > 0, "Delay must be greater than zero");
+        delay = _delay;
+    }
+
+    function queueTransaction(address target, uint256 value, bytes memory data) public {
+        uint256 executionTime = block.timestamp + delay;
+        queuedTransactions[queueIndex++] = TimelockedTransaction(target, value, data, executionTime);
+    }
+
+    function executeTransaction(uint256 transactionId) public {
+        TimelockedTransaction storage transaction = queuedTransactions[transactionId];
+        require(block.timestamp >= transaction.executionTime, "Transaction not yet executable");
+        require(transaction.target.call{value: transaction.value}(transaction.data), "Transaction execution failed");
+        // Mark the transaction as executed
+        delete queuedTransactions[transactionId];
+    }
+}
+```

@@ -1,0 +1,36 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IProxy {
+    function implementation() external view returns (address);
+    function upgradeTo(address newImplementation) external;
+}
+
+contract UUPSProxy is IProxy {
+    address private immutable _implementation;
+
+    constructor(address implementationAddress) {
+        _implementation = implementationAddress;
+    }
+
+    function implementation() external view override returns (address) {
+        return _implementation;
+    }
+
+    function upgradeTo(address newImplementation) external override {
+        require(msg.sender == address(this), "Only this contract can upgrade");
+        _implementation = newImplementation;
+    }
+
+    fallback() external payable {
+        address impl = _implementation;
+        assembly {
+            calldatacopy(0, 0, calldatasize())
+            let result := delegatecall(gas(), impl, 0, calldatasize(), 0, 0)
+            returndatacopy(0, 0, returndatasize())
+            switch result
+            case 0 { revert(0, returndatasize()) }
+            default { return(0, returndatasize()) }
+        }
+    }
+}

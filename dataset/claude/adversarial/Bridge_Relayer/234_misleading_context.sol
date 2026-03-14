@@ -1,0 +1,161 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+contract BridgeRelayer {
+    address public owner;
+    address public relayer;
+
+    uint256 public nonce;
+    uint256 public requiredConfirmations = 1;
+
+    mapping(bytes32 => bool) public processedDeposits;
+    mapping(address => mapping(address => uint256)) public tokenBalances;
+
+    event Deposit(
+        address indexed token,
+        address indexed sender,
+        address indexed recipient,
+        uint256 amount,
+        uint256 destinationChainId,
+        uint256 nonce
+    );
+
+    event Withdrawal(
+        bytes32 indexed depositHash,
+        address indexed token,
+        address indexed recipient,
+        uint256 amount
+    );
+
+    event RelayerUpdated(address indexed oldRelayer, address indexed newRelayer);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier onlyRelayer() {
+        require(msg.sender == relayer, "Not relayer");
+        _;
+    }
+
+    constructor(address _relayer) {
+        owner = msg.sender;
+        relayer = _relayer;
+    }
+
+    function depositETH(address recipient, uint256 destinationChainId) external payable {
+        require(msg.value > 0, "Zero amount");
+        require(recipient != address(0), "Zero address");
+
+        uint256 currentNonce = nonce++;
+
+        emit Deposit(
+            address(0),
+            msg.sender,
+            recipient,
+            msg.value,
+            destinationChainId,
+            currentNonce
+        );
+    }
+
+    function depositERC20(
+        address token,
+        uint256 amount,
+        address recipient,
+        uint256 destinationChainId
+    ) external {
+        require(amount > 0, "Zero amount");
+        require(recipient != address(0), "Zero address");
+        require(token != address(0), "Zero token address");
+
+        (bool success, bytes memory data) = token.call(
+            abi.encodeWithSignature("transferFrom(address,address,uint256)", msg.sender, address(this), amount)
+        );
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "Transfer failed");
+
+        tokenBalances[token][msg.sender] += amount;
+        uint256 currentNonce = nonce++;
+
+        emit Deposit(
+            token,
+            msg.sender,
+            recipient,
+            amount,
+            destinationChainId,
+            currentNonce
+        );
+    }
+
+    function relayWithdrawETH(
+        bytes32 depositHash,
+        address payable recipient,
+        uint256 amount
+    ) external onlyRelayer {
+        require(!processedDeposits[depositHash], "Already processed");
+        require(address(this).balance >= amount, "Insufficient ETH balance");
+
+        processedDeposits[depositHash] = true;
+        recipient.transfer(amount);
+
+        emit Withdrawal(depositHash, address(0), recipient, amount);
+    }
+
+    function relayWithdrawERC20(
+        bytes32 depositHash,
+        address token,
+        address recipient,
+        uint256 amount
+    ) external onlyRelayer {
+        require(!processedDeposits[depositHash], "Already processed");
+
+        processedDeposits[depositHash] = true;
+
+        (bool success, bytes memory data) = token.call(
+            abi.encodeWithSignature("transfer(address,uint256)", recipient, amount)
+        );
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "Transfer failed");
+
+        emit Withdrawal(depositHash, token, recipient, amount);
+    }
+
+    function setRelayer(address _relayer) external onlyOwner {
+        emit RelayerUpdated(relayer, _relayer);
+        relayer = _relayer;
+    }
+
+    function setRequiredConfirmations(uint256 _confirmations) external onlyOwner {
+        requiredConfirmations = _confirmations;
+    }
+
+    function computeDepositHash(
+        address token,
+        address sender,
+        address recipient,
+        uint256 amount,
+        uint256 sourceChainId,
+        uint256 depositNonce
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(token, sender, recipient, amount, sourceChainId, depositNonce));
+    }
+
+    function emergencyWithdrawETH() external onlyOwner {
+        payable(owner).transfer(address(this).balance);
+    }
+
+    function emergencyWithdrawERC20(address token) external onlyOwner {
+        (bool success, bytes memory data) = token.call(
+            abi.encodeWithSignature("balanceOf(address)", address(this))
+        );
+        require(success, "Balance check failed");
+        uint256 balance = abi.decode(data, (uint256));
+
+        (success, data) = token.call(
+            abi.encodeWithSignature("transfer(address,uint256)", owner, balance)
+        );
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "Transfer failed");
+    }
+
+    receive() external payable {}
+}

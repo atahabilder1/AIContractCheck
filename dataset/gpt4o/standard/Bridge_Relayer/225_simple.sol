@@ -1,0 +1,41 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BasicBridgeRelayer {
+    address public owner;
+    mapping(address => bool) public authorizedRelayers;
+    event RelayerAuthorized(address indexed relayer);
+    event RelayerRevoked(address indexed relayer);
+    event MessageForwarded(address indexed relayer, address indexed destination, bytes data);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    modifier onlyAuthorizedRelayer() {
+        require(authorizedRelayers[msg.sender], "Not an authorized relayer");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function authorizeRelayer(address relayer) external onlyOwner {
+        authorizedRelayers[relayer] = true;
+        emit RelayerAuthorized(relayer);
+    }
+
+    function revokeRelayer(address relayer) external onlyOwner {
+        authorizedRelayers[relayer] = false;
+        emit RelayerRevoked(relayer);
+    }
+
+    function forwardMessage(address destination, bytes calldata data) external onlyAuthorizedRelayer {
+        require(destination != address(0), "Invalid destination address");
+        (bool success, ) = destination.call(data);
+        require(success, "Message forwarding failed");
+        emit MessageForwarded(msg.sender, destination, data);
+    }
+}

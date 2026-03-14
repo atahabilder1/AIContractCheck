@@ -1,0 +1,76 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrowdfundingICO {
+    address public owner;
+    uint256 public targetAmount;
+    uint256 public currentAmount;
+    uint256 public startTime;
+    uint256 public endTime;
+    uint256 public tokenPrice;
+    uint256 public tokensSold;
+
+    mapping(address => uint256) public contributions;
+
+    event ContributionReceived(address indexed contributor, uint256 amount);
+    event TokensPurchased(address indexed buyer, uint256 amount);
+    event Refunded(address indexed contributor, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    modifier isRunning() {
+        require(block.timestamp >= startTime && block.timestamp <= endTime, "Crowdfunding is not running");
+        _;
+    }
+
+    constructor(uint256 _targetAmount, uint256 _durationInDays, uint256 _tokenPrice) {
+        owner = msg.sender;
+        targetAmount = _targetAmount;
+        startTime = block.timestamp;
+        endTime = block.timestamp + _durationInDays * 1 days;
+        tokenPrice = _tokenPrice;
+    }
+
+    function contribute() public payable {
+        require(block.timestamp <= endTime, "Crowdfunding period has ended");
+        require(msg.value > 0, "Contribution must be greater than zero");
+
+        contributions[msg.sender] += msg.value;
+        currentAmount += msg.value;
+
+        emit ContributionReceived(msg.sender, msg.value);
+    }
+
+    function buyTokens() public payable {
+        require(block.timestamp <= endTime, "Crowdfunding period has ended");
+        require(msg.value > 0, "Purchase amount must be greater than zero");
+
+        uint256 tokens = msg.value / tokenPrice;
+        require(tokens > 0, "Tokens purchased must be greater than zero");
+
+        contributions[msg.sender] += msg.value;
+        currentAmount += msg.value;
+        tokensSold += tokens;
+
+        emit TokensPurchased(msg.sender, tokens);
+    }
+
+    function withdraw() public onlyOwner {
+        require(block.timestamp > endTime && currentAmount >= targetAmount, "Cannot withdraw yet");
+        payable(owner).transfer(address(this).balance);
+    }
+
+    function refund() public {
+        require(block.timestamp > endTime && currentAmount < targetAmount, "Refund not available yet");
+        uint256 contribution = contributions[msg.sender];
+        require(contribution > 0, "No contribution to refund");
+
+        payable(msg.sender).transfer(contribution);
+        contributions[msg.sender] = 0;
+
+        emit Refunded(msg.sender, contribution);
+    }
+}

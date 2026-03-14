@@ -1,0 +1,218 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
+
+interface IBridgeHub {
+    function verifyMessage(
+        address _sourceChainId,
+        address _sender,
+        address _contractAddress,
+        uint256 _sequenceNumber,
+        bytes calldata _message
+    ) external view returns (bool);
+
+    function receiveMessage(
+        address _sourceChainId,
+        address _sender,
+        address _contractAddress,
+        uint256 _sequenceNumber,
+        bytes calldata _message
+    ) external returns (bool);
+}
+
+contract CrossChainMessaging is Ownable {
+    using Address for address;
+
+    struct Message {
+        address sourceChainId;
+        address sender;
+        address contractAddress;
+        uint256 sequenceNumber;
+        bytes message;
+        bool executed;
+    }
+
+    struct ChainConfig {
+        address bridgeHubAddress;
+        uint256 gasLimitForExecution;
+    }
+
+    mapping(uint256 => ChainConfig) public chainConfigs;
+    mapping(uint256 => uint256) public nextSequenceNumbers;
+    mapping(uint256 => mapping(uint256 => Message)) public messages;
+
+    event MessageSent(
+        address indexed destinationChainId,
+        address indexed sender,
+        address contractAddress,
+        uint256 sequenceNumber,
+        bytes message
+    );
+    event MessageReceived(
+        address indexed sourceChainId,
+        address indexed sender,
+        address contractAddress,
+        uint256 sequenceNumber,
+        bytes message
+    );
+    event MessageExecuted(
+        address indexed sourceChainId,
+        address indexed sender,
+        address contractAddress,
+        uint256 sequenceNumber,
+        bytes message
+    );
+
+    constructor(address _initialOwner) Ownable(_initialOwner) {}
+
+    function setChainConfig(
+        uint256 _chainId,
+        address _bridgeHubAddress,
+        uint256 _gasLimitForExecution
+    ) public onlyOwner {
+        require(_bridgeHubAddress.isContract(), "Bridge hub must be a contract");
+        chainConfigs[_chainId] = ChainConfig({
+            bridgeHubAddress: _bridgeHubAddress,
+            gasLimitForExecution: _gasLimitForExecution
+        });
+    }
+
+    function sendMessage(
+        address _destinationChainId,
+        address _contractAddress,
+        bytes calldata _message
+    ) public {
+        uint256 currentSequenceNumber = nextSequenceNumbers[_destinationChainId];
+        messages[uint256(uint160(msg.sender))][_destinationChainId][currentSequenceNumber] = Message(
+            address(uint160(uint256(block.chainid))), // Source chain ID
+            msg.sender,
+            _contractAddress,
+            currentSequenceNumber,
+            _message,
+            false
+        );
+        nextSequenceNumbers[_destinationChainId]++;
+
+        emit MessageSent(
+            _destinationChainId,
+            msg.sender,
+            _contractAddress,
+            currentSequenceNumber,
+            _message
+        );
+    }
+
+    function receiveMessage(
+        address _sourceChainId,
+        address _sender,
+        address _contractAddress,
+        uint256 _sequenceNumber,
+        bytes calldata _message
+    ) public {
+        require(chainConfigs[uint256(_sourceChainId)].bridgeHubAddress != address(0), "Chain not configured");
+
+        IBridgeHub bridgeHub = IBridgeHub(chainConfigs[uint256(_sourceChainId)].bridgeHubAddress);
+
+        require(
+            bridgeHub.verifyMessage(
+                _sourceChainId,
+                _sender,
+                _contractAddress,
+                _sequenceNumber,
+                _message
+            ),
+            "Message verification failed"
+        );
+
+        emit MessageReceived(_sourceChainId, _sender, _contractAddress, _sequenceNumber, _message);
+    }
+
+    function executeMessage(
+        address _sourceChainId,
+        address _sender,
+        address _contractAddress,
+        uint256 _sequenceNumber,
+        bytes calldata _message
+    ) public {
+        require(chainConfigs[uint256(_sourceChainId)].bridgeHubAddress != address(0), "Chain not configured");
+
+        // Check if message has already been received and processed by the bridge hub on this chain
+        // This is a simplified check; a real implementation might involve more robust state management
+        // or rely on the bridge hub to handle duplicate message detection.
+        // For this example, we'll assume the bridge hub handles the initial receive and verification.
+
+        // Now, we need to execute the message on the target contract.
+        // The target contract needs to be able to handle messages sent to it from other chains.
+        // This contract acts as a router and executor.
+
+        // Re-verify message with the bridge hub to ensure integrity and prevent reentrancy.
+        // In a real-world scenario, the bridge hub would likely have a dedicated function for this.
+        // For this example, we'll call a hypothetical verifyMessage on the bridge hub again.
+        // A more robust approach would involve a proof mechanism or signature verification.
+        IBridgeHub bridgeHub = IBridgeHub(chainConfigs[uint256(_sourceChainId)].bridgeHubAddress);
+        require(
+            bridgeHub.verifyMessage(
+                _sourceChainId,
+                _sender,
+                _contractAddress,
+                _sequenceNumber,
+                _message
+            ),
+            "Message verification failed before execution"
+        );
+
+        // Execute the message on the target contract.
+        // This requires the target contract to have a specific function to receive and process cross-chain calls.
+        // We'll assume a standard interface for simplicity.
+        (bool success, ) = _contractAddress.call{gas: chainConfigs[uint256(_sourceChainId)].gasLimitForExecution}(
+            abi.encodeWithSelector(
+                bytes4(keccak256("executeCrossChainMessage(address,uint256,bytes)")), // Example selector
+                _sourceChainId,
+                _sequenceNumber,
+                _message
+            )
+        );
+
+        require(success, "Message execution failed");
+
+        // Mark the message as executed.
+        // In a more complex system, this state might be managed by the bridge hub or a separate relayer.
+        // For this example, we'll update the state within this contract.
+        messages[uint256(_sourceChainId)][_sequenceNumber].executed = true;
+
+        emit MessageExecuted(_sourceChainId, _sender, _contractAddress, _sequenceNumber, _message);
+    }
+
+    // This function would be called by a relayer or a trusted entity to forward messages.
+    // It's a simplified example and a real-world implementation would involve more complex logic
+    // for relaying, proof submission, and gas payment.
+    function relayMessage(
+        address _destinationChainId,
+        address _sourceChainId,
+        address _sender,
+        address _contractAddress,
+        uint256 _sequenceNumber,
+        bytes calldata _message
+    ) public onlyOwner { // onlyOwner for simplicity, should be a relayer role
+        require(chainConfigs[uint256(_destinationChainId)].bridgeHubAddress != address(0), "Destination chain not configured");
+
+        // Forward the message to the bridge hub on the destination chain.
+        // The bridge hub on the destination chain will then handle verification and potentially execution.
+        (bool success, ) = payable(chainConfigs[uint256(_destinationChainId)].bridgeHubAddress).call(
+            abi.encodeWithSelector(
+                bytes4(keccak256("receiveMessage(address,address,address,uint256,bytes)")),
+                _sourceChainId,
+                _sender,
+                _contractAddress,
+                _sequenceNumber,
+                _message
+            )
+        );
+        require(success, "Failed to forward message to destination bridge hub");
+    }
+}
+```

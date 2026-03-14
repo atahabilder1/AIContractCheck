@@ -1,0 +1,111 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract AccessControl {
+    // Role hierarchy
+    enum Role {
+        ADMIN,
+        MANAGER,
+        EMPLOYEE,
+        CONTRACTOR
+    }
+
+    // Time-limited roles
+    mapping(address => mapping(uint => Role)) public timeLimitedRoles;
+
+    // Multi-sig role changes
+    mapping(address => mapping(address => mapping(uint => Role))) public multiSigRoleChanges;
+
+    // Enumerable role member registry
+    mapping(Role => mapping(address => bool)) public roleMembers;
+
+    // Events
+    event RoleGranted(address indexed _address, Role indexed _role);
+    event RoleRevoked(address indexed _address, Role indexed _role);
+    event RoleChanged(address indexed _address, Role indexed _oldRole, Role indexed _newRole);
+
+    // Modifiers
+    modifier onlyAdmin() {
+        require(msg.sender == owner, "Only the contract owner can perform this action");
+        _;
+    }
+
+    modifier onlyAuthorized() {
+        require(msg.sender == owner || msg.sender == admin, "Only authorized users can perform this action");
+        _;
+    }
+
+    // Constructor
+    constructor() public {
+        owner = msg.sender;
+    }
+
+    // Grant role
+    function grantRole(address _address, Role _role) public onlyAdmin {
+        require(_address != address(0), "Invalid address");
+        require(_role != Role.NONE, "Invalid role");
+
+        timeLimitedRoles[_address][_role] = block.timestamp;
+
+        emit RoleGranted(_address, _role);
+    }
+
+    // Revoke role
+    function revokeRole(address _address, Role _role) public onlyAdmin {
+        require(_address != address(0), "Invalid address");
+        require(_role != Role.NONE, "Invalid role");
+
+        timeLimitedRoles[_address][_role] = 0;
+
+        emit RoleRevoked(_address, _role);
+    }
+
+    // Change role
+    function changeRole(address _address, Role _oldRole, Role _newRole) public onlyAuthorized {
+        require(_address != address(0), "Invalid address");
+        require(_oldRole != Role.NONE, "Invalid old role");
+        require(_newRole != Role.NONE, "Invalid new role");
+
+        timeLimitedRoles[_address][_oldRole] = 0;
+        timeLimitedRoles[_address][_newRole] = block.timestamp;
+
+        emit RoleChanged(_address, _oldRole, _newRole);
+    }
+
+    // Multi-sig role change
+    function multiSigRoleChange(address _address, Role _oldRole, Role _newRole) public onlyAuthorized {
+        require(_address != address(0), "Invalid address");
+        require(_oldRole != Role.NONE, "Invalid old role");
+        require(_newRole != Role.NONE, "Invalid new role");
+
+        multiSigRoleChanges[_address][msg.sender][_oldRole] = _newRole;
+    }
+
+    // Get role members
+    function getRoleMembers(Role _role) public view returns (address[]) {
+        address[] memory members = new address[](roleMembers[_role].length);
+
+        for (uint i = 0; i < roleMembers[_role].length; i++) {
+            members[i] = roleMembers[_role][i];
+        }
+
+        return members;
+    }
+
+    // Get role member
+    function getRoleMember(address _address, Role _role) public view returns (bool) {
+        return roleMembers[_role][_address];
+    }
+
+    // Get time-limited role
+    function getTimeLimitedRole(address _address, Role _role) public view returns (uint) {
+        return timeLimitedRoles[_address][_role];
+    }
+
+    // Get multi-sig role change
+    function getMultiSigRoleChange(address _address, Role _oldRole, Role _newRole) public view returns (uint) {
+        return multiSigRoleChanges[_address][msg.sender][_oldRole];
+    }
+}
+```

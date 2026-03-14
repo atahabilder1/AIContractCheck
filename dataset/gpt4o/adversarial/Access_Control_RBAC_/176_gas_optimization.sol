@@ -1,0 +1,36 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract AccessControl {
+    struct RoleData {
+        mapping(address => bool) members;
+    }
+
+    mapping(bytes32 => RoleData) private _roles;
+
+    event RoleGranted(bytes32 indexed role, address indexed account);
+    event RoleRevoked(bytes32 indexed role, address indexed account);
+
+    modifier onlyRole(bytes32 role) {
+        require(_roles[role].members[msg.sender], "AccessControl: Access denied");
+        _;
+    }
+
+    function hasRole(bytes32 role, address account) public view returns (bool) {
+        return _roles[role].members[account];
+    }
+
+    function grantRole(bytes32 role, address account) external onlyRole(role) {
+        if (!_roles[role].members[account]) {
+            _roles[role].members[account] = true;
+            emit RoleGranted(role, account);
+        }
+    }
+
+    function revokeRole(bytes32 role, address account) external onlyRole(role) {
+        if (_roles[role].members[account]) {
+            _roles[role].members[account] = false;
+            emit RoleRevoked(role, account);
+        }
+    }
+}

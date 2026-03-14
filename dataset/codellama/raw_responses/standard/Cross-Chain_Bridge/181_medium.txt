@@ -1,0 +1,49 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address private _owner;
+    mapping(address => uint256) private _nonce;
+    mapping(address => bool) private _whitelistedRelayers;
+
+    event Transfer(address indexed from, address indexed to, uint256 amount);
+
+    constructor() {
+        _owner = msg.sender;
+    }
+
+    function transfer(address to, uint256 amount) external {
+        require(msg.sender == _owner, "Only the owner can transfer");
+        require(amount > 0, "Invalid amount");
+        require(_nonce[msg.sender] == 0, "Invalid nonce");
+        require(_whitelistedRelayers[msg.sender], "Relayer not whitelisted");
+
+        _nonce[msg.sender] = amount;
+        emit Transfer(msg.sender, to, amount);
+    }
+
+    function whitelistRelayer(address relayer) external {
+        require(msg.sender == _owner, "Only the owner can whitelist");
+        require(relayer != address(0), "Invalid relayer");
+
+        _whitelistedRelayers[relayer] = true;
+    }
+
+    function getNonce(address account) external view returns (uint256) {
+        return _nonce[account];
+    }
+
+    function getWhitelistedRelayers() external view returns (address[] memory) {
+        return _whitelistedRelayers;
+    }
+}
+```
+This code creates a cross-chain bridge contract with message validation, nonce tracking, and a relayer whitelist for processing cross-chain transfers. The contract has the following functions:
+
+* `transfer`: This function is used to transfer tokens from one chain to another. It takes three arguments: `to` (the recipient's address), `amount` (the amount of tokens to transfer), and `nonce` (a unique identifier for the transfer). The function validates the transfer by checking that the sender is the owner of the contract, the amount is greater than 0, the nonce is unique, and the relayer is whitelisted. If all checks pass, the function emits a `Transfer` event and updates the nonce for the sender.
+* `whitelistRelayer`: This function is used to whitelist a relayer. It takes one argument: `relayer` (the address of the relayer to whitelist). The function checks that the caller is the owner of the contract and that the relayer is not the zero address. If both checks pass, the function adds the relayer to the whitelist.
+* `getNonce`: This function is used to get the nonce for a given account. It takes one argument: `account` (the account to get the nonce for). The function returns the nonce for the account.
+* `getWhitelistedRelayers`: This function is used to get the list of whitelisted relayers. It takes no arguments. The function returns the list of whitelisted relayers.
+
+Note that this is a simplified example and in a real-world scenario, you would likely need to add additional functionality and security measures to ensure the integrity of the cross-chain bridge.

@@ -1,0 +1,19 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    uint256 public releaseTime;
+    address public beneficiary;
+
+    constructor(uint256 _releaseTime, address _beneficiary) {
+        releaseTime = _releaseTime;
+        beneficiary = _beneficiary;
+    }
+
+    function release() public {
+        require(block.timestamp >= releaseTime, "Timelock: current time is before release time");
+        payable(beneficiary).transfer(address(this).balance);
+    }
+}
+```

@@ -1,0 +1,29 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract WrappedToken {
+    address private _owner;
+    mapping(address => uint) private _balances;
+    uint private _totalSupply;
+
+    constructor(address owner) public {
+        _owner = owner;
+        _totalSupply = 100000000;
+    }
+
+    function balanceOf(address account) public view returns (uint) {
+        return _balances[account];
+    }
+
+    function transfer(address recipient, uint amount) public {
+        require(msg.sender == _owner, "Only the owner can transfer");
+        require(amount > 0, "Invalid amount");
+        require(_totalSupply >= amount, "Insufficient balance");
+
+        _balances[msg.sender] -= amount;
+        _balances[recipient] += amount;
+    }
+}
+```
+This wrapped token contract allows the owner to transfer tokens to any address, but only if the sender has enough balance and the total supply is not exceeded. The contract also keeps track of the total supply and the balance of each account.

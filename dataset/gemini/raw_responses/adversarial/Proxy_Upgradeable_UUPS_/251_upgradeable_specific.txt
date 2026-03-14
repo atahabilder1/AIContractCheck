@@ -1,0 +1,24 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/proxy/Proxy.sol";
+import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract MyUpgradeableContract is UUPSUpgradeable, Ownable {
+    uint256 public myValue;
+
+    function initialize(uint256 _initialValue) public initializer {
+        myValue = _initialValue;
+    }
+
+    function updateValue(uint256 _newValue) public {
+        myValue = _newValue;
+    }
+
+    function upgradeTo(address newImplementation) public onlyOwner {
+        _upgradeToAndCall(newImplementation, abi.encodeWithSelector(MyUpgradeableContract.initialize.selector, uint256(0)));
+    }
+}
+```

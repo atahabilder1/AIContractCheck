@@ -1,0 +1,26 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    address public owner;
+    mapping(address => uint256) public balances;
+
+    event Withdrawal(address indexed _from, uint256 _amount);
+
+    constructor() public {
+        owner = msg.sender;
+    }
+
+    function withdraw(address _to, uint256 _amount) public {
+        require(msg.sender == owner, "Only the owner can withdraw");
+        require(_to != address(0), "Invalid recipient address");
+        require(_amount > 0, "Invalid amount");
+
+        uint256 balance = balances[msg.sender];
+        require(balance >= _amount, "Insufficient balance");
+
+        balances[msg.sender] = balance - _amount;
+
+        emit Withdrawal(msg.sender, _amount);
+    }
+}

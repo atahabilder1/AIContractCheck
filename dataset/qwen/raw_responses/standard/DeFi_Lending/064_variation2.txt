@@ -1,0 +1,64 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+contract LendingPool {
+    struct Market {
+        uint256 collateralAmount;
+        uint256 borrowAmount;
+        uint256 collateralFactor;
+        uint256 borrowRate;
+    }
+
+    mapping(address => mapping(address => Market)) public markets;
+
+    event MarketUpdated(address indexed collateralToken, address indexed borrowToken, uint256 collateralFactor, uint256 borrowRate);
+    event Deposit(address indexed user, address indexed collateralToken, uint256 amount);
+    event Borrow(address indexed user, address indexed borrowToken, uint256 amount);
+    event Repay(address indexed user, address indexed borrowToken, uint256 amount);
+    event Withdraw(address indexed user, address indexed collateralToken, uint256 amount);
+
+    function updateMarket(address collateralToken, address borrowToken, uint256 collateralFactor, uint256 borrowRate) external {
+        markets[collateralToken][borrowToken].collateralFactor = collateralFactor;
+        markets[collateralToken][borrowToken].borrowRate = borrowRate;
+        emit MarketUpdated(collateralToken, borrowToken, collateralFactor, borrowRate);
+    }
+
+    function deposit(address collateralToken, uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        markets[collateralToken][address(0)].collateralAmount += amount;
+        IERC20(collateralToken).transferFrom(msg.sender, address(this), amount);
+        emit Deposit(msg.sender, collateralToken, amount);
+    }
+
+    function borrow(address borrowToken, uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        Market storage market = markets[address(0)][borrowToken];
+        require(market.collateralAmount * market.collateralFactor > market.borrowAmount + amount, "Insufficient collateral");
+        market.borrowAmount += amount;
+        IERC20(borrowToken).transfer(msg.sender, amount);
+        emit Borrow(msg.sender, borrowToken, amount);
+    }
+
+    function repay(address borrowToken, uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        markets[address(0)][borrowToken].borrowAmount -= amount;
+        IERC20(borrowToken).transferFrom(msg.sender, address(this), amount);
+        emit Repay(msg.sender, borrowToken, amount);
+    }
+
+    function withdraw(address collateralToken, uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        Market storage market = markets[collateralToken][address(0)];
+        require(market.collateralAmount - amount * market.collateralFactor >= market.borrowAmount, "Insufficient collateral");
+        market.collateralAmount -= amount;
+        IERC20(collateralToken).transfer(msg.sender, amount);
+        emit Withdraw(msg.sender, collateralToken, amount);
+    }
+}
+
+interface IERC20 {
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+}
+```

@@ -1,0 +1,69 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+
+contract VersionedImplementation is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+    uint256 public version;
+    uint256 public immutable deploymentTime;
+    address public lastApprovedImplementation;
+    uint256 public upgradeTimelock;
+    bool public rollbackEnabled;
+
+    event VersionUpdated(uint256 newVersion);
+    event TimelockSet(uint256 newTimelock);
+    event RollbackEnabled(bool status);
+
+    function initialize(uint256 _version, uint256 _upgradeTimelock, bool _rollbackEnabled) public initializer {
+        __UUPSUpgradeable_init();
+        __Ownable_init();
+        __ReentrancyGuard_init();
+        version = _version;
+        deploymentTime = block.timestamp;
+        upgradeTimelock = _upgradeTimelock;
+        rollbackEnabled = _rollbackEnabled;
+    }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(block.timestamp >= deploymentTime + upgradeTimelock, "Upgrade timelock not passed");
+        lastApprovedImplementation = newImplementation;
+    }
+
+    function upgradeToAndCall(address newImplementation, bytes memory data) public onlyOwner {
+        _authorizeUpgrade(newImplementation);
+        _upgradeToAndCall(newImplementation, data, false);
+    }
+
+    function rollbackToLast() public onlyOwner nonReentrant {
+        require(rollbackEnabled, "Rollback not enabled");
+        require(lastApprovedImplementation != address(0), "No previous implementation");
+        _upgradeTo(lastApprovedImplementation);
+        emit VersionUpdated(version - 1);
+    }
+
+    function setUpgradeTimelock(uint256 _newTimelock) public onlyOwner {
+        upgradeTimelock = _newTimelock;
+        emit TimelockSet(_newTimelock);
+    }
+
+    function setRollbackEnabled(bool _status) public onlyOwner {
+        rollbackEnabled = _status;
+        emit RollbackEnabled(_status);
+    }
+
+    function incrementVersion() internal {
+        version += 1;
+        emit VersionUpdated(version);
+    }
+
+    function _validateStorageLayout() internal pure {
+        // Example of storage layout validation
+        // In practice, this would involve checking the storage slots of the contract
+        // to ensure they match the expected layout of the new implementation.
+        // This is a placeholder and should be replaced with actual validation logic.
+        assert(true);
+    }
+}

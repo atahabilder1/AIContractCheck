@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    address public owner;
+    mapping(address => bool) public isRelayer;
+
+    event RelayerAdded(address indexed relayer);
+    event RelayerRemoved(address indexed relayer);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    modifier onlyRelayer() {
+        require(isRelayer[msg.sender], "Not a relayer");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function addRelayer(address _relayer) external onlyOwner {
+        require(_relayer != address(0), "Invalid address");
+        require(!isRelayer[_relayer], "Already a relayer");
+        isRelayer[_relayer] = true;
+        emit RelayerAdded(_relayer);
+    }
+
+    function removeRelayer(address _relayer) external onlyOwner {
+        require(isRelayer[_relayer], "Not a relayer");
+        isRelayer[_relayer] = false;
+        emit RelayerRemoved(_relayer);
+    }
+
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "Invalid address");
+        owner = newOwner;
+    }
+
+    function relayTransaction(address target, bytes memory data) external onlyRelayer {
+        (bool success, ) = target.call(data);
+        require(success, "Relay transaction failed");
+    }
+}

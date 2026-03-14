@@ -1,0 +1,72 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    address public owner;
+    mapping(bytes32 => bool) public queuedTransactions;
+
+    event QueueTransaction(bytes32 txHash, uint256 eta);
+    event ExecuteTransaction(bytes32 txHash);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function queueTransaction(
+        address target,
+        uint256 value,
+        string memory signature,
+        bytes memory data,
+        uint256 eta
+    ) public onlyOwner returns (bytes32 txHash) {
+        txHash = getTxHash(target, value, signature, data, eta);
+        require(!queuedTransactions[txHash], "Transaction already queued");
+        queuedTransactions[txHash] = true;
+
+        emit QueueTransaction(txHash, eta);
+    }
+
+    function executeTransaction(
+        address target,
+        uint256 value,
+        string memory signature,
+        bytes memory data,
+        uint256 eta
+    ) public onlyOwner returns (bytes memory) {
+        bytes32 txHash = getTxHash(target, value, signature, data, eta);
+        require(queuedTransactions[txHash], "Transaction not queued");
+        require(block.timestamp >= eta, "Transaction not yet ready");
+
+        queuedTransactions[txHash] = false;
+
+        bytes memory callData;
+
+        if (bytes(signature).length == 0) {
+            callData = data;
+        } else {
+            callData = abi.encodePacked(bytes4(keccak256(bytes(signature))), data);
+        }
+
+        (bool success, bytes memory returnData) = target.call{value: value}(callData);
+        require(success, "Transaction execution reverted");
+
+        emit ExecuteTransaction(txHash);
+
+        return returnData;
+    }
+
+    function getTxHash(
+        address target,
+        uint256 value,
+        string memory signature,
+        bytes memory data,
+        uint256 eta
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encode(target, value, signature, data, eta));
+    }
+}

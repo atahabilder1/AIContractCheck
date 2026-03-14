@@ -1,0 +1,67 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleDAO {
+    struct Proposal {
+        string description;
+        uint256 voteCount;
+        bool executed;
+    }
+
+    address public chairperson;
+    Proposal[] public proposals;
+    mapping(address => bool) public voters;
+
+    modifier onlyChairperson() {
+        require(msg.sender == chairperson, "Only chairperson can call this function");
+        _;
+    }
+
+    constructor() {
+        chairperson = msg.sender;
+    }
+
+    function addProposal(string memory description) public onlyChairperson {
+        proposals.push(Proposal({
+            description: description,
+            voteCount: 0,
+            executed: false
+        }));
+    }
+
+    function giveRightToVote(address voter) public onlyChairperson {
+        require(!voters[voter], "The voter already has the right to vote.");
+        voters[voter] = true;
+    }
+
+    function vote(uint256 proposalIndex) public {
+        require(voters[msg.sender], "Has no right to vote");
+        require(proposalIndex < proposals.length, "Invalid proposal index");
+        
+        Proposal storage proposal = proposals[proposalIndex];
+        require(!proposal.executed, "Proposal has already been executed");
+
+        proposal.voteCount += 1;
+    }
+
+    function executeProposal(uint256 proposalIndex) public onlyChairperson {
+        require(proposalIndex < proposals.length, "Invalid proposal index");
+        
+        Proposal storage proposal = proposals[proposalIndex];
+        require(!proposal.executed, "Proposal has already been executed");
+
+        if (proposal.voteCount > 0) {
+            proposal.executed = true;
+            // Execute proposal logic here
+        }
+    }
+
+    function getProposal(uint256 proposalIndex) public view returns (string memory, uint256, bool) {
+        require(proposalIndex < proposals.length, "Invalid proposal index");
+        
+        Proposal storage proposal = proposals[proposalIndex];
+        return (proposal.description, proposal.voteCount, proposal.executed);
+    }
+}
+```

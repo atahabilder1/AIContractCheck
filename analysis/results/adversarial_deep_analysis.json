@@ -1,0 +1,373 @@
+{
+  "overall": {
+    "u_stat": 158404.5,
+    "p_value": 5.023790643101336e-07,
+    "cliffs_delta": -0.19085906312726944,
+    "effect": "small",
+    "std_mean": 5.01980198019802,
+    "std_median": 3.0,
+    "adv_mean": 3.388382687927107,
+    "adv_median": 2.0
+  },
+  "per_llm": {
+    "claude": {
+      "n_std": 51,
+      "n_adv": 165,
+      "u_stat": 5003.0,
+      "p_value": 0.04086334555117565,
+      "cliffs_delta": -0.18906714200831848,
+      "effect": "small",
+      "std_mean": 10.215686274509803,
+      "adv_mean": 6.593939393939394,
+      "significant": true
+    },
+    "codellama": {
+      "n_std": 20,
+      "n_adv": 84,
+      "u_stat": 1106.0,
+      "p_value": 0.01808505270909905,
+      "cliffs_delta": -0.31666666666666665,
+      "effect": "small",
+      "std_mean": 2.15,
+      "adv_mean": 1.0119047619047619,
+      "significant": true
+    },
+    "deepseek": {
+      "n_std": 59,
+      "n_adv": 146,
+      "u_stat": 4754.5,
+      "p_value": 0.23811321641154082,
+      "cliffs_delta": -0.1039006268864639,
+      "effect": "negligible",
+      "std_mean": 3.711864406779661,
+      "adv_mean": 2.6780821917808217,
+      "significant": false
+    },
+    "gemini": {
+      "n_std": 25,
+      "n_adv": 124,
+      "u_stat": 1916.0,
+      "p_value": 0.06160032159403218,
+      "cliffs_delta": -0.2361290322580645,
+      "effect": "small",
+      "std_mean": 5.96,
+      "adv_mean": 4.233870967741935,
+      "significant": false
+    },
+    "gpt4o": {
+      "n_std": 83,
+      "n_adv": 187,
+      "u_stat": 9496.5,
+      "p_value": 0.002955666147140075,
+      "cliffs_delta": -0.2236969267444108,
+      "effect": "small",
+      "std_mean": 4.0843373493975905,
+      "adv_mean": 2.593582887700535,
+      "significant": true
+    },
+    "qwen": {
+      "n_std": 65,
+      "n_adv": 172,
+      "u_stat": 7136.5,
+      "p_value": 0.0007823207176853141,
+      "cliffs_delta": -0.276654740608229,
+      "effect": "small",
+      "std_mean": 3.8461538461538463,
+      "adv_mean": 2.3313953488372094,
+      "significant": true
+    }
+  },
+  "per_category": {
+    "Access_Control_RBAC_": {
+      "n_std": 24,
+      "n_adv": 50,
+      "p_value": 0.0015163377582030708,
+      "cliffs_delta": -0.38083333333333336,
+      "effect": "medium",
+      "significant": true,
+      "std_mean": 2.2083333333333335,
+      "adv_mean": 0.36
+    },
+    "Auction": {
+      "n_std": 18,
+      "n_adv": 49,
+      "p_value": 0.4862502343635068,
+      "cliffs_delta": -0.11224489795918367,
+      "effect": "negligible",
+      "significant": false,
+      "std_mean": 8.277777777777779,
+      "adv_mean": 5.653061224489796
+    },
+    "Bridge_Relayer": {
+      "n_std": 20,
+      "n_adv": 55,
+      "p_value": 0.37741579710705975,
+      "cliffs_delta": 0.1318181818181818,
+      "effect": "negligible",
+      "significant": false,
+      "std_mean": 3.65,
+      "adv_mean": 2.2545454545454544
+    },
+    "Cross-Chain_Bridge": {
+      "n_std": 16,
+      "n_adv": 47,
+      "p_value": 0.7426261212749823,
+      "cliffs_delta": -0.05585106382978723,
+      "effect": "negligible",
+      "significant": false,
+      "std_mean": 3.6875,
+      "adv_mean": 2.9574468085106385
+    },
+    "Cross-Chain_Messaging": {
+      "n_std": 17,
+      "n_adv": 55,
+      "p_value": 0.08681333291249303,
+      "cliffs_delta": -0.26524064171122996,
+      "effect": "small",
+      "significant": false,
+      "std_mean": 2.4705882352941178,
+      "adv_mean": 1.5454545454545454
+    },
+    "Crowdfunding_ICO": {
+      "n_std": 11,
+      "n_adv": 39,
+      "p_value": 0.07396293164224713,
+      "cliffs_delta": 0.35664335664335667,
+      "effect": "medium",
+      "significant": false,
+      "std_mean": 4.818181818181818,
+      "adv_mean": 7.358974358974359
+    },
+    "DeFi_DEX_AMM": {
+      "n_std": 15,
+      "n_adv": 38,
+      "p_value": 0.43870037256582417,
+      "cliffs_delta": 0.13859649122807016,
+      "effect": "negligible",
+      "significant": false,
+      "std_mean": 7.8,
+      "adv_mean": 5.894736842105263
+    },
+    "DeFi_Lending": {
+      "n_std": 17,
+      "n_adv": 47,
+      "p_value": 0.11657134825786777,
+      "cliffs_delta": -0.2553191489361702,
+      "effect": "small",
+      "significant": false,
+      "std_mean": 7.529411764705882,
+      "adv_mean": 4.914893617021277
+    },
+    "DeFi_Staking": {
+      "n_std": 12,
+      "n_adv": 43,
+      "p_value": 0.032291895076751204,
+      "cliffs_delta": -0.4069767441860465,
+      "effect": "medium",
+      "significant": true,
+      "std_mean": 9.75,
+      "adv_mean": 6.4186046511627906
+    },
+    "ERC1155_Multi-Token": {
+      "n_std": 11,
+      "n_adv": 37,
+      "p_value": 0.0039236637811008255,
+      "cliffs_delta": -0.5085995085995086,
+      "effect": "large",
+      "significant": true,
+      "std_mean": 1.8181818181818181,
+      "adv_mean": 0.4594594594594595
+    },
+    "ERC20_Token": {
+      "n_std": 11,
+      "n_adv": 48,
+      "p_value": 1.0312722707334387e-05,
+      "cliffs_delta": -0.6401515151515151,
+      "effect": "large",
+      "significant": true,
+      "std_mean": 1.9090909090909092,
+      "adv_mean": 0.14583333333333334
+    },
+    "ERC721_NFT": {
+      "n_std": 7,
+      "n_adv": 19,
+      "p_value": 0.0004336293471102362,
+      "cliffs_delta": -0.9097744360902256,
+      "effect": "large",
+      "significant": true,
+      "std_mean": 9.285714285714286,
+      "adv_mean": 2.0526315789473686
+    },
+    "Escrow": {
+      "n_std": 22,
+      "n_adv": 54,
+      "p_value": 0.17619143210892496,
+      "cliffs_delta": -0.19612794612794612,
+      "effect": "small",
+      "significant": false,
+      "std_mean": 4.7727272727272725,
+      "adv_mean": 2.9444444444444446
+    },
+    "Flash_Loan_Provider": {
+      "n_std": 16,
+      "n_adv": 43,
+      "p_value": 0.38053957460037113,
+      "cliffs_delta": -0.14970930232558138,
+      "effect": "small",
+      "significant": false,
+      "std_mean": 3.5625,
+      "adv_mean": 3.4186046511627906
+    },
+    "Governance_DAO": {
+      "n_std": 14,
+      "n_adv": 34,
+      "p_value": 0.2528676114449857,
+      "cliffs_delta": -0.20798319327731093,
+      "effect": "small",
+      "significant": false,
+      "std_mean": 6.0,
+      "adv_mean": 3.5
+    },
+    "Multisig_Wallet": {
+      "n_std": 14,
+      "n_adv": 41,
+      "p_value": 0.06727066975856996,
+      "cliffs_delta": 0.3205574912891986,
+      "effect": "small",
+      "significant": false,
+      "std_mean": 1.3571428571428572,
+      "adv_mean": 2.0
+    },
+    "Proxy_Upgradeable_UUPS_": {
+      "n_std": 9,
+      "n_adv": 29,
+      "p_value": 0.9576117651566375,
+      "cliffs_delta": 0.01532567049808429,
+      "effect": "negligible",
+      "significant": false,
+      "std_mean": 4.444444444444445,
+      "adv_mean": 3.689655172413793
+    },
+    "Timelock": {
+      "n_std": 17,
+      "n_adv": 52,
+      "p_value": 0.12658473818035612,
+      "cliffs_delta": -0.24773755656108598,
+      "effect": "small",
+      "significant": false,
+      "std_mean": 7.176470588235294,
+      "adv_mean": 6.0
+    },
+    "Wrapped_Token": {
+      "n_std": 16,
+      "n_adv": 49,
+      "p_value": 0.019308551568196237,
+      "cliffs_delta": -0.3622448979591837,
+      "effect": "medium",
+      "significant": true,
+      "std_mean": 3.25,
+      "adv_mean": 0.9591836734693877
+    },
+    "Yield_Aggregator": {
+      "n_std": 16,
+      "n_adv": 49,
+      "p_value": 0.00886670394518764,
+      "cliffs_delta": -0.4362244897959184,
+      "effect": "medium",
+      "significant": true,
+      "std_mean": 9.0625,
+      "adv_mean": 5.673469387755102
+    }
+  },
+  "per_trigger": {
+    "cross_chain_specific": {
+      "n": 41,
+      "mean": 2.5121951219512195,
+      "median": 1.0,
+      "p_vs_standard": 0.0011907494478506822,
+      "cliffs_delta_vs_standard": -0.30958705626660227,
+      "effect": "small",
+      "significant": true
+    },
+    "gas_optimization": {
+      "n": 175,
+      "mean": 3.4057142857142857,
+      "median": 2.0,
+      "p_vs_standard": 0.0008312884797592061,
+      "cliffs_delta_vs_standard": -0.18183875530410185,
+      "effect": "small",
+      "significant": true
+    },
+    "misleading_context": {
+      "n": 85,
+      "mean": 4.188235294117647,
+      "median": 3.0,
+      "p_vs_standard": 0.10048780566763421,
+      "cliffs_delta_vs_standard": -0.1157445156280334,
+      "effect": "negligible",
+      "significant": false
+    },
+    "no_dependencies": {
+      "n": 178,
+      "mean": 3.7191011235955056,
+      "median": 2.0,
+      "p_vs_standard": 0.0024600522279415453,
+      "cliffs_delta_vs_standard": -0.1637742425927986,
+      "effect": "small",
+      "significant": true
+    },
+    "obfuscated_malicious": {
+      "n": 79,
+      "mean": 4.1265822784810124,
+      "median": 2.0,
+      "p_vs_standard": 0.2892401167933405,
+      "cliffs_delta_vs_standard": -0.07695199899736808,
+      "effect": "negligible",
+      "significant": false
+    },
+    "simplicity": {
+      "n": 168,
+      "mean": 2.357142857142857,
+      "median": 1.0,
+      "p_vs_standard": 4.223815245109946e-09,
+      "cliffs_delta_vs_standard": -0.32282335376394783,
+      "effect": "small",
+      "significant": true
+    },
+    "speed_deadline": {
+      "n": 147,
+      "mean": 3.54421768707483,
+      "median": 2.0,
+      "p_vs_standard": 0.005812383400775651,
+      "cliffs_delta_vs_standard": -0.15886486607844458,
+      "effect": "small",
+      "significant": true
+    },
+    "upgradeable_specific": {
+      "n": 5,
+      "mean": 3.0,
+      "median": 3.0,
+      "p_vs_standard": 0.757935710840106,
+      "cliffs_delta_vs_standard": -0.08052805280528053,
+      "effect": "negligible",
+      "significant": false
+    }
+  },
+  "trigger_kruskal": {
+    "H": 18.0251144972676,
+    "p": 0.011857203153052494,
+    "significant": true
+  },
+  "loc_adversarial": {
+    "std_mean_loc": 70.50825082508251,
+    "adv_mean_loc": 51.40774487471526,
+    "p_value": 1.1906395236168876e-12,
+    "cliffs_delta": -0.27346504582121084
+  },
+  "high_severity_adversarial": {
+    "std_rate": 0.3432343234323432,
+    "adv_rate": 0.265375854214123,
+    "p_value": 0.009696318714953883,
+    "cliffs_delta": -0.07785846921822023
+  }
+}

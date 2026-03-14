@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract WrappedToken {
+    string public name;
+    string public symbol;
+    uint256 public totalSupply;
+    mapping(address => uint256) public balances;
+
+    constructor(string memory _name, string memory _symbol, uint256 _totalSupply) public {
+        name = _name;
+        symbol = _symbol;
+        totalSupply = _totalSupply;
+    }
+
+    function transfer(address _to, uint256 _amount) public {
+        require(balances[msg.sender] >= _amount, "Insufficient balance");
+        balances[msg.sender] -= _amount;
+        balances[_to] += _amount;
+    }
+
+    function balanceOf(address _owner) public view returns (uint256) {
+        return balances[_owner];
+    }
+}

@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IFlashLoanReceiver {
+    function executeOperation(address token, uint256 amount, uint256 fee, bytes calldata params) external returns (bool);
+}
+
+contract FlashLoanProvider {
+    mapping(address => uint256) public balances;
+
+    function deposit(address token, uint256 amount) external {
+        require(amount > 0, "Amount must be greater than 0");
+        balances[token] += amount;
+    }
+
+    function flashLoan(address receiverAddress, address token, uint256 amount, bytes calldata params) external {
+        uint256 fee = amount / 100; // 1% fee
+        require(balances[token] >= amount + fee, "Insufficient balance");
+
+        balances[token] -= amount + fee;
+
+        IFlashLoanReceiver(receiverAddress).executeOperation(token, amount, fee, params);
+
+        balances[token] += amount + fee;
+    }
+
+    function getBalance(address token) external view returns (uint256) {
+        return balances[token];
+    }
+}

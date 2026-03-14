@@ -1,0 +1,70 @@
+```
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address public owner;
+    uint public balance;
+    mapping (address => uint) public deposits;
+    mapping (address => uint) public milestones;
+    mapping (address => mapping (address => uint)) public disputes;
+    mapping (address => mapping (address => uint)) public arbiters;
+    mapping (address => mapping (address => uint)) public disputeResolutions;
+    uint public timeout;
+
+    constructor() public {
+        owner = msg.sender;
+    }
+
+    function deposit(uint amount) public {
+        require(msg.value >= amount, "Insufficient balance");
+        deposits[msg.sender] += amount;
+    }
+
+    function milestone(uint amount) public {
+        require(msg.value >= amount, "Insufficient balance");
+        milestones[msg.sender] += amount;
+    }
+
+    function dispute(address arbiter, string memory reason) public {
+        require(msg.sender != arbiter, "Cannot dispute own decision");
+        disputes[msg.sender][arbiter] = reason;
+    }
+
+    function resolveDispute(address arbiter, bool outcome) public {
+        require(msg.sender == arbiter, "Only the arbiter can resolve the dispute");
+        disputeResolutions[msg.sender][arbiter] = outcome;
+    }
+
+    function release(uint milestone) public {
+        require(milestone == milestones[msg.sender], "Invalid milestone");
+        require(msg.sender == owner, "Only the owner can release the funds");
+        require(block.timestamp >= timeout, "Timeout not reached");
+        balance -= milestone;
+        msg.sender.transfer(milestone);
+    }
+
+    function timeout() public {
+        require(block.timestamp >= timeout, "Timeout not reached");
+        balance -= deposits[msg.sender];
+        msg.sender.transfer(deposits[msg.sender]);
+    }
+
+    function getBalance() public view returns (uint) {
+        return balance;
+    }
+}
+```
+This contract has the following features:
+
+* A constructor that sets the owner of the contract and initializes the balance to 0.
+* A `deposit` function that allows users to deposit Ether into the contract.
+* A `milestone` function that allows users to set a milestone for their deposit.
+* A `dispute` function that allows users to dispute a decision made by the arbiter.
+* A `resolveDispute` function that allows the arbiter to resolve the dispute.
+* A `release` function that allows the owner to release the funds to the user after the milestone has been reached.
+* A `timeout` function that allows the user to get a refund if the milestone has not been reached within the specified time.
+* A `getBalance` function that returns the current balance of the contract.
+
+Note that this is just one possible implementation of an escrow platform, and there may be other features or functionality that you want to include. Additionally, you may want to consider adding additional security measures, such as using secure hash functions to protect user data, or implementing a voting system to allow users to choose the arbiter.

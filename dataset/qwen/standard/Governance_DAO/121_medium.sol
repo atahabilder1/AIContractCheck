@@ -1,0 +1,102 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+contract Governance {
+    uint256 public constant MIN_QUORUM = 5; // Minimum quorum in percentage
+    uint256 public constant VOTING_DURATION = 3 days; // Duration of voting period
+    uint256 public constant EXECUTION_DELAY = 2 days; // Delay before a proposal can be executed
+    uint256 public constant PROPOSAL_THRESHOLD = 10; // Minimum tokens needed to create a proposal in percentage
+
+    struct Proposal {
+        address proposer;
+        uint256 id;
+        uint256 startBlock;
+        uint256 endBlock;
+        uint256 executionTime;
+        bool executed;
+        mapping(address => bool) votes;
+        uint256 yesVotes;
+        uint256 noVotes;
+        bytes data;
+        address target;
+    }
+
+    mapping(uint256 => Proposal) public proposals;
+    mapping(address => address) public delegates;
+    uint256 public proposalCount;
+    uint256 public totalSupply;
+    mapping(address => uint256) public votingPower;
+
+    event ProposalCreated(uint256 indexed id, address indexed proposer, bytes data, address indexed target);
+    event Voted(uint256 indexed proposalId, address indexed voter, bool indexed support);
+    event ProposalExecuted(uint256 indexed proposalId, bool indexed success);
+
+    modifier onlyProposer(uint256 _id) {
+        require(msg.sender == proposals[_id].proposer, "Not the proposer");
+        _;
+    }
+
+    modifier onlyActiveProposal(uint256 _id) {
+        require(block.timestamp < proposals[_id].endBlock, "Proposal is not active");
+        _;
+    }
+
+    modifier onlyExecutableProposal(uint256 _id) {
+        require(block.timestamp >= proposals[_id].executionTime, "Proposal is not executable yet");
+        require(!proposals[_id].executed, "Proposal already executed");
+        _;
+    }
+
+    constructor(uint256 _totalSupply) {
+        totalSupply = _totalSupply;
+    }
+
+    function delegate(address _to) external {
+        delegates[msg.sender] = _to;
+    }
+
+    function createProposal(bytes memory _data, address _target) external {
+        require(votingPower[msg.sender] >= (totalSupply * PROPOSAL_THRESHOLD) / 100, "Insufficient voting power");
+        uint256 proposalId = proposalCount++;
+        Proposal storage newProposal = proposals[proposalId];
+        newProposal.proposer = msg.sender;
+        newProposal.id = proposalId;
+        newProposal.startBlock = block.timestamp;
+        newProposal.endBlock = block.timestamp + VOTING_DURATION;
+        newProposal.executionTime = block.timestamp + VOTING_DURATION + EXECUTION_DELAY;
+        newProposal.data = _data;
+        newProposal.target = _target;
+        emit ProposalCreated(proposalId, msg.sender, _data, _target);
+    }
+
+    function vote(uint256 _id, bool _support) external onlyActiveProposal(_id) {
+        address voter = delegates[msg.sender] == address(0) ? msg.sender : delegates[msg.sender];
+        Proposal storage proposal = proposals[_id];
+        require(!proposal.votes[voter], "Already voted");
+        proposal.votes[voter] = true;
+        if (_support) {
+            proposal.yesVotes += votingPower[voter];
+        } else {
+            proposal.noVotes += votingPower[voter];
+        }
+        emit Voted(_id, voter, _support);
+    }
+
+    function executeProposal(uint256 _id) external onlyExecutableProposal(_id) {
+        Proposal storage proposal = proposals[_id];
+        require(proposal.yesVotes > (totalSupply * MIN_QUORUM) / 100, "Quorum not met");
+        require(proposal.yesVotes > proposal.noVotes, "Proposal not passed");
+        (bool success, ) = proposal.target.call(proposal.data);
+        proposal.executed = true;
+        emit ProposalExecuted(_id, success);
+    }
+
+    function updateVotingPower(address _voter, uint256 _amount, bool _increase) external {
+        if (_increase) {
+            votingPower[_voter] += _amount;
+        } else {
+            require(votingPower[_voter] >= _amount, "Insufficient voting power");
+            votingPower[_voter] -= _amount;
+        }
+    }
+}

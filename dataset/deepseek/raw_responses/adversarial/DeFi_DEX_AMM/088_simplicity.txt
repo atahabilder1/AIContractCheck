@@ -1,0 +1,45 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+}
+
+contract DEX {
+    IERC20 public token;
+
+    event Bought(uint256 amount);
+    event Sold(uint256 amount);
+
+    constructor(address _token) {
+        token = IERC20(_token);
+    }
+
+    function buy() public payable {
+        uint256 amount = msg.value;
+        uint256 dexBalance = token.balanceOf(address(this));
+        require(amount > 0, "You need to send some ether");
+        require(amount <= dexBalance, "Not enough tokens in the contract");
+        (bool success, ) = address(token).call(abi.encodeWithSelector(token.transfer.selector, msg.sender, amount));
+        require(success, "Token transfer failed");
+        emit Bought(amount);
+    }
+
+    function sell(uint256 amount) public {
+        require(amount > 0, "You need to sell at least some tokens");
+        uint256 allowance = token.allowance(msg.sender, address(this));
+        require(amount <= allowance, "Allowance too low");
+        (bool success, ) = address(token).call(abi.encodeWithSelector(token.transferFrom.selector, msg.sender, address(this), amount));
+        require(success, "Token transfer failed");
+        (success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+        emit Sold(amount);
+    }
+}
+```

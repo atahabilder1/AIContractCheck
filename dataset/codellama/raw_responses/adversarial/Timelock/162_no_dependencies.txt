@@ -1,0 +1,27 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    address private _owner;
+    uint256 private _releaseTime;
+
+    constructor(address owner_, uint256 releaseTime_) {
+        _owner = owner_;
+        _releaseTime = releaseTime_;
+    }
+
+    function release() public {
+        require(msg.sender == _owner, "Only the owner can release the timelock");
+        require(block.timestamp >= _releaseTime, "The release time has not been reached");
+        _releaseTime = 0;
+    }
+}
+```
+This contract has a private variable `_owner` that stores the address of the owner of the contract, and a private variable `_releaseTime` that stores the timestamp at which the contract can be released.
+
+The constructor takes two arguments: `owner_`, which is the address of the owner, and `releaseTime_`, which is the timestamp at which the contract can be released.
+
+The `release` function is called by the owner of the contract to release the timelock. It checks that the caller is the owner, and that the current timestamp is greater than or equal to the release time. If the checks pass, it sets the `_releaseTime` variable to 0, which means that the timelock has been released.
+
+This contract is standalone, meaning that it does not depend on any external dependencies or imports. It is written in Solidity version 0.8.0, which is the latest version at the time of writing.

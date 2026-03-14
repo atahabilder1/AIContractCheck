@@ -1,0 +1,126 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultisigWallet {
+    address[] public owners;
+    uint public required;
+    uint public transactionCount;
+
+    struct Transaction {
+        address payable destination;
+        uint value;
+        bytes data;
+        bool executed;
+        uint confirmationCount;
+        mapping(address => bool) isConfirmed;
+    }
+
+    mapping(uint => Transaction) public transactions;
+
+    modifier onlyOwner() {
+        require(isOwner(msg.sender), "Not an owner");
+        _;
+    }
+
+    modifier transactionExists(uint transactionId) {
+        require(transactions[transactionId].destination != address(0), "Transaction does not exist");
+        _;
+    }
+
+    modifier notExecuted(uint transactionId) {
+        require(!transactions[transactionId].executed, "Transaction already executed");
+        _;
+    }
+
+    modifier notConfirmed(uint transactionId) {
+        require(!transactions[transactionId].isConfirmed[msg.sender], "Transaction already confirmed by this owner");
+        _;
+    }
+
+    modifier confirmed(uint transactionId) {
+        require(transactions[transactionId].isConfirmed[msg.sender], "Transaction not confirmed by this owner");
+        _;
+    }
+
+    event Confirmation(address owner, uint transactionId);
+    event Execution(uint transactionId);
+    event ExecutionFailure(uint transactionId);
+    event Deposit(address sender, uint value);
+    event Submission(uint transactionId);
+    event OwnerAddition(address owner);
+    event OwnerRemoval(address owner);
+    event RequirementChange(uint required);
+
+    constructor(address[] memory _owners, uint _required) {
+        require(_owners.length > 0, "Owners required");
+        require(_required > 0 && _required <= _owners.length, "Invalid requirement");
+
+        for (uint i = 0; i < _owners.length; i++) {
+            require(!isOwner(_owners[i]) && _owners[i] != address(0), "Invalid owner");
+            owners.push(_owners[i]);
+            emit OwnerAddition(_owners[i]);
+        }
+        required = _required;
+        emit RequirementChange(_required);
+    }
+
+    receive() external payable {
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function isOwner(address owner) public view returns (bool) {
+        for (uint i = 0; i < owners.length; i++) {
+            if (owner == owners[i]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function submitTransaction(address payable destination, uint value, bytes memory data) public onlyOwner {
+        uint transactionId = addTransaction(destination, value, data);
+        confirmTransaction(transactionId);
+    }
+
+    function confirmTransaction(uint transactionId) public onlyOwner transactionExists(transactionId) notConfirmed(transactionId) notExecuted(transactionId) {
+        Transaction storage transaction = transactions[transactionId];
+        transaction.isConfirmed[msg.sender] = true;
+        transaction.confirmationCount += 1;
+        emit Confirmation(msg.sender, transactionId);
+        executeTransaction(transactionId);
+    }
+
+    function executeTransaction(uint transactionId) public onlyOwner transactionExists(transactionId) notExecuted(transactionId) {
+        Transaction storage transaction = transactions[transactionId];
+
+        require(transaction.confirmationCount >= required, "Not enough confirmations");
+
+        transaction.executed = true;
+        (bool success, ) = transaction.destination.call{value: transaction.value}(transaction.data);
+        if (success) {
+            emit Execution(transactionId);
+        } else {
+            transaction.executed = false;
+            emit ExecutionFailure(transactionId);
+        }
+    }
+
+    function revokeConfirmation(uint transactionId) public onlyOwner confirmed(transactionId) notExecuted(transactionId) {
+        Transaction storage transaction = transactions[transactionId];
+        transaction.isConfirmed[msg.sender] = false;
+        transaction.confirmationCount -= 1;
+    }
+
+    function addTransaction(address payable destination, uint value, bytes memory data) internal returns (uint transactionId) {
+        transactionId = transactionCount;
+        transactions[transactionId] = Transaction({
+            destination: destination,
+            value: value,
+            data: data,
+            executed: false,
+            confirmationCount: 0
+        });
+        transactionCount += 1;
+        emit Submission(transactionId);
+    }
+}

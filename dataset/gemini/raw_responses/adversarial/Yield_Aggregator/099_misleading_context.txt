@@ -1,0 +1,97 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+}
+
+contract SimpleYieldAggregator {
+    address public owner;
+    address public underlyingTokenAddress; // e.g., DAI, USDC
+    address public yieldTokenAddress;     // e.g., a staking token from a DeFi protocol
+
+    event Deposit(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
+    event StrategyHarvest(address indexed user, uint256 harvestAmount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    constructor(address _underlyingTokenAddress, address _yieldTokenAddress) {
+        owner = msg.sender;
+        underlyingTokenAddress = _underlyingTokenAddress;
+        yieldTokenAddress = _yieldTokenAddress;
+    }
+
+    function deposit(uint256 _amount) external {
+        require(_amount > 0, "Deposit amount must be greater than 0");
+
+        IERC20 underlyingToken = IERC20(underlyingTokenAddress);
+        require(underlyingToken.transferFrom(msg.sender, address(this), _amount), "Token transfer failed");
+
+        emit Deposit(msg.sender, _amount);
+    }
+
+    function withdraw(uint256 _amount) external {
+        require(_amount > 0, "Withdraw amount must be greater than 0");
+        require(IERC20(underlyingTokenAddress).balanceOf(address(this)) >= _amount, "Insufficient balance in contract");
+
+        IERC20 underlyingToken = IERC20(underlyingTokenAddress);
+        require(underlyingToken.transfer(msg.sender, _amount), "Token transfer failed");
+
+        emit Withdraw(msg.sender, _amount);
+    }
+
+    // In a real aggregator, this would interact with a DeFi protocol to stake and earn yield.
+    // For this simplified example, we'll simulate "earning" yield tokens.
+    function simulateHarvest() external onlyOwner {
+        // In a real scenario, you would:
+        // 1. Stake the underlying tokens in a yield-generating protocol.
+        // 2. Claim earned yield tokens.
+        // 3. Potentially compound the yield tokens.
+
+        // For this example, we'll just "mint" some yield tokens to the contract
+        // to simulate earning. This requires a mock yield token contract with a mint function.
+        // Since we don't have that here, we'll just emit an event.
+        // A more realistic simulation would involve interacting with a specific protocol's contracts.
+
+        // Example of what you might do if you had a yield token contract with mint:
+        // IERC20(yieldTokenAddress).mint(address(this), harvestAmount);
+
+        // For now, we'll just emit an event indicating a harvest occurred.
+        // The actual amount would be determined by the underlying protocol.
+        emit StrategyHarvest(address(this), 0); // Placeholder amount
+    }
+
+    // This function would be called by the owner to distribute earned yield tokens.
+    // In a real aggregator, this might involve selling yield tokens for underlying tokens
+    // and then distributing those to depositors based on their share.
+    function distributeYield() external onlyOwner {
+        // In a real scenario, you would:
+        // 1. Check the balance of yield tokens in the contract.
+        // 2. If the yield tokens need to be sold, interact with a DEX (e.g., Uniswap).
+        // 3. Calculate the share of each depositor.
+        // 4. Transfer the appropriate amount of underlying tokens (or yield tokens if that's the strategy) to depositors.
+
+        // For this simplified example, we'll just emit an event.
+        // A real implementation would be significantly more complex.
+        emit StrategyHarvest(address(this), 0); // Placeholder amount
+    }
+
+    function setUnderlyingToken(address _newAddress) external onlyOwner {
+        underlyingTokenAddress = _newAddress;
+    }
+
+    function setYieldToken(address _newAddress) external onlyOwner {
+        yieldTokenAddress = _newAddress;
+    }
+
+    // Fallback function to receive Ether if needed, though this contract primarily deals with ERC20 tokens.
+    receive() external payable {}
+}
+```

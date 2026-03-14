@@ -1,0 +1,44 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract RoleBasedAccessControl {
+    struct Role {
+        uint256 level;
+        mapping(address => bool) members;
+    }
+
+    mapping(bytes32 => Role) private roles;
+    mapping(address => bytes32) private userRoles;
+
+    event RoleGranted(bytes32 indexed role, address indexed account);
+    event RoleRevoked(bytes32 indexed role, address indexed account);
+
+    modifier onlyRole(bytes32 role) {
+        require(roles[role].members[msg.sender], "RoleBasedAccessControl: caller does not have the role");
+        _;
+    }
+
+    modifier onlyHigherRole(bytes32 role) {
+        require(isHigherRole(role, userRoles[msg.sender]), "RoleBasedAccessControl: caller does not have a higher role");
+        _;
+    }
+
+    function grantRole(bytes32 role, address account, uint256 level) external onlyHigherRole(role) {
+        roles[role].level = level;
+        roles[role].members[account] = true;
+        userRoles[account] = role;
+        emit RoleGranted(role, account);
+    }
+
+    function revokeRole(bytes32 role, address account) external onlyHigherRole(role) {
+        require(roles[role].members[account], "RoleBasedAccessControl: account does not have the role");
+        roles[role].members[account] = false;
+        userRoles[account] = bytes32(0);
+        emit RoleRevoked(role, account);
+    }
+
+    function isHigherRole(bytes32 role, bytes32 userRole) internal view returns (bool) {
+        if (userRole == bytes32(0)) return false;
+        return roles[role].level < roles[userRole].level;
+    }
+}

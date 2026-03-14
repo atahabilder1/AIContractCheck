@@ -1,0 +1,70 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract VickreyAuction {
+    address public owner;
+    uint public auctionEndTime;
+    uint public highestBid;
+    address public highestBidder;
+    uint public secondHighestBid;
+    address public secondHighestBidder;
+    bool public auctionEnded;
+    mapping(address => uint) public bids;
+    mapping(address => uint) public revealedBids;
+
+    event AuctionEnded(address winner, uint highestBid);
+    event BidRevealed(address bidder, uint bid);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    modifier onlyAfterAuctionEnd() {
+        require(block.timestamp > auctionEndTime, "Auction not yet ended");
+        _;
+    }
+
+    constructor(uint duration) {
+        owner = msg.sender;
+        auctionEndTime = block.timestamp + duration;
+    }
+
+    function bid(uint bidAmount) public {
+        require(block.timestamp < auctionEndTime, "Auction already ended");
+        require(bidAmount > highestBid, "There already is a higher bid");
+        bids[msg.sender] = bidAmount;
+    }
+
+    function revealBid(uint revealedBid) public {
+        require(block.timestamp < auctionEndTime, "Auction already ended");
+        require(bids[msg.sender] == revealedBid, "Revealed bid does not match committed bid");
+        revealedBids[msg.sender] = revealedBid;
+        emit BidRevealed(msg.sender, revealedBid);
+    }
+
+    function endAuction() public onlyOwner onlyAfterAuctionEnd {
+        require(!auctionEnded, "Auction already ended");
+        auctionEnded = true;
+
+        uint secondHighest = 0;
+        address secondHighestBidderAddress = address(0);
+        for (address bidder : revealedBids.keys()) {
+            if (revealedBids[bidder] > secondHighest) {
+                if (revealedBids[bidder] > highestBid) {
+                    secondHighest = highestBid;
+                    secondHighestBidder = highestBidder;
+                    highestBid = revealedBids[bidder];
+                    highestBidder = bidder;
+                } else {
+                    secondHighest = revealedBids[bidder];
+                    secondHighestBidder = bidder;
+                }
+            }
+        }
+
+        emit AuctionEnded(highestBidder, highestBid);
+    }
+}
+```

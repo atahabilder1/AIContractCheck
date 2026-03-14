@@ -1,0 +1,141 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract ReputationPermissions {
+    address public owner;
+
+    enum PermissionLevel {
+        None,
+        Basic,
+        Intermediate,
+        Advanced,
+        Admin
+    }
+
+    struct User {
+        uint256 reputationScore;
+        PermissionLevel level;
+        bool registered;
+    }
+
+    mapping(address => User) public users;
+    mapping(bytes4 => PermissionLevel) public functionPermissions;
+
+    event UserRegistered(address indexed user);
+    event ReputationUpdated(address indexed user, uint256 newScore, PermissionLevel newLevel);
+    event FunctionPermissionSet(bytes4 indexed selector, PermissionLevel level);
+
+    uint256 public constant BASIC_THRESHOLD = 10;
+    uint256 public constant INTERMEDIATE_THRESHOLD = 50;
+    uint256 public constant ADVANCED_THRESHOLD = 150;
+    uint256 public constant ADMIN_THRESHOLD = 500;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier onlyRegistered() {
+        require(users[msg.sender].registered, "Not registered");
+        _;
+    }
+
+    modifier requiresPermission(PermissionLevel required) {
+        require(users[msg.sender].registered, "Not registered");
+        require(users[msg.sender].level >= required, "Insufficient permission level");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+        users[msg.sender] = User({
+            reputationScore: ADMIN_THRESHOLD,
+            level: PermissionLevel.Admin,
+            registered: true
+        });
+
+        functionPermissions[this.proposalCreate.selector] = PermissionLevel.Intermediate;
+        functionPermissions[this.proposalExecute.selector] = PermissionLevel.Advanced;
+        functionPermissions[this.setFunctionPermission.selector] = PermissionLevel.Admin;
+        functionPermissions[this.grantReputation.selector] = PermissionLevel.Intermediate;
+    }
+
+    function register() external {
+        require(!users[msg.sender].registered, "Already registered");
+        users[msg.sender] = User({
+            reputationScore: 0,
+            level: PermissionLevel.None,
+            registered: true
+        });
+        emit UserRegistered(msg.sender);
+    }
+
+    function grantReputation(address user, uint256 amount) external requiresPermission(PermissionLevel.Intermediate) {
+        require(users[user].registered, "User not registered");
+        require(user != msg.sender, "Cannot grant to self");
+
+        users[user].reputationScore += amount;
+        _updatePermissionLevel(user);
+
+        emit ReputationUpdated(user, users[user].reputationScore, users[user].level);
+    }
+
+    function slashReputation(address user, uint256 amount) external onlyOwner {
+        require(users[user].registered, "User not registered");
+
+        if (amount >= users[user].reputationScore) {
+            users[user].reputationScore = 0;
+        } else {
+            users[user].reputationScore -= amount;
+        }
+        _updatePermissionLevel(user);
+
+        emit ReputationUpdated(user, users[user].reputationScore, users[user].level);
+    }
+
+    function setFunctionPermission(bytes4 selector, PermissionLevel level) external requiresPermission(PermissionLevel.Admin) {
+        functionPermissions[selector] = level;
+        emit FunctionPermissionSet(selector, level);
+    }
+
+    function proposalCreate(string calldata description) external requiresPermission(PermissionLevel.Intermediate) returns (uint256) {
+        // Placeholder for proposal logic
+        return uint256(keccak256(abi.encodePacked(description, block.timestamp, msg.sender)));
+    }
+
+    function proposalExecute(uint256 proposalId) external requiresPermission(PermissionLevel.Advanced) {
+        // Placeholder for execution logic
+        (proposalId);
+    }
+
+    function checkPermission(address user, bytes4 selector) external view returns (bool) {
+        if (!users[user].registered) return false;
+        return users[user].level >= functionPermissions[selector];
+    }
+
+    function getReputationScore(address user) external view returns (uint256) {
+        return users[user].reputationScore;
+    }
+
+    function getPermissionLevel(address user) external view returns (PermissionLevel) {
+        return users[user].level;
+    }
+
+    function _updatePermissionLevel(address user) internal {
+        uint256 score = users[user].reputationScore;
+
+        if (score >= ADMIN_THRESHOLD) {
+            users[user].level = PermissionLevel.Admin;
+        } else if (score >= ADVANCED_THRESHOLD) {
+            users[user].level = PermissionLevel.Advanced;
+        } else if (score >= INTERMEDIATE_THRESHOLD) {
+            users[user].level = PermissionLevel.Intermediate;
+        } else if (score >= BASIC_THRESHOLD) {
+            users[user].level = PermissionLevel.Basic;
+        } else {
+            users[user].level = PermissionLevel.None;
+        }
+    }
+}
+```

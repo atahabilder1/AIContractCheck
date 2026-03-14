@@ -1,0 +1,84 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DecentralizedRelayerNetwork {
+    struct Relayer {
+        uint256 stake;
+        uint256 lastRelay;
+        bool active;
+    }
+
+    address public owner;
+    uint256 public minStake;
+    uint256 public gasReimbursement;
+    uint256 public slashAmount;
+    uint256 public roundRobinIndex;
+    mapping(address => Relayer) public relayers;
+    address[] public activeRelayers;
+
+    event Staked(address indexed relayer, uint256 amount);
+    event Slashed(address indexed relayer, uint256 amount);
+    event GasReimbursed(address indexed relayer, uint256 amount);
+    event RelayAssigned(address indexed relayer);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    modifier onlyActiveRelayer() {
+        require(relayers[msg.sender].active, "Not an active relayer");
+        _;
+    }
+
+    constructor(uint256 _minStake, uint256 _gasReimbursement, uint256 _slashAmount) {
+        owner = msg.sender;
+        minStake = _minStake;
+        gasReimbursement = _gasReimbursement;
+        slashAmount = _slashAmount;
+    }
+
+    function stake() external payable {
+        require(msg.value >= minStake, "Stake amount is too low");
+        if (!relayers[msg.sender].active) {
+            activeRelayers.push(msg.sender);
+        }
+        relayers[msg.sender].stake += msg.value;
+        relayers[msg.sender].active = true;
+        emit Staked(msg.sender, msg.value);
+    }
+
+    function slash(address _relayer) external onlyOwner {
+        require(relayers[_relayer].stake >= slashAmount, "Insufficient stake to slash");
+        relayers[_relayer].stake -= slashAmount;
+        payable(_relayer).transfer(slashAmount);
+        emit Slashed(_relayer, slashAmount);
+    }
+
+    function getRelay() external onlyActiveRelayer {
+        require(block.timestamp - relayers[msg.sender].lastRelay >= 1 hours, "Relay too frequent");
+        relayers[msg.sender].lastRelay = block.timestamp;
+        emit GasReimbursed(msg.sender, gasReimbursement);
+        payable(msg.sender).transfer(gasReimbursement);
+    }
+
+    function assignRelay() external view returns (address) {
+        require(activeRelayers.length > 0, "No active relayers");
+        address relayer = activeRelayers[roundRobinIndex];
+        roundRobinIndex = (roundRobinIndex + 1) % activeRelayers.length;
+        emit RelayAssigned(relayer);
+        return relayer;
+    }
+
+    function removeRelayer(address _relayer) external onlyOwner {
+        require(relayers[_relayer].active, "Relayer is not active");
+        relayers[_relayer].active = false;
+        for (uint256 i = 0; i < activeRelayers.length; i++) {
+            if (activeRelayers[i] == _relayer) {
+                activeRelayers[i] = activeRelayers[activeRelayers.length - 1];
+                activeRelayers.pop();
+                break;
+            }
+        }
+    }
+}

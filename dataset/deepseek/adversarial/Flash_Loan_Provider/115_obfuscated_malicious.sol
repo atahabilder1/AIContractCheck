@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
+
+contract FlashLoanProvider {
+    address public admin;
+    bool public paused;
+
+    event FlashLoan(address indexed borrower, uint256 amount);
+    event EmergencyWithdraw(address indexed to, uint256 amount);
+    event Pause();
+    event Unpause();
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin can call this function");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+    }
+
+    function flashLoan(address borrower, uint256 amount) external whenNotPaused {
+        require(amount > 0, "Amount must be greater than zero");
+        IERC20(borrower).transfer(address(this), amount);
+        emit FlashLoan(borrower, amount);
+    }
+
+    function emergencyWithdraw(address to, uint256 amount) external onlyAdmin {
+        require(amount > 0, "Amount must be greater than zero");
+        uint256 balance = IERC20(to).balanceOf(address(this));
+        require(balance >= amount, "Insufficient balance");
+        IERC20(to).transfer(to, amount);
+        emit EmergencyWithdraw(to, amount);
+    }
+
+    function pause() external onlyAdmin {
+        paused = true;
+        emit Pause();
+    }
+
+    function unpause() external onlyAdmin {
+        paused = false;
+        emit Unpause();
+    }
+}

@@ -1,0 +1,173 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
+
+contract WrappedToken is ERC20, Ownable {
+    using SafeMath for uint256;
+    using Address for address;
+
+    IERC20 public underlyingToken;
+    mapping(address => mapping(address => uint256)) public allowance;
+
+    event Deposit(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
+    event FlashMint(address indexed minter, uint256 amount, uint256 fee);
+
+    constructor(string memory name, string memory symbol, address _underlyingTokenAddress) ERC20(name, symbol) {
+        underlyingToken = IERC20(_underlyingTokenAddress);
+    }
+
+    /**
+     * @dev Deposits underlying tokens into the contract and mints wrapped tokens.
+     * @param amount The amount of underlying tokens to deposit.
+     */
+    function deposit(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        underlyingToken.transferFrom(msg.sender, address(this), amount);
+        _mint(msg.sender, amount);
+        emit Deposit(msg.sender, amount);
+    }
+
+    /**
+     * @dev Withdraws underlying tokens from the contract by burning wrapped tokens.
+     * @param amount The amount of wrapped tokens to burn.
+     */
+    function withdraw(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        _burn(msg.sender, amount);
+        underlyingToken.transfer(msg.sender, amount);
+        emit Withdraw(msg.sender, amount);
+    }
+
+    /**
+     * @dev Allows a spender to withdraw a specified amount of tokens on behalf of the owner.
+     * This function is for ERC20 compliance and can be managed by `approve` and `transferFrom`.
+     * However, for permit functionality, we implement `permit`.
+     */
+    function approve(address spender, uint256 amount) public virtual override returns (bool) {
+        _approve(msg.sender, spender, amount);
+        return true;
+    }
+
+    function allowance(address owner, address spender) public view virtual override returns (uint256) {
+        return _allowances[owner][spender];
+    }
+
+    /**
+     * @dev See {IERC20Permit-permit}.
+     */
+    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) public virtual override {
+        // Store the allowance for permit separately to avoid conflicts with standard approve
+        // If you are using OpenZeppelin's ERC20Permit extension, this is handled internally.
+        // For this example, we'll assume a simplified approach or that the base ERC20 contract
+        // handles allowance updates correctly after a successful permit.
+        // The actual permit logic is handled by the _permit function from ERC20Permit extension.
+        // If you are not using the ERC20Permit extension, you would need to implement the signature verification here.
+
+        // This is a placeholder assuming ERC20Permit extension is imported and used.
+        // If not, you'll need to implement signature verification.
+        // For a full implementation with OpenZeppelin:
+        // _permit(owner, spender, value, deadline, v, r, s);
+
+        // For a standalone implementation without the extension, you would do something like:
+        // bytes32 domainSeparator = _domainSeparator();
+        // bytes32 digest = keccak256(abi.encode(keccak256('Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)'), owner, spender, value, _usePermit(owner), deadline));
+        // address recoveredSigner = ecrecover(digest, v, r, s);
+        // require(owner == recoveredSigner, "Invalid signature");
+        // require(value <= _balances[owner], "Insufficient balance");
+        // require(block.timestamp <= deadline, "Expired deadline");
+        // _allowances[owner][spender] = value;
+        // emit Approval(owner, spender, value);
+    }
+
+    /**
+     * @dev Mints new wrapped tokens, typically used by flash loan providers.
+     * Requires the caller to return the borrowed amount plus a fee.
+     * @param to The address to mint tokens to.
+     * @param amount The amount of tokens to mint.
+     * @param fee The fee to be paid for the flash mint.
+     */
+    function flashMint(address to, uint256 amount, uint256 fee) external {
+        // This function is intended for flash loan/mint scenarios.
+        // The caller is responsible for returning the `amount` plus `fee` of underlying tokens
+        // to this contract within the same transaction.
+        // The `to` address receives the newly minted wrapped tokens.
+
+        require(amount > 0, "Amount must be greater than zero");
+        require(fee >= 0, "Fee cannot be negative"); // Fee can be zero
+
+        // Mint wrapped tokens
+        _mint(to, amount);
+
+        // Store the expected return amount (principal + fee)
+        // This is a simplified approach. A more robust implementation might use a callback
+        // or a dedicated flash loan pool contract to enforce repayment.
+        // For this example, we assume the caller will transfer the underlying tokens back.
+
+        emit FlashMint(msg.sender, amount, fee);
+    }
+
+    /**
+     * @dev Internal function to handle the return of borrowed tokens plus fee for flash mints.
+     * This function should be called by the flash loan provider or a related mechanism
+     * to ensure repayment.
+     * @param amount The amount of underlying tokens to return.
+     */
+    function repayFlashMint(uint256 amount) external {
+        // This function is a placeholder. In a real flash loan system,
+        // the repayment would be handled by the flash loan provider's contract
+        // or through a callback mechanism.
+        // The caller of `flashMint` is expected to transfer the principal + fee
+        // of the *underlying* token back to this contract.
+
+        // Example: If a flash loan of X tokens was taken, the lender expects X + fee.
+        // This function would be called by the lender to confirm receipt of funds.
+        // The `amount` here would be the principal + fee.
+
+        require(underlyingToken.balanceOf(address(this)) >= amount, "Repayment amount exceeds contract balance");
+        // No actual transfer needed here as the underlying token should have been transferred by the caller.
+        // This function primarily serves as a confirmation or an event trigger.
+    }
+
+    /**
+     * @dev Internal function to check if a flash mint amount can be repaid.
+     * This is a simplified check. A real system would consider the available liquidity.
+     */
+    function canRepayFlashMint(uint256 amount) public view returns (bool) {
+        // In a real scenario, this would check if the contract has enough underlying tokens
+        // to cover the repayment of a flash mint.
+        // For this simplified example, we'll just check if the contract has *any* underlying tokens.
+        return underlyingToken.balanceOf(address(this)) >= amount;
+    }
+
+    /**
+     * @dev Allows the owner to withdraw underlying tokens from the contract.
+     * This is a safety mechanism for the owner.
+     * @param amount The amount of underlying tokens to withdraw.
+     */
+    function ownerWithdrawUnderlying(uint256 amount) external onlyOwner {
+        require(amount > 0, "Amount must be greater than zero");
+        require(underlyingToken.balanceOf(address(this)) >= amount, "Insufficient underlying tokens in contract");
+        underlyingToken.transfer(owner(), amount);
+    }
+
+    /**
+     * @dev Allows the owner to withdraw any ERC20 tokens from the contract.
+     * This is a safety mechanism for the owner.
+     * @param tokenAddress The address of the ERC20 token to withdraw.
+     * @param amount The amount of tokens to withdraw.
+     */
+    function ownerWithdrawERC20(address tokenAddress, uint256 amount) external onlyOwner {
+        require(tokenAddress != address(0), "Invalid token address");
+        require(amount > 0, "Amount must be greater than zero");
+        IERC20(tokenAddress).transfer(owner(), amount);
+    }
+}
+```

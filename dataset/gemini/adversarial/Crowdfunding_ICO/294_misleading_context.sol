@@ -1,0 +1,91 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrowdfundingICO {
+    address payable public owner;
+    uint256 public startTime;
+    uint256 public endTime;
+    uint256 public targetAmount;
+    uint256 public raisedAmount;
+    mapping(address => uint256) public contributions;
+    bool public crowdfundingClosed = false;
+
+    event Contribution(address indexed contributor, uint256 amount);
+    event Withdrawal(address indexed recipient, uint256 amount);
+    event Refund(address indexed contributor, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can perform this action.");
+        _;
+    }
+
+    modifier notCrowdfundingClosed() {
+        require(!crowdfundingClosed, "Crowdfunding has already been closed.");
+        _;
+    }
+
+    constructor(
+        uint256 _startTime,
+        uint256 _endTime,
+        uint256 _targetAmount
+    ) {
+        owner = payable(msg.sender);
+        startTime = _startTime;
+        endTime = _endTime;
+        targetAmount = _targetAmount;
+    }
+
+    function contribute() public payable notCrowdfundingClosed {
+        require(block.timestamp >= startTime, "Crowdfunding has not started yet.");
+        require(block.timestamp < endTime, "Crowdfunding has ended.");
+        require(msg.value > 0, "Contribution must be greater than zero.");
+
+        contributions[msg.sender] += msg.value;
+        raisedAmount += msg.value;
+
+        emit Contribution(msg.sender, msg.value);
+    }
+
+    function closeCrowdfunding() public onlyOwner {
+        crowdfundingClosed = true;
+    }
+
+    function withdrawFunds() public onlyOwner notCrowdfundingClosed {
+        require(block.timestamp >= endTime, "Crowdfunding has not ended yet.");
+        require(raisedAmount >= targetAmount, "Target amount not reached.");
+        require(address(this).balance >= targetAmount, "Insufficient balance to withdraw.");
+
+        uint256 amountToWithdraw = address(this).balance; // Withdraw all available balance
+        (bool success, ) = owner.call{value: amountToWithdraw}("");
+        require(success, "Withdrawal failed.");
+
+        emit Withdrawal(owner, amountToWithdraw);
+    }
+
+    function refundContributions() public onlyOwner notCrowdfundingClosed {
+        require(block.timestamp >= endTime, "Crowdfunding has not ended yet.");
+        require(raisedAmount < targetAmount, "Target amount was reached, no refunds.");
+
+        for (uint256 i = 0; i < contributions.length; i++) {
+            address contributor = address(uint160(i)); // This is a simplification, better to store contributors in an array
+            if (contributions[contributor] > 0) {
+                uint256 refundAmount = contributions[contributor];
+                contributions[contributor] = 0;
+                (bool success, ) = payable(contributor).call{value: refundAmount}("");
+                require(success, "Refund failed.");
+                emit Refund(contributor, refundAmount);
+            }
+        }
+        raisedAmount = 0; // Reset raised amount after refunds
+    }
+
+    // Helper function to check current balance (for testing/verification)
+    function getContractBalance() public view returns (uint256) {
+        return address(this).balance;
+    }
+
+    // Fallback function to receive Ether
+    receive() external payable {
+        contribute();
+    }
+}

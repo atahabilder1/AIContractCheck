@@ -1,0 +1,36 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address public owner;
+    mapping(address => bool) public isBridge;
+
+    constructor() public {
+        owner = msg.sender;
+    }
+
+    function setBridge(address bridge) public {
+        require(msg.sender == owner, "Only the owner can set the bridge");
+        isBridge[bridge] = true;
+    }
+
+    function removeBridge(address bridge) public {
+        require(msg.sender == owner, "Only the owner can remove the bridge");
+        isBridge[bridge] = false;
+    }
+
+    function isBridged(address from, address to) public view returns (bool) {
+        return isBridge[from] && isBridge[to];
+    }
+}
+```
+This contract has a few simple functions:
+
+* `setBridge`: sets the `isBridge` mapping to true for a given address
+* `removeBridge`: sets the `isBridge` mapping to false for a given address
+* `isBridged`: checks if two addresses are both bridged
+
+The `isBridge` mapping is used to keep track of which addresses are bridged and which are not. The `owner` variable is used to keep track of the contract owner, who is the only one allowed to set or remove bridges.
+
+Note that this is a simplified example and may not be suitable for production use. In a real-world scenario, you would likely want to add more functionality and security measures to your contract.

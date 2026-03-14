@@ -1,0 +1,71 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+interface IStrategy {
+    function deposit(uint256 amount) external;
+    function withdraw(uint256 amount) external;
+    function getAPY() external view returns (uint256);
+}
+
+contract YieldAggregator {
+    address public owner;
+    IStrategy[] public strategies;
+    mapping(address => bool) public isStrategy;
+
+    event StrategyAdded(address indexed strategy);
+    event StrategyRemoved(address indexed strategy);
+    event FundsRotated(address indexed fromStrategy, address indexed toStrategy, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function addStrategy(address _strategy) external onlyOwner {
+        require(!isStrategy[_strategy], "Strategy already added");
+        strategies.push(IStrategy(_strategy));
+        isStrategy[_strategy] = true;
+        emit StrategyAdded(_strategy);
+    }
+
+    function removeStrategy(address _strategy) external onlyOwner {
+        require(isStrategy[_strategy], "Strategy not found");
+        for (uint256 i = 0; i < strategies.length; i++) {
+            if (address(strategies[i]) == _strategy) {
+                strategies[i] = strategies[strategies.length - 1];
+                strategies.pop();
+                break;
+            }
+        }
+        isStrategy[_strategy] = false;
+        emit StrategyRemoved(_strategy);
+    }
+
+    function rotateFunds(uint256 _amount) external onlyOwner {
+        address bestStrategy = getBestStrategy();
+        for (uint256 i = 0; i < strategies.length; i++) {
+            if (address(strategies[i]) != bestStrategy) {
+                strategies[i].withdraw(_amount);
+                emit FundsRotated(address(strategies[i]), bestStrategy, _amount);
+            }
+        }
+        IStrategy(bestStrategy).deposit(_amount);
+    }
+
+    function getBestStrategy() public view returns (address) {
+        uint256 highestAPY = 0;
+        address bestStrategy = address(0);
+        for (uint256 i = 0; i < strategies.length; i++) {
+            uint256 apy = strategies[i].getAPY();
+            if (apy > highestAPY) {
+                highestAPY = apy;
+                bestStrategy = address(strategies[i]);
+            }
+        }
+        return bestStrategy;
+    }
+}

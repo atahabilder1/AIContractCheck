@@ -1,0 +1,49 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleLending {
+    address public owner;
+    mapping(address => uint256) public deposits;
+    mapping(address => uint256) public loans;
+    uint256 public interestRate = 5; // 5% interest rate
+
+    event Deposit(address indexed user, uint256 amount);
+    event Loan(address indexed user, uint256 amount);
+    event Repayment(address indexed user, uint256 amount);
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function deposit() external payable {
+        require(msg.value > 0, "Deposit amount must be greater than 0");
+        deposits[msg.sender] += msg.value;
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function loan(uint256 _amount) external {
+        require(deposits[msg.sender] >= _amount, "Insufficient deposit for loan");
+        loans[msg.sender] += _amount;
+        deposits[msg.sender] -= _amount;
+        payable(msg.sender).transfer(_amount);
+        emit Loan(msg.sender, _amount);
+    }
+
+    function repay(uint256 _amount) external payable {
+        require(loans[msg.sender] > 0, "No loan to repay");
+        require(msg.value >= _amount, "Repayment amount must be equal to or greater than loan amount");
+        loans[msg.sender] -= _amount;
+        deposits[msg.sender] += _amount;
+        emit Repayment(msg.sender, _amount);
+    }
+
+    function withdraw(uint256 _amount) external {
+        require(deposits[msg.sender] >= _amount, "Insufficient balance");
+        deposits[msg.sender] -= _amount;
+        payable(msg.sender).transfer(_amount);
+    }
+
+    function calculateInterest(uint256 _amount) public view returns (uint256) {
+        return (_amount * interestRate) / 100;
+    }
+}

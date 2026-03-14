@@ -1,0 +1,93 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract LiquidStaking is ERC20, Ownable {
+    IERC20 public immutable underlyingToken;
+    uint256 public totalStaked;
+    mapping(address => uint256) public stakedBalance;
+
+    event Staked(address indexed user, uint256 amount);
+    event Unstaked(address indexed user, uint256 amount);
+    event RewardClaimed(address indexed user, uint256 amount);
+
+    constructor(address _underlyingTokenAddress) ERC20("Receipt Token", "stToken") {
+        underlyingToken = IERC20(_underlyingTokenAddress);
+    }
+
+    function stake(uint256 _amount) external {
+        require(_amount > 0, "Amount must be greater than zero");
+        require(underlyingToken.balanceOf(msg.sender) >= _amount, "Insufficient balance");
+
+        underlyingToken.transferFrom(msg.sender, address(this), _amount);
+
+        stakedBalance[msg.sender] += _amount;
+        totalStaked += _amount;
+
+        // Mint stTokens to the user
+        _mint(msg.sender, _amount); // Simple 1:1 minting for now
+
+        emit Staked(msg.sender, _amount);
+    }
+
+    function unstake(uint256 _amount) external {
+        require(_amount > 0, "Amount must be greater than zero");
+        require(stakedBalance[msg.sender] >= _amount, "Insufficient staked balance");
+
+        stakedBalance[msg.sender] -= _amount;
+        totalStaked -= _amount;
+
+        // Burn stTokens from the user
+        _burn(msg.sender, _amount);
+
+        underlyingToken.transfer(msg.sender, _amount);
+
+        emit Unstaked(msg.sender, _amount);
+    }
+
+    // This is a placeholder function. Real reward claiming would involve
+    // interacting with a separate staking/rewarding mechanism.
+    function claimRewards() external {
+        // In a real scenario, you would:
+        // 1. Check if the user has rewards available from a staking contract.
+        // 2. Transfer those rewards to the user.
+        // 3. Emit a RewardClaimed event.
+        // For this example, we'll simulate a reward claim (e.g., 10% of staked amount)
+        // This is NOT how real rewards work and is purely illustrative.
+
+        uint256 rewardsToClaim = (stakedBalance[msg.sender] * 10) / 100; // Example: 10%
+        require(rewardsToClaim > 0, "No rewards to claim");
+
+        // Assume you have a mechanism to get rewards (e.g., another contract or a treasury)
+        // For this example, we'll assume the underlying token is used for rewards
+        // and that the contract has enough balance to cover it (which is unlikely in reality without a proper system)
+        require(underlyingToken.balanceOf(address(this)) >= rewardsToClaim, "Insufficient reward balance in contract");
+
+        underlyingToken.transfer(msg.sender, rewardsToClaim);
+
+        emit RewardClaimed(msg.sender, rewardsToClaim);
+    }
+
+    // Function to allow the owner to deposit underlying tokens for rewards or other operations
+    function depositUnderlyingTokens(uint256 _amount) external onlyOwner {
+        require(_amount > 0, "Amount must be greater than zero");
+        underlyingToken.transferFrom(msg.sender, address(this), _amount);
+    }
+
+    // Function to allow the owner to withdraw underlying tokens (e.g., if rewards were miscalculated or for contract management)
+    function withdrawUnderlyingTokens(uint256 _amount) external onlyOwner {
+        require(_amount > 0, "Amount must be greater than zero");
+        require(underlyingToken.balanceOf(address(this)) >= _amount, "Insufficient balance in contract");
+        underlyingToken.transfer(msg.sender, _amount);
+    }
+
+    // Function to allow the owner to withdraw stTokens (e.g., if they were mistakenly minted to the contract)
+    function withdrawStTokens(uint256 _amount) external onlyOwner {
+        require(_amount > 0, "Amount must be greater than zero");
+        require(balanceOf(address(this)) >= _amount, "Insufficient stToken balance in contract");
+        _burn(address(this), _amount);
+    }
+}

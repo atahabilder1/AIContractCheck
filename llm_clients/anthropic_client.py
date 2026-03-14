@@ -1,82 +1,48 @@
 """
-Anthropic Claude 3.5 Sonnet client for generating Solidity smart contracts.
+Claude client for generating Solidity smart contracts.
+Uses Claude Code CLI (claude -p) for generation via subscription.
 """
 
 import os
-import anthropic
-from dotenv import load_dotenv
-
-load_dotenv()
+import subprocess
 
 SYSTEM_PROMPT = """You are a Solidity smart contract developer.
 Generate only the Solidity code, no explanations.
 Always include the SPDX license identifier and pragma statement."""
 
 
-def get_client() -> anthropic.Anthropic:
-    """Get Anthropic client with API key from environment."""
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY environment variable not set")
-    return anthropic.Anthropic(api_key=api_key)
-
-
-def generate_contract(prompt: str, model: str = "claude-3-5-sonnet-20241022") -> str:
+def generate_contract(prompt: str) -> str:
     """
-    Generate a Solidity smart contract using Claude 3.5 Sonnet.
+    Generate a Solidity smart contract using Claude Code CLI.
 
     Args:
         prompt: The prompt describing the contract to generate
-        model: The Anthropic model to use (default: claude-3-5-sonnet)
 
     Returns:
         The generated Solidity code as a string
     """
-    client = get_client()
+    full_prompt = f"{SYSTEM_PROMPT}\n\n{prompt}"
 
-    response = client.messages.create(
-        model=model,
-        max_tokens=4000,
-        system=SYSTEM_PROMPT,
-        messages=[
-            {"role": "user", "content": prompt}
-        ]
+    env = os.environ.copy()
+    env.pop("CLAUDECODE", None)
+
+    result = subprocess.run(
+        ["claude", "-p", full_prompt],
+        capture_output=True,
+        text=True,
+        timeout=180,
+        env=env,
     )
 
-    return response.content[0].text
+    if result.returncode != 0:
+        raise RuntimeError(f"Claude CLI error: {result.stderr}")
 
-
-def extract_solidity_code(response: str) -> str:
-    """
-    Extract Solidity code from a response that may contain markdown code blocks.
-
-    Args:
-        response: The raw response from the LLM
-
-    Returns:
-        The extracted Solidity code
-    """
-    if "```solidity" in response:
-        start = response.find("```solidity") + len("```solidity")
-        end = response.find("```", start)
-        if end != -1:
-            return response[start:end].strip()
-
-    if "```" in response:
-        start = response.find("```") + 3
-        newline = response.find("\n", start)
-        if newline != -1:
-            start = newline + 1
-        end = response.find("```", start)
-        if end != -1:
-            return response[start:end].strip()
-
-    return response.strip()
+    return result.stdout.strip()
 
 
 if __name__ == "__main__":
     test_prompt = "Write a basic ERC20 token contract in Solidity."
-    print("Testing Claude client...")
+    print("Testing Claude Code CLI client...")
     try:
         code = generate_contract(test_prompt)
         print("Generated code:")

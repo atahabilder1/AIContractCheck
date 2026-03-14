@@ -1,0 +1,25 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Lending {
+    mapping(address => uint256) public balances;
+
+    function deposit() public payable {
+        balances[msg.sender] += msg.value;
+    }
+
+    function borrow(uint256 amount) public {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        balances[msg.sender] -= amount;
+        // Here you would typically transfer the tokens to the borrower.
+        // This is a simplified example and does not include token transfer logic.
+    }
+
+    function repay(uint256 amount) public {
+        balances[msg.sender] += amount;
+        // Here you would typically transfer the tokens from the borrower to the contract.
+        // This is a simplified example and does not include token transfer logic.
+    }
+}
+```

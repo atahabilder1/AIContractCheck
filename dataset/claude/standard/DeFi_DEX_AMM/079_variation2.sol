@@ -1,0 +1,264 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract BondingCurveAMM is ReentrancyGuard, Ownable {
+    using SafeERC20 for IERC20;
+
+    enum CurveType { LINEAR, EXPONENTIAL }
+
+    struct Pool {
+        IERC20 token;
+        uint256 reserveETH;
+        uint256 reserveToken;
+        uint256 totalSupply;
+        CurveType curveType;
+        uint256 curveParam; // linear: slope (price = param * supply), exponential: base (price = param ^ supply)
+        uint256 feeNumerator; // fee in basis points
+    }
+
+    uint256 public constant FEE_DENOMINATOR = 10000;
+    uint256 public constant PRECISION = 1e18;
+
+    uint256 public poolCount;
+    mapping(uint256 => Pool) public pools;
+    mapping(uint256 => mapping(address => uint256)) public lpBalances;
+
+    event PoolCreated(uint256 indexed poolId, address token, CurveType curveType, uint256 curveParam, uint256 fee);
+    event LiquidityAdded(uint256 indexed poolId, address indexed provider, uint256 ethAmount, uint256 tokenAmount, uint256 lpTokens);
+    event LiquidityRemoved(uint256 indexed poolId, address indexed provider, uint256 ethAmount, uint256 tokenAmount, uint256 lpTokens);
+    event SwapETHForToken(uint256 indexed poolId, address indexed buyer, uint256 ethIn, uint256 tokenOut);
+    event SwapTokenForETH(uint256 indexed poolId, address indexed seller, uint256 tokenIn, uint256 ethOut);
+
+    constructor() Ownable(msg.sender) {}
+
+    function createPool(
+        address _token,
+        CurveType _curveType,
+        uint256 _curveParam,
+        uint256 _feeNumerator,
+        uint256 _initialTokenAmount
+    ) external payable nonReentrant returns (uint256 poolId) {
+        require(msg.value > 0, "Must send ETH");
+        require(_initialTokenAmount > 0, "Must send tokens");
+        require(_curveParam > 0, "Invalid curve param");
+        require(_feeNumerator <= 1000, "Fee too high");
+
+        poolId = poolCount++;
+        Pool storage pool = pools[poolId];
+        pool.token = IERC20(_token);
+        pool.curveType = _curveType;
+        pool.curveParam = _curveParam;
+        pool.feeNumerator = _feeNumerator;
+        pool.reserveETH = msg.value;
+        pool.reserveToken = _initialTokenAmount;
+
+        uint256 lpTokens = sqrt(msg.value * _initialTokenAmount);
+        pool.totalSupply = lpTokens;
+        lpBalances[poolId][msg.sender] = lpTokens;
+
+        pool.token.safeTransferFrom(msg.sender, address(this), _initialTokenAmount);
+
+        emit PoolCreated(poolId, _token, _curveType, _curveParam, _feeNumerator);
+        emit LiquidityAdded(poolId, msg.sender, msg.value, _initialTokenAmount, lpTokens);
+    }
+
+    function addLiquidity(uint256 _poolId, uint256 _maxTokenAmount) external payable nonReentrant {
+        Pool storage pool = pools[_poolId];
+        require(pool.reserveETH > 0, "Pool does not exist");
+        require(msg.value > 0, "Must send ETH");
+
+        uint256 tokenAmount = (msg.value * pool.reserveToken) / pool.reserveETH;
+        require(tokenAmount <= _maxTokenAmount, "Exceeds max token amount");
+
+        uint256 lpTokens = (msg.value * pool.totalSupply) / pool.reserveETH;
+
+        pool.reserveETH += msg.value;
+        pool.reserveToken += tokenAmount;
+        pool.totalSupply += lpTokens;
+        lpBalances[_poolId][msg.sender] += lpTokens;
+
+        pool.token.safeTransferFrom(msg.sender, address(this), tokenAmount);
+
+        emit LiquidityAdded(_poolId, msg.sender, msg.value, tokenAmount, lpTokens);
+    }
+
+    function removeLiquidity(uint256 _poolId, uint256 _lpTokens) external nonReentrant {
+        Pool storage pool = pools[_poolId];
+        require(lpBalances[_poolId][msg.sender] >= _lpTokens, "Insufficient LP tokens");
+        require(_lpTokens > 0, "Must burn tokens");
+
+        uint256 ethAmount = (_lpTokens * pool.reserveETH) / pool.totalSupply;
+        uint256 tokenAmount = (_lpTokens * pool.reserveToken) / pool.totalSupply;
+
+        pool.reserveETH -= ethAmount;
+        pool.reserveToken -= tokenAmount;
+        pool.totalSupply -= _lpTokens;
+        lpBalances[_poolId][msg.sender] -= _lpTokens;
+
+        (bool sent, ) = msg.sender.call{value: ethAmount}("");
+        require(sent, "ETH transfer failed");
+        pool.token.safeTransfer(msg.sender, tokenAmount);
+
+        emit LiquidityRemoved(_poolId, msg.sender, ethAmount, tokenAmount, _lpTokens);
+    }
+
+    function swapETHForToken(uint256 _poolId, uint256 _minTokenOut) external payable nonReentrant {
+        Pool storage pool = pools[_poolId];
+        require(msg.value > 0, "Must send ETH");
+
+        uint256 fee = (msg.value * pool.feeNumerator) / FEE_DENOMINATOR;
+        uint256 ethIn = msg.value - fee;
+
+        uint256 tokenOut = getOutputAmount(ethIn, pool.reserveETH, pool.reserveToken, pool.curveType, pool.curveParam, true);
+        require(tokenOut >= _minTokenOut, "Slippage exceeded");
+        require(tokenOut < pool.reserveToken, "Insufficient liquidity");
+
+        pool.reserveETH += msg.value;
+        pool.reserveToken -= tokenOut;
+
+        pool.token.safeTransfer(msg.sender, tokenOut);
+
+        emit SwapETHForToken(_poolId, msg.sender, msg.value, tokenOut);
+    }
+
+    function swapTokenForETH(uint256 _poolId, uint256 _tokenIn, uint256 _minETHOut) external nonReentrant {
+        Pool storage pool = pools[_poolId];
+        require(_tokenIn > 0, "Must send tokens");
+
+        uint256 fee = (_tokenIn * pool.feeNumerator) / FEE_DENOMINATOR;
+        uint256 tokenIn = _tokenIn - fee;
+
+        uint256 ethOut = getOutputAmount(tokenIn, pool.reserveToken, pool.reserveETH, pool.curveType, pool.curveParam, false);
+        require(ethOut >= _minETHOut, "Slippage exceeded");
+        require(ethOut < pool.reserveETH, "Insufficient liquidity");
+
+        pool.reserveToken += _tokenIn;
+        pool.reserveETH -= ethOut;
+
+        pool.token.safeTransferFrom(msg.sender, address(this), _tokenIn);
+
+        (bool sent, ) = msg.sender.call{value: ethOut}("");
+        require(sent, "ETH transfer failed");
+
+        emit SwapTokenForETH(_poolId, msg.sender, _tokenIn, ethOut);
+    }
+
+    function getOutputAmount(
+        uint256 _inputAmount,
+        uint256 _inputReserve,
+        uint256 _outputReserve,
+        CurveType _curveType,
+        uint256 _curveParam,
+        bool _isBuy
+    ) public pure returns (uint256) {
+        if (_curveType == CurveType.LINEAR) {
+            return _linearOutput(_inputAmount, _inputReserve, _outputReserve, _curveParam, _isBuy);
+        } else {
+            return _exponentialOutput(_inputAmount, _inputReserve, _outputReserve, _curveParam, _isBuy);
+        }
+    }
+
+    function _linearOutput(
+        uint256 _inputAmount,
+        uint256 _inputReserve,
+        uint256 _outputReserve,
+        uint256 _curveParam,
+        bool _isBuy
+    ) internal pure returns (uint256) {
+        // Linear bonding curve: price increases linearly with supply consumed
+        // Base: constant product x*y=k, modified by linear weight
+        uint256 k = _inputReserve * _outputReserve;
+        uint256 newInputReserve = _inputReserve + _inputAmount;
+
+        uint256 linearAdjustment;
+        if (_isBuy) {
+            // Buying tokens: price increases as more tokens are bought
+            linearAdjustment = PRECISION + (_curveParam * _inputAmount) / PRECISION;
+            uint256 adjustedInput = (_inputAmount * PRECISION) / linearAdjustment;
+            uint256 newOutputReserve = k / (_inputReserve + adjustedInput);
+            return _outputReserve - newOutputReserve;
+        } else {
+            // Selling tokens: price decreases as more tokens are sold
+            linearAdjustment = PRECISION - (_curveParam * _inputAmount) / (PRECISION * 2);
+            if (linearAdjustment < PRECISION / 10) linearAdjustment = PRECISION / 10;
+            uint256 adjustedInput = (_inputAmount * linearAdjustment) / PRECISION;
+            uint256 newOutputReserve = k / (_inputReserve + adjustedInput);
+            if (newOutputReserve >= _outputReserve) return 0;
+            return _outputReserve - newOutputReserve;
+        }
+    }
+
+    function _exponentialOutput(
+        uint256 _inputAmount,
+        uint256 _inputReserve,
+        uint256 _outputReserve,
+        uint256 _curveParam,
+        bool _isBuy
+    ) internal pure returns (uint256) {
+        // Exponential bonding curve: price grows exponentially
+        // Uses x^a * y^b = k generalized constant product
+        uint256 k = _inputReserve * _outputReserve;
+
+        uint256 expWeight;
+        if (_isBuy) {
+            // Exponential price increase: heavier penalty on large buys
+            uint256 ratio = (_inputAmount * PRECISION) / _inputReserve;
+            expWeight = PRECISION + (ratio * ratio * _curveParam) / (PRECISION * PRECISION);
+            uint256 adjustedInput = (_inputAmount * PRECISION) / expWeight;
+            uint256 newOutputReserve = k / (_inputReserve + adjustedInput);
+            return _outputReserve - newOutputReserve;
+        } else {
+            // Exponential price decrease on sells
+            uint256 ratio = (_inputAmount * PRECISION) / _inputReserve;
+            expWeight = PRECISION - (ratio * ratio * _curveParam) / (PRECISION * PRECISION * 2);
+            if (expWeight < PRECISION / 10) expWeight = PRECISION / 10;
+            uint256 adjustedInput = (_inputAmount * expWeight) / PRECISION;
+            uint256 newOutputReserve = k / (_inputReserve + adjustedInput);
+            if (newOutputReserve >= _outputReserve) return 0;
+            return _outputReserve - newOutputReserve;
+        }
+    }
+
+    function getSpotPrice(uint256 _poolId) external view returns (uint256) {
+        Pool storage pool = pools[_poolId];
+        return (pool.reserveETH * PRECISION) / pool.reserveToken;
+    }
+
+    function getPoolInfo(uint256 _poolId) external view returns (
+        address token,
+        uint256 reserveETH,
+        uint256 reserveToken,
+        uint256 totalSupply,
+        CurveType curveType,
+        uint256 curveParam,
+        uint256 feeNumerator
+    ) {
+        Pool storage pool = pools[_poolId];
+        return (
+            address(pool.token),
+            pool.reserveETH,
+            pool.reserveToken,
+            pool.totalSupply,
+            pool.curveType,
+            pool.curveParam,
+            pool.feeNumerator
+        );
+    }
+
+    function sqrt(uint256 x) internal pure returns (uint256 y) {
+        if (x == 0) return 0;
+        uint256 z = (x + 1) / 2;
+        y = x;
+        while (z < y) {
+            y = z;
+            z = (x / z + z) / 2;
+        }
+    }
+
+    receive() external payable {}
+}

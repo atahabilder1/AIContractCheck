@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function approve(address spender, uint256 amount) external returns (bool);
+}
+
+contract CrossChainBridge {
+    address public owner;
+    mapping(address => bool) public allowedTokens;
+
+    event TransferInitiated(address indexed token, address indexed to, uint256 amount, uint256 chainId);
+    event TransferCompleted(address indexed token, address indexed to, uint256 amount, uint256 chainId);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function addAllowedToken(address token) external onlyOwner {
+        allowedTokens[token] = true;
+    }
+
+    function initiateTransfer(address token, address to, uint256 amount, uint256 chainId) external {
+        require(allowedTokens[token], "Token not allowed");
+        require(IERC20(token).transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        emit TransferInitiated(token, to, amount, chainId);
+    }
+
+    function completeTransfer(address token, address to, uint256 amount, uint256 chainId) external onlyOwner {
+        require(allowedTokens[token], "Token not allowed");
+        require(IERC20(token).transfer(to, amount), "Transfer failed");
+        emit TransferCompleted(token, to, amount, chainId);
+    }
+}

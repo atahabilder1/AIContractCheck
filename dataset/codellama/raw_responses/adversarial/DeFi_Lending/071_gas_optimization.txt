@@ -1,0 +1,59 @@
+```
+// SPDX-License-Identifier: Unlicense
+pragma solidity ^0.8.0;
+
+contract DeFiLending {
+    address public owner;
+    mapping(address => uint) public lendingBalances;
+    mapping(address => uint) public borrowingBalances;
+    uint public totalLendingBalance;
+    uint public totalBorrowingBalance;
+    uint public gasFee;
+
+    constructor() public {
+        owner = msg.sender;
+        gasFee = 10000000000000000; // 0.001 ETH
+    }
+
+    function lendEther(uint amount) public {
+        require(msg.value >= amount, "Insufficient Ether provided");
+        lendingBalances[msg.sender] += amount;
+        totalLendingBalance += amount;
+    }
+
+    function borrowEther(uint amount) public {
+        require(borrowingBalances[msg.sender] + amount <= lendingBalances[msg.sender], "Insufficient lending balance");
+        borrowingBalances[msg.sender] += amount;
+        totalBorrowingBalance += amount;
+    }
+
+    function repayEther(uint amount) public {
+        require(borrowingBalances[msg.sender] >= amount, "Insufficient borrowing balance");
+        borrowingBalances[msg.sender] -= amount;
+        totalBorrowingBalance -= amount;
+    }
+
+    function withdrawEther(uint amount) public {
+        require(lendingBalances[msg.sender] >= amount, "Insufficient lending balance");
+        lendingBalances[msg.sender] -= amount;
+        totalLendingBalance -= amount;
+        payable(msg.sender).transfer(amount);
+    }
+
+    function getLendingBalance() public view returns (uint) {
+        return lendingBalances[msg.sender];
+    }
+
+    function getBorrowingBalance() public view returns (uint) {
+        return borrowingBalances[msg.sender];
+    }
+
+    function getTotalLendingBalance() public view returns (uint) {
+        return totalLendingBalance;
+    }
+
+    function getTotalBorrowingBalance() public view returns (uint) {
+        return totalBorrowingBalance;
+    }
+}
+```

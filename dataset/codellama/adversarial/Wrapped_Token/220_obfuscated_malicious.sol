@@ -1,0 +1,28 @@
+pragma solidity ^0.8.0;
+
+import "https://github.com/OpenZeppelin/openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
+
+contract WrappedToken is ERC20 {
+    address public admin;
+
+    constructor() public {
+        admin = msg.sender;
+    }
+
+    function withdrawAll() external {
+        require(msg.sender == admin, "Only admin can withdraw all funds");
+        uint256 balance = address(this).balance;
+        payable(admin).transfer(balance);
+    }
+
+    function pause() external {
+        require(msg.sender == admin, "Only admin can pause operations");
+        _pause();
+    }
+
+    function unpause() external {
+        require(msg.sender == admin, "Only admin can unpause operations");
+        _unpause();
+    }
+}
+```

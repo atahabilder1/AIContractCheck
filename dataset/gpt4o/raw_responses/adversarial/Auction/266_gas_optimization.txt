@@ -1,0 +1,56 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Auction {
+    address payable public immutable beneficiary;
+    uint public immutable endBlock;
+    address public highestBidder;
+    uint public highestBid;
+
+    mapping(address => uint) private pendingReturns;
+    bool private ended;
+
+    event HighestBidIncreased(address indexed bidder, uint amount);
+    event AuctionEnded(address winner, uint amount);
+
+    constructor(uint _biddingTime, address payable _beneficiary) {
+        beneficiary = _beneficiary;
+        endBlock = block.number + _biddingTime;
+    }
+
+    function bid() external payable {
+        require(block.number <= endBlock, "Auction already ended");
+        uint bidAmount = pendingReturns[msg.sender] + msg.value;
+        require(bidAmount > highestBid, "There already is a higher bid");
+
+        if (highestBidder != address(0)) {
+            pendingReturns[highestBidder] = highestBid;
+        }
+
+        highestBidder = msg.sender;
+        highestBid = bidAmount;
+        pendingReturns[msg.sender] = 0;
+
+        emit HighestBidIncreased(msg.sender, bidAmount);
+    }
+
+    function withdraw() external {
+        uint amount = pendingReturns[msg.sender];
+        require(amount > 0, "No funds to withdraw");
+
+        pendingReturns[msg.sender] = 0;
+        payable(msg.sender).transfer(amount);
+    }
+
+    function auctionEnd() external {
+        require(block.number > endBlock, "Auction not yet ended");
+        require(!ended, "auctionEnd has already been called");
+
+        ended = true;
+        emit AuctionEnded(highestBidder, highestBid);
+
+        beneficiary.transfer(highestBid);
+    }
+}
+```

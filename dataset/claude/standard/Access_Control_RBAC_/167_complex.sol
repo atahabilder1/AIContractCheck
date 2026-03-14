@@ -1,0 +1,212 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract RoleBasedAccessControl {
+    struct RoleData {
+        mapping(address => bool) members;
+        mapping(address => uint256) expiration;
+        address[] memberList;
+        mapping(address => uint256) memberIndex;
+        bytes32 adminRole;
+    }
+
+    struct RoleChangeProposal {
+        bytes32 role;
+        address account;
+        bool grant; // true = grant, false = revoke
+        uint256 approvalCount;
+        mapping(address => bool) approvals;
+        bool executed;
+        uint256 deadline;
+    }
+
+    mapping(bytes32 => RoleData) private _roles;
+    mapping(uint256 => RoleChangeProposal) private _proposals;
+    uint256 private _proposalCount;
+
+    uint256 public requiredApprovals;
+
+    bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 public constant PROPOSER_ROLE = keccak256("PROPOSER_ROLE");
+
+    event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender);
+    event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender);
+    event RoleAdminChanged(bytes32 indexed role, bytes32 indexed previousAdminRole, bytes32 indexed newAdminRole);
+    event ProposalCreated(uint256 indexed proposalId, bytes32 role, address account, bool grant, uint256 deadline);
+    event ProposalApproved(uint256 indexed proposalId, address indexed approver);
+    event ProposalExecuted(uint256 indexed proposalId);
+
+    modifier onlyRole(bytes32 role) {
+        require(hasRole(role, msg.sender), "AccessControl: missing role");
+        _;
+    }
+
+    constructor(uint256 _requiredApprovals) {
+        require(_requiredApprovals >= 1, "Need at least 1 approval");
+        requiredApprovals = _requiredApprovals;
+
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender, 0);
+        _grantRole(ADMIN_ROLE, msg.sender, 0);
+        _grantRole(PROPOSER_ROLE, msg.sender, 0);
+
+        _roles[ADMIN_ROLE].adminRole = DEFAULT_ADMIN_ROLE;
+        _roles[PROPOSER_ROLE].adminRole = ADMIN_ROLE;
+    }
+
+    function hasRole(bytes32 role, address account) public view returns (bool) {
+        if (!_roles[role].members[account]) return false;
+        uint256 exp = _roles[role].expiration[account];
+        if (exp != 0 && block.timestamp > exp) return false;
+        return true;
+    }
+
+    function getRoleAdmin(bytes32 role) public view returns (bytes32) {
+        return _roles[role].adminRole;
+    }
+
+    function getRoleMemberCount(bytes32 role) public view returns (uint256) {
+        return _roles[role].memberList.length;
+    }
+
+    function getRoleMember(bytes32 role, uint256 index) public view returns (address) {
+        require(index < _roles[role].memberList.length, "Index out of bounds");
+        return _roles[role].memberList[index];
+    }
+
+    function getRoleMembers(bytes32 role) public view returns (address[] memory) {
+        return _roles[role].memberList;
+    }
+
+    function getRoleExpiration(bytes32 role, address account) public view returns (uint256) {
+        return _roles[role].expiration[account];
+    }
+
+    function setRoleAdmin(bytes32 role, bytes32 adminRole) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 previous = _roles[role].adminRole;
+        _roles[role].adminRole = adminRole;
+        emit RoleAdminChanged(role, previous, adminRole);
+    }
+
+    function grantRole(bytes32 role, address account, uint256 duration) external onlyRole(getRoleAdmin(role)) {
+        uint256 expiration = duration > 0 ? block.timestamp + duration : 0;
+        _grantRole(role, account, expiration);
+    }
+
+    function revokeRole(bytes32 role, address account) external onlyRole(getRoleAdmin(role)) {
+        _revokeRole(role, account);
+    }
+
+    function renounceRole(bytes32 role) external {
+        _revokeRole(role, msg.sender);
+    }
+
+    // Multi-sig role change proposals
+
+    function proposeRoleChange(bytes32 role, address account, bool grant, uint256 deadline) external onlyRole(PROPOSER_ROLE) returns (uint256) {
+        require(deadline > block.timestamp, "Deadline must be in the future");
+
+        uint256 proposalId = _proposalCount++;
+        RoleChangeProposal storage p = _proposals[proposalId];
+        p.role = role;
+        p.account = account;
+        p.grant = grant;
+        p.deadline = deadline;
+
+        emit ProposalCreated(proposalId, role, account, grant, deadline);
+        return proposalId;
+    }
+
+    function approveProposal(uint256 proposalId) external onlyRole(ADMIN_ROLE) {
+        RoleChangeProposal storage p = _proposals[proposalId];
+        require(!p.executed, "Already executed");
+        require(block.timestamp <= p.deadline, "Proposal expired");
+        require(!p.approvals[msg.sender], "Already approved");
+
+        p.approvals[msg.sender] = true;
+        p.approvalCount++;
+
+        emit ProposalApproved(proposalId, msg.sender);
+
+        if (p.approvalCount >= requiredApprovals) {
+            p.executed = true;
+            if (p.grant) {
+                _grantRole(p.role, p.account, 0);
+            } else {
+                _revokeRole(p.role, p.account);
+            }
+            emit ProposalExecuted(proposalId);
+        }
+    }
+
+    function getProposal(uint256 proposalId) external view returns (
+        bytes32 role,
+        address account,
+        bool grant,
+        uint256 approvalCount,
+        bool executed,
+        uint256 deadline
+    ) {
+        RoleChangeProposal storage p = _proposals[proposalId];
+        return (p.role, p.account, p.grant, p.approvalCount, p.executed, p.deadline);
+    }
+
+    function hasApproved(uint256 proposalId, address approver) external view returns (bool) {
+        return _proposals[proposalId].approvals[approver];
+    }
+
+    function setRequiredApprovals(uint256 _requiredApprovals) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_requiredApprovals >= 1, "Need at least 1 approval");
+        requiredApprovals = _requiredApprovals;
+    }
+
+    function cleanExpiredMembers(bytes32 role) external {
+        address[] storage members = _roles[role].memberList;
+        uint256 i = 0;
+        while (i < members.length) {
+            address member = members[i];
+            uint256 exp = _roles[role].expiration[member];
+            if (exp != 0 && block.timestamp > exp) {
+                _removeMember(role, member);
+            } else {
+                i++;
+            }
+        }
+    }
+
+    // Internal functions
+
+    function _grantRole(bytes32 role, address account, uint256 expiration) internal {
+        if (!_roles[role].members[account]) {
+            _roles[role].members[account] = true;
+            _roles[role].memberIndex[account] = _roles[role].memberList.length;
+            _roles[role].memberList.push(account);
+        }
+        _roles[role].expiration[account] = expiration;
+        emit RoleGranted(role, account, msg.sender);
+    }
+
+    function _revokeRole(bytes32 role, address account) internal {
+        if (_roles[role].members[account]) {
+            _removeMember(role, account);
+            emit RoleRevoked(role, account, msg.sender);
+        }
+    }
+
+    function _removeMember(bytes32 role, address account) internal {
+        _roles[role].members[account] = false;
+        _roles[role].expiration[account] = 0;
+
+        uint256 index = _roles[role].memberIndex[account];
+        uint256 lastIndex = _roles[role].memberList.length - 1;
+
+        if (index != lastIndex) {
+            address lastMember = _roles[role].memberList[lastIndex];
+            _roles[role].memberList[index] = lastMember;
+            _roles[role].memberIndex[lastMember] = index;
+        }
+
+        _roles[role].memberList.pop();
+        delete _roles[role].memberIndex[account];
+    }
+}

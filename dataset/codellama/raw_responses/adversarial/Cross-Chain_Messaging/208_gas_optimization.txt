@@ -1,0 +1,48 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainMessaging {
+    struct Message {
+        uint timestamp;
+        address sender;
+        string message;
+    }
+
+    mapping(uint => Message) public messages;
+    uint public messageCount;
+
+    function sendMessage(string calldata _message) external {
+        messages[messageCount++] = Message({
+            timestamp: block.timestamp,
+            sender: msg.sender,
+            message: _message
+        });
+    }
+
+    function getMessages() external view returns (Message[] memory) {
+        Message[] memory _messages = new Message[](messageCount);
+        for (uint i = 0; i < messageCount; i++) {
+            _messages[i] = messages[i];
+        }
+        return _messages;
+    }
+
+    function getMessage(uint _index) external view returns (Message memory) {
+        return messages[_index];
+    }
+
+    function getMessageCount() external view returns (uint) {
+        return messageCount;
+    }
+}
+```
+This code is gas-optimized and removes redundant operations. It uses the `struct` type to store the message data and the `mapping` type to store the messages. It also uses the `uint` type for the message count to avoid using the `uint8` type, which is less efficient.
+
+The `sendMessage` function is the main entry point for sending messages. It takes a `string calldata` parameter for the message and adds it to the `messages` mapping using the `messageCount` variable as the key. It then increments the `messageCount` variable to keep track of the number of messages.
+
+The `getMessages` function returns an array of `Message` structs that contains all the messages in the contract. It uses a `for` loop to iterate over the `messageCount` variable and adds each message to the array.
+
+The `getMessage` function returns a single `Message` struct for the message at the specified index. It uses the `getMessageCount` function to get the number of messages and then returns the message at the specified index.
+
+The `getMessageCount` function returns the number of messages in the contract. It uses the `messageCount` variable to keep track of the number of messages.

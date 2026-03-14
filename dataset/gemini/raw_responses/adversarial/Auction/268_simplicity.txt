@@ -1,0 +1,40 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MinimalAuction {
+    address public highestBidder;
+    uint256 public highestBid;
+    bool public ended;
+
+    event Bid(address bidder, uint256 amount);
+    event AuctionEnded(address winner, uint256 amount);
+
+    function bid() public payable {
+        require(!ended, "Auction has already ended.");
+        require(msg.value > highestBid, "Bid must be higher than the current highest bid.");
+
+        if (highestBidder != address(0)) {
+            // Refund previous highest bidder
+            payable(highestBidder).transfer(highestBid);
+        }
+
+        highestBidder = msg.sender;
+        highestBid = msg.value;
+
+        emit Bid(msg.sender, msg.value);
+    }
+
+    function endAuction() public {
+        require(!ended, "Auction has already ended.");
+        ended = true;
+
+        emit AuctionEnded(highestBidder, highestBid);
+    }
+
+    // Fallback function to receive Ether directly if needed, though not strictly required for minimal functionality
+    receive() external payable {
+        bid();
+    }
+}
+```

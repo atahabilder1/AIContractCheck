@@ -1,0 +1,10 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract FlashLoanProvider {
+    event FlashLoan(address indexed _borrower, uint256 indexed _amount);
+
+    function flashLoan(address _borrower, uint256 _amount) public {
+        emit FlashLoan(_borrower, _amount);
+    }
+}

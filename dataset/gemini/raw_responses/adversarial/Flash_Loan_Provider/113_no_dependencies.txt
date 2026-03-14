@@ -1,0 +1,132 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IFlashLoanReceiver {
+    function executeFlashLoan(address borrower, address asset, uint256 amount, bytes calldata data) external;
+}
+
+contract FlashLoanProvider {
+    address public owner;
+
+    event LoanCreated(address indexed borrower, address indexed asset, uint256 amount, uint256 fee);
+    event LoanRepaid(address indexed borrower, address indexed asset, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can perform this action.");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    receive() external payable {}
+
+    function deposit(address asset) public payable onlyOwner {
+        // This function is a placeholder for a real DEX or lending pool where assets would be deposited.
+        // In a real scenario, you would interact with an external protocol to deposit assets.
+        // For this example, we assume the contract holds the assets directly.
+        // The 'payable' keyword allows the owner to send ether to the contract to fund it.
+        // For ERC20 tokens, a separate deposit mechanism would be needed.
+        require(asset != address(0), "Invalid asset address.");
+        // In a real implementation, you'd manage balances of different assets.
+    }
+
+    function withdraw(address asset, uint256 amount) public onlyOwner {
+        // Similar to deposit, this is a placeholder for withdrawing from a DEX or lending pool.
+        // For this example, we assume the contract holds the assets directly.
+        require(asset != address(0), "Invalid asset address.");
+        // In a real implementation, you'd manage balances of different assets.
+        // For ERC20, you would use `IERC20(asset).transfer(msg.sender, amount);`
+        // For ETH, you would use `payable(msg.sender).transfer(amount);`
+    }
+
+    function requestFlashLoan(address asset, uint256 amount, address receiver, bytes calldata data) public {
+        require(asset != address(0), "Invalid asset address.");
+        require(receiver != address(0), "Invalid receiver address.");
+        require(amount > 0, "Loan amount must be greater than zero.");
+
+        // 1. Check if the contract has enough of the requested asset.
+        // For ETH, check contract balance.
+        // For ERC20, check contract balance of that token.
+        if (asset == address(0)) { // Assuming address(0) represents ETH for simplicity
+            require(address(this).balance >= amount, "Insufficient ETH balance for loan.");
+        } else {
+            // In a real scenario, you'd need an ERC20 interface and check the balance.
+            // For this example, we are omitting ERC20 specific checks for simplicity and focusing on the flash loan logic.
+            // You would typically have a mapping `mapping(address => uint256) public assetBalances;`
+            // and check `assetBalances[asset] >= amount`.
+        }
+
+        // 2. Transfer the loan amount to the borrower.
+        if (asset == address(0)) { // ETH
+            payable(msg.sender).transfer(amount);
+        } else {
+            // For ERC20, you would transfer from this contract's balance.
+            // `IERC20(asset).transfer(msg.sender, amount);`
+            // This requires the FlashLoanProvider contract to have approved the token spending or to be the owner.
+        }
+
+        // 3. Call the receiver's executeFlashLoan function.
+        IFlashLoanReceiver(receiver).executeFlashLoan(msg.sender, asset, amount, data);
+
+        // 4. After the receiver returns, the borrower should have returned the loan amount + fee.
+        // The receiver contract is responsible for sending the repayment back to this contract.
+        // This contract will then check if the repayment was sufficient.
+    }
+
+    // This function is called by the receiver contract to repay the loan and any fees.
+    // It should be called *after* the receiver's executeFlashLoan has completed its logic.
+    function repayFlashLoan(address asset, uint256 amount, uint256 fee) public {
+        require(msg.sender != address(0), "Invalid sender."); // Ensure it's not an accidental call
+        require(amount > 0, "Repayment amount must be greater than zero.");
+        require(fee >= 0, "Fee cannot be negative.");
+
+        uint256 totalRepayment = amount + fee;
+
+        // Check if the correct amount has been sent back to this contract.
+        if (asset == address(0)) { // ETH
+            require(msg.value >= totalRepayment, "Insufficient ETH repayment received.");
+            // If more ETH was sent than required, the excess will remain in the contract.
+        } else {
+            // For ERC20, you'd need to check the balance of the token in this contract.
+            // This function would typically be called by the receiver contract *after* it has
+            // transferred the repayment tokens to this contract.
+            // `require(IERC20(asset).balanceOf(address(this)) >= totalRepayment, "Insufficient token repayment received.");`
+        }
+
+        emit LoanRepaid(msg.sender, asset, amount);
+    }
+
+    // A simple function to calculate a fee. In a real system, this would be more complex.
+    function calculateFee(uint256 amount) public view returns (uint256) {
+        // Example fee: 0.1%
+        return (amount * 1) / 1000;
+    }
+
+    // This function is meant to be called by the receiver to signal successful repayment.
+    // The actual asset transfer back to the FlashLoanProvider should happen BEFORE this call.
+    function confirmRepayment(address asset, uint256 amount, uint256 fee) public {
+        require(msg.sender != address(0), "Invalid sender.");
+
+        uint256 totalExpectedRepayment = amount + fee;
+
+        // Check if the contract has received the funds.
+        if (asset == address(0)) { // ETH
+            // The ETH would have been sent directly to this contract's address.
+            // This function doesn't directly check msg.value, as the repayment happens
+            // implicitly when the receiver calls `repayFlashLoan` or similar.
+            // A more robust system would have the receiver explicitly send funds to this contract
+            // and then call a function like this to confirm.
+        } else {
+            // For ERC20, the receiver contract would transfer the tokens to this contract.
+            // This function would verify that the tokens have arrived.
+            // `require(IERC20(asset).balanceOf(address(this)) >= totalExpectedRepayment, "Repayment not yet received.");`
+        }
+
+        // In a more advanced system, you might track outstanding loans and mark them as repaid here.
+        // For this simplified example, the logic relies on the receiver sending back the correct amount.
+    }
+}
+```

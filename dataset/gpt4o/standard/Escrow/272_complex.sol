@@ -1,0 +1,146 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    struct Milestone {
+        uint256 amount;
+        bool isReleased;
+    }
+
+    struct Dispute {
+        address[] disputingParties;
+        string evidence;
+        bool resolved;
+        address arbiter;
+    }
+
+    struct EscrowAgreement {
+        address payer;
+        address payee;
+        Milestone[] milestones;
+        uint256 deadline;
+        bool isCompleted;
+        Dispute dispute;
+    }
+
+    mapping(uint256 => EscrowAgreement) public agreements;
+    uint256 public agreementCount;
+
+    event AgreementCreated(uint256 agreementId, address payer, address payee, uint256 totalAmount, uint256 deadline);
+    event MilestoneCompleted(uint256 agreementId, uint256 milestoneIndex);
+    event DisputeOpened(uint256 agreementId, address[] disputingParties, string evidence);
+    event DisputeResolved(uint256 agreementId, address arbiter, bool resolved);
+    event AgreementCompleted(uint256 agreementId);
+
+    modifier onlyParticipant(uint256 agreementId) {
+        require(msg.sender == agreements[agreementId].payer || msg.sender == agreements[agreementId].payee, "Not a participant");
+        _;
+    }
+
+    modifier onlyArbiter(uint256 agreementId) {
+        require(msg.sender == agreements[agreementId].dispute.arbiter, "Not the arbiter");
+        _;
+    }
+
+    function createAgreement(address _payee, uint256[] memory _milestoneAmounts, uint256 _deadline) external payable {
+        require(_payee != address(0), "Invalid payee");
+        require(msg.value > 0, "No funds sent");
+
+        uint256 totalAmount;
+        for (uint256 i = 0; i < _milestoneAmounts.length; i++) {
+            totalAmount += _milestoneAmounts[i];
+        }
+        require(totalAmount == msg.value, "Incorrect total amount");
+
+        Milestone[] memory milestones = new Milestone[](_milestoneAmounts.length);
+        for (uint256 i = 0; i < _milestoneAmounts.length; i++) {
+            milestones[i] = Milestone(_milestoneAmounts[i], false);
+        }
+
+        agreements[agreementCount] = EscrowAgreement({
+            payer: msg.sender,
+            payee: _payee,
+            milestones: milestones,
+            deadline: block.timestamp + _deadline,
+            isCompleted: false,
+            dispute: Dispute(new address[](0), "", false, address(0))
+        });
+
+        emit AgreementCreated(agreementCount, msg.sender, _payee, msg.value, _deadline);
+        agreementCount++;
+    }
+
+    function releaseMilestone(uint256 agreementId, uint256 milestoneIndex) external onlyParticipant(agreementId) {
+        EscrowAgreement storage agreement = agreements[agreementId];
+        require(!agreement.isCompleted, "Agreement already completed");
+        require(!agreement.milestones[milestoneIndex].isReleased, "Milestone already released");
+
+        agreement.milestones[milestoneIndex].isReleased = true;
+        payable(agreement.payee).transfer(agreement.milestones[milestoneIndex].amount);
+
+        emit MilestoneCompleted(agreementId, milestoneIndex);
+
+        if (allMilestonesReleased(agreementId)) {
+            agreement.isCompleted = true;
+            emit AgreementCompleted(agreementId);
+        }
+    }
+
+    function openDispute(uint256 agreementId, string calldata _evidence) external onlyParticipant(agreementId) {
+        EscrowAgreement storage agreement = agreements[agreementId];
+        require(!agreement.dispute.resolved, "Dispute already resolved");
+
+        agreement.dispute.disputingParties.push(msg.sender);
+        agreement.dispute.evidence = _evidence;
+
+        emit DisputeOpened(agreementId, agreement.dispute.disputingParties, _evidence);
+    }
+
+    function resolveDispute(uint256 agreementId, bool _resolved) external onlyArbiter(agreementId) {
+        EscrowAgreement storage agreement = agreements[agreementId];
+        require(!agreement.dispute.resolved, "Dispute already resolved");
+
+        agreement.dispute.resolved = _resolved;
+
+        if (_resolved) {
+            for (uint256 i = 0; i < agreement.milestones.length; i++) {
+                if (!agreement.milestones[i].isReleased) {
+                    agreement.milestones[i].isReleased = true;
+                    payable(agreement.payee).transfer(agreement.milestones[i].amount);
+                }
+            }
+        }
+
+        emit DisputeResolved(agreementId, msg.sender, _resolved);
+    }
+
+    function selectArbiter(uint256 agreementId, address _arbiter) external onlyParticipant(agreementId) {
+        require(_arbiter != address(0), "Invalid arbiter");
+        agreements[agreementId].dispute.arbiter = _arbiter;
+    }
+
+    function allMilestonesReleased(uint256 agreementId) internal view returns (bool) {
+        EscrowAgreement storage agreement = agreements[agreementId];
+        for (uint256 i = 0; i < agreement.milestones.length; i++) {
+            if (!agreement.milestones[i].isReleased) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function checkDeadline(uint256 agreementId) external {
+        EscrowAgreement storage agreement = agreements[agreementId];
+        require(block.timestamp > agreement.deadline, "Deadline not reached");
+
+        agreement.isCompleted = true;
+        for (uint256 i = 0; i < agreement.milestones.length; i++) {
+            if (!agreement.milestones[i].isReleased) {
+                agreement.milestones[i].isReleased = true;
+                payable(agreement.payee).transfer(agreement.milestones[i].amount);
+            }
+        }
+
+        emit AgreementCompleted(agreementId);
+    }
+}

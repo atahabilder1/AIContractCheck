@@ -1,0 +1,287 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address to, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+}
+
+contract DeFiLending {
+    address public owner;
+
+    struct Market {
+        bool isListed;
+        uint256 totalDeposits;
+        uint256 totalBorrows;
+        uint256 reserveFactor;
+        uint256 collateralFactor;
+        uint256 baseRate;
+        uint256 multiplier;
+        uint256 lastAccrualBlock;
+        uint256 borrowIndex;
+    }
+
+    struct UserAccount {
+        uint256 depositBalance;
+        uint256 borrowBalance;
+        uint256 borrowIndex;
+    }
+
+    mapping(address => Market) public markets;
+    mapping(address => mapping(address => UserAccount)) public accounts;
+    address[] public listedTokens;
+
+    uint256 public constant SCALE = 1e18;
+    uint256 public constant BLOCKS_PER_YEAR = 2_628_000;
+    uint256 public constant LIQUIDATION_INCENTIVE = 1.08e18;
+    uint256 public constant CLOSE_FACTOR = 0.5e18;
+
+    mapping(address => uint256) public tokenPrices;
+
+    event Deposit(address indexed token, address indexed user, uint256 amount);
+    event Withdraw(address indexed token, address indexed user, uint256 amount);
+    event Borrow(address indexed token, address indexed user, uint256 amount);
+    event Repay(address indexed token, address indexed user, uint256 amount);
+    event Liquidate(
+        address indexed liquidator,
+        address indexed borrower,
+        address borrowToken,
+        address collateralToken,
+        uint256 repayAmount,
+        uint256 seizedAmount
+    );
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "not owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function listMarket(
+        address token,
+        uint256 collateralFactor,
+        uint256 reserveFactor,
+        uint256 baseRate,
+        uint256 multiplier
+    ) external onlyOwner {
+        require(!markets[token].isListed, "already listed");
+        require(collateralFactor <= 0.9e18, "CF too high");
+
+        markets[token] = Market({
+            isListed: true,
+            totalDeposits: 0,
+            totalBorrows: 0,
+            reserveFactor: reserveFactor,
+            collateralFactor: collateralFactor,
+            baseRate: baseRate,
+            multiplier: multiplier,
+            lastAccrualBlock: block.number,
+            borrowIndex: SCALE
+        });
+        listedTokens.push(token);
+    }
+
+    function setPrice(address token, uint256 price) external onlyOwner {
+        tokenPrices[token] = price;
+    }
+
+    function accrueInterest(address token) public {
+        Market storage market = markets[token];
+        if (block.number == market.lastAccrualBlock) return;
+
+        uint256 blockDelta = block.number - market.lastAccrualBlock;
+
+        if (market.totalBorrows == 0) {
+            market.lastAccrualBlock = block.number;
+            return;
+        }
+
+        uint256 utilization = (market.totalBorrows * SCALE) / (market.totalDeposits + 1);
+        uint256 borrowRatePerBlock = (market.baseRate + (utilization * market.multiplier) / SCALE) / BLOCKS_PER_YEAR;
+
+        uint256 interestAccumulated = (market.totalBorrows * borrowRatePerBlock * blockDelta) / SCALE;
+        uint256 reserveShare = (interestAccumulated * market.reserveFactor) / SCALE;
+
+        market.totalBorrows += interestAccumulated;
+        market.totalDeposits += interestAccumulated - reserveShare;
+        market.borrowIndex += (market.borrowIndex * borrowRatePerBlock * blockDelta) / SCALE;
+        market.lastAccrualBlock = block.number;
+    }
+
+    function deposit(address token, uint256 amount) external {
+        Market storage market = markets[token];
+        require(market.isListed, "not listed");
+        accrueInterest(token);
+
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
+
+        accounts[token][msg.sender].depositBalance += amount;
+        market.totalDeposits += amount;
+
+        emit Deposit(token, msg.sender, amount);
+    }
+
+    function withdraw(address token, uint256 amount) external {
+        Market storage market = markets[token];
+        require(market.isListed, "not listed");
+        accrueInterest(token);
+
+        UserAccount storage account = accounts[token][msg.sender];
+        require(account.depositBalance >= amount, "insufficient balance");
+
+        account.depositBalance -= amount;
+        market.totalDeposits -= amount;
+
+        require(_isHealthy(msg.sender), "undercollateralized after withdraw");
+
+        IERC20(token).transfer(msg.sender, amount);
+
+        emit Withdraw(token, msg.sender, amount);
+    }
+
+    function borrow(address token, uint256 amount) external {
+        Market storage market = markets[token];
+        require(market.isListed, "not listed");
+        accrueInterest(token);
+
+        UserAccount storage account = accounts[token][msg.sender];
+
+        if (account.borrowBalance == 0) {
+            account.borrowIndex = market.borrowIndex;
+        } else {
+            _updateBorrow(token, msg.sender);
+        }
+
+        account.borrowBalance += amount;
+        market.totalBorrows += amount;
+
+        require(_isHealthy(msg.sender), "undercollateralized");
+        require(market.totalDeposits >= amount, "insufficient liquidity");
+
+        IERC20(token).transfer(msg.sender, amount);
+
+        emit Borrow(token, msg.sender, amount);
+    }
+
+    function repay(address token, uint256 amount) external {
+        Market storage market = markets[token];
+        require(market.isListed, "not listed");
+        accrueInterest(token);
+
+        _updateBorrow(token, msg.sender);
+
+        UserAccount storage account = accounts[token][msg.sender];
+        uint256 repayAmount = amount > account.borrowBalance ? account.borrowBalance : amount;
+
+        IERC20(token).transferFrom(msg.sender, address(this), repayAmount);
+
+        account.borrowBalance -= repayAmount;
+        market.totalBorrows -= repayAmount;
+
+        emit Repay(token, msg.sender, repayAmount);
+    }
+
+    function liquidate(
+        address borrower,
+        address borrowToken,
+        address collateralToken,
+        uint256 repayAmount
+    ) external {
+        require(msg.sender != borrower, "cannot self-liquidate");
+        accrueInterest(borrowToken);
+        accrueInterest(collateralToken);
+
+        _updateBorrow(borrowToken, borrower);
+
+        require(!_isHealthy(borrower), "borrower is healthy");
+
+        UserAccount storage borrowAccount = accounts[borrowToken][borrower];
+        uint256 maxRepay = (borrowAccount.borrowBalance * CLOSE_FACTOR) / SCALE;
+        require(repayAmount <= maxRepay, "exceeds close factor");
+
+        IERC20(borrowToken).transferFrom(msg.sender, address(this), repayAmount);
+
+        borrowAccount.borrowBalance -= repayAmount;
+        markets[borrowToken].totalBorrows -= repayAmount;
+
+        uint256 borrowValue = (repayAmount * tokenPrices[borrowToken]) / SCALE;
+        uint256 seizeValue = (borrowValue * LIQUIDATION_INCENTIVE) / SCALE;
+        uint256 seizeAmount = (seizeValue * SCALE) / tokenPrices[collateralToken];
+
+        UserAccount storage collateralAccount = accounts[collateralToken][borrower];
+        require(collateralAccount.depositBalance >= seizeAmount, "insufficient collateral");
+
+        collateralAccount.depositBalance -= seizeAmount;
+        markets[collateralToken].totalDeposits -= seizeAmount;
+
+        IERC20(collateralToken).transfer(msg.sender, seizeAmount);
+
+        emit Liquidate(msg.sender, borrower, borrowToken, collateralToken, repayAmount, seizeAmount);
+    }
+
+    function _updateBorrow(address token, address user) internal {
+        UserAccount storage account = accounts[token][user];
+        if (account.borrowBalance == 0) return;
+
+        Market storage market = markets[token];
+        uint256 principalTimesIndex = account.borrowBalance * market.borrowIndex;
+        account.borrowBalance = principalTimesIndex / account.borrowIndex;
+        account.borrowIndex = market.borrowIndex;
+    }
+
+    function _isHealthy(address user) internal view returns (bool) {
+        uint256 totalCollateralValue = 0;
+        uint256 totalBorrowValue = 0;
+
+        for (uint256 i = 0; i < listedTokens.length; i++) {
+            address token = listedTokens[i];
+            UserAccount storage account = accounts[token][user];
+            uint256 price = tokenPrices[token];
+
+            if (account.depositBalance > 0) {
+                uint256 depositValue = (account.depositBalance * price) / SCALE;
+                totalCollateralValue += (depositValue * markets[token].collateralFactor) / SCALE;
+            }
+
+            if (account.borrowBalance > 0) {
+                totalBorrowValue += (account.borrowBalance * price) / SCALE;
+            }
+        }
+
+        return totalCollateralValue >= totalBorrowValue;
+    }
+
+    function getAccountLiquidity(address user) external view returns (uint256 collateral, uint256 debt) {
+        for (uint256 i = 0; i < listedTokens.length; i++) {
+            address token = listedTokens[i];
+            UserAccount storage account = accounts[token][user];
+            uint256 price = tokenPrices[token];
+
+            if (account.depositBalance > 0) {
+                uint256 depositValue = (account.depositBalance * price) / SCALE;
+                collateral += (depositValue * markets[token].collateralFactor) / SCALE;
+            }
+
+            if (account.borrowBalance > 0) {
+                debt += (account.borrowBalance * price) / SCALE;
+            }
+        }
+    }
+
+    function getUtilizationRate(address token) external view returns (uint256) {
+        Market storage market = markets[token];
+        if (market.totalDeposits == 0) return 0;
+        return (market.totalBorrows * SCALE) / market.totalDeposits;
+    }
+
+    function getListedTokenCount() external view returns (uint256) {
+        return listedTokens.length;
+    }
+}

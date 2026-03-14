@@ -1,0 +1,28 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiLending {
+    address public owner;
+    uint public totalBorrowed;
+    mapping(address => uint) public borrowed;
+
+    constructor() public {
+        owner = msg.sender;
+    }
+
+    function borrow(uint amount) public {
+        require(amount > 0, "Invalid amount");
+        require(totalBorrowed + amount <= address(this).balance, "Insufficient funds");
+        totalBorrowed += amount;
+        borrowed[msg.sender] += amount;
+    }
+
+    function repay(uint amount) public {
+        require(amount > 0, "Invalid amount");
+        require(borrowed[msg.sender] >= amount, "Insufficient amount");
+        totalBorrowed -= amount;
+        borrowed[msg.sender] -= amount;
+    }
+}
+```

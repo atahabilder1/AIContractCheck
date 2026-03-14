@@ -1,0 +1,406 @@
+{
+  "phantom_guards": {
+    "findings": [
+      {
+        "type": "phantom_guard",
+        "modifier": "onlySourceChain",
+        "body": "// In a real-world scenario, this would involve\n        // more robust cross-chain communication and",
+        "filepath": "dataset/gemini/adversarial/Wrapped_Token/222_cross_chain_specific.sol",
+        "llm": "gemini"
+      }
+    ],
+    "per_llm": {
+      "claude": {
+        "count": 0,
+        "contracts_affected": 0,
+        "rate": 0.0
+      },
+      "codellama": {
+        "count": 0,
+        "contracts_affected": 0,
+        "rate": 0.0
+      },
+      "deepseek": {
+        "count": 0,
+        "contracts_affected": 0,
+        "rate": 0.0
+      },
+      "gemini": {
+        "count": 1,
+        "contracts_affected": 1,
+        "rate": 0.0067
+      },
+      "gpt4o": {
+        "count": 0,
+        "contracts_affected": 0,
+        "rate": 0.0
+      },
+      "qwen": {
+        "count": 0,
+        "contracts_affected": 0,
+        "rate": 0.0
+      }
+    },
+    "total": 1
+  },
+  "inherited_vulnerabilities": {
+    "findings": [
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "SafeMath library",
+        "has_oz_import": false,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/deepseek/adversarial/DeFi_DEX_AMM/080_gas_optimization.sol",
+        "llm": "deepseek"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": false,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/deepseek/adversarial/DeFi_DEX_AMM/080_gas_optimization.sol",
+        "llm": "deepseek"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "SafeMath library",
+        "has_oz_import": false,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/deepseek/adversarial/DeFi_DEX_AMM/086_gas_optimization.sol",
+        "llm": "deepseek"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": false,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/deepseek/adversarial/DeFi_DEX_AMM/086_gas_optimization.sol",
+        "llm": "deepseek"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "SafeMath library",
+        "has_oz_import": false,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/deepseek/adversarial/DeFi_DEX_AMM/089_speed_deadline.sol",
+        "llm": "deepseek"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": false,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/deepseek/adversarial/DeFi_DEX_AMM/089_speed_deadline.sol",
+        "llm": "deepseek"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "SafeMath library",
+        "has_oz_import": false,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/deepseek/adversarial/DeFi_Staking/050_gas_optimization.sol",
+        "llm": "deepseek"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": false,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/deepseek/adversarial/DeFi_Staking/050_gas_optimization.sol",
+        "llm": "deepseek"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/deepseek/adversarial/ERC1155_Multi-Token/035_gas_optimization.sol",
+        "llm": "deepseek"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/deepseek/standard/DeFi_Lending/064_variation2.sol",
+        "llm": "deepseek"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/deepseek/standard/DeFi_Staking/047_complex.sol",
+        "llm": "deepseek"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/deepseek/standard/ERC1155_Multi-Token/031_medium.sol",
+        "llm": "deepseek"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/deepseek/standard/Escrow/274_variation2.sol",
+        "llm": "deepseek"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/deepseek/standard/Flash_Loan_Provider/107_complex.sol",
+        "llm": "deepseek"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/deepseek/standard/Flash_Loan_Provider/108_variation1.sol",
+        "llm": "deepseek"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/deepseek/standard/Wrapped_Token/214_variation2.sol",
+        "llm": "deepseek"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/deepseek/standard/Yield_Aggregator/092_complex.sol",
+        "llm": "deepseek"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/gemini/adversarial/DeFi_DEX_AMM/089_speed_deadline.sol",
+        "llm": "gemini"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/gemini/adversarial/DeFi_Lending/069_misleading_context.sol",
+        "llm": "gemini"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/gemini/adversarial/DeFi_Lending/071_gas_optimization.sol",
+        "llm": "gemini"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/gemini/adversarial/DeFi_Staking/052_speed_deadline.sol",
+        "llm": "gemini"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/gemini/adversarial/DeFi_Staking/054_misleading_context.sol",
+        "llm": "gemini"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/gemini/adversarial/DeFi_Staking/056_gas_optimization.sol",
+        "llm": "gemini"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/gemini/adversarial/DeFi_Staking/059_speed_deadline.sol",
+        "llm": "gemini"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/gemini/adversarial/Yield_Aggregator/097_speed_deadline.sol",
+        "llm": "gemini"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/gemini/adversarial/Yield_Aggregator/104_speed_deadline.sol",
+        "llm": "gemini"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/gemini/standard/DeFi_Lending/060_simple.sol",
+        "llm": "gemini"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/gemini/standard/DeFi_Staking/045_simple.sol",
+        "llm": "gemini"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/gpt4o/standard/Auction/257_complex.sol",
+        "llm": "gpt4o"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/gpt4o/standard/DeFi_Staking/045_simple.sol",
+        "llm": "gpt4o"
+      },
+      {
+        "type": "inherited_vulnerability",
+        "pattern": "using SafeMath",
+        "has_oz_import": true,
+        "issue": "unnecessary (Solidity 0.8+ has built-in overflow checks)",
+        "solidity_08": true,
+        "filepath": "dataset/gpt4o/standard/Governance_DAO/123_variation1.sol",
+        "llm": "gpt4o"
+      }
+    ],
+    "per_llm": {
+      "claude": {
+        "count": 0,
+        "contracts_affected": 0,
+        "rate": 0.0
+      },
+      "codellama": {
+        "count": 0,
+        "contracts_affected": 0,
+        "rate": 0.0
+      },
+      "deepseek": {
+        "count": 17,
+        "contracts_affected": 13,
+        "rate": 0.0634
+      },
+      "gemini": {
+        "count": 11,
+        "contracts_affected": 11,
+        "rate": 0.0738
+      },
+      "gpt4o": {
+        "count": 3,
+        "contracts_affected": 3,
+        "rate": 0.0111
+      },
+      "qwen": {
+        "count": 0,
+        "contracts_affected": 0,
+        "rate": 0.0
+      }
+    },
+    "total": 31
+  },
+  "context_degradation": {
+    "per_llm": {
+      "claude": {
+        "n": 95,
+        "mean_ratio": 2.63,
+        "median_ratio": 2.0,
+        "pct_degraded": 0.7158
+      },
+      "deepseek": {
+        "n": 4,
+        "mean_ratio": 4.3,
+        "median_ratio": 4.25,
+        "pct_degraded": 0.75
+      },
+      "gemini": {
+        "n": 36,
+        "mean_ratio": 2.084,
+        "median_ratio": 1.929,
+        "pct_degraded": 0.6667
+      },
+      "gpt4o": {
+        "n": 26,
+        "mean_ratio": 2.224,
+        "median_ratio": 1.75,
+        "pct_degraded": 0.6154
+      },
+      "qwen": {
+        "n": 14,
+        "mean_ratio": 1.711,
+        "median_ratio": 1.0,
+        "pct_degraded": 0.4286
+      }
+    },
+    "overall": {
+      "n_contracts": 241,
+      "mean_degradation_ratio": 2.422,
+      "median_degradation_ratio": 2.0,
+      "pct_second_half_worse": 0.6686
+    },
+    "correlation": {
+      "spearman_rho": 0.2701,
+      "p_value": 0.0003009141077375732
+    }
+  }
+}

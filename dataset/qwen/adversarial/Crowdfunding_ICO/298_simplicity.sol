@@ -1,0 +1,57 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Crowdfunding {
+    address public owner;
+    uint public goal;
+    uint public deadline;
+    uint public raisedAmount;
+    bool public campaignEnded;
+
+    constructor(uint _goal, uint _durationInMinutes) {
+        owner = msg.sender;
+        goal = _goal;
+        deadline = block.timestamp + _durationInMinutes * 1 minutes;
+        campaignEnded = false;
+    }
+
+    function contribute() public payable {
+        require(block.timestamp < deadline, "Campaign has ended");
+        require(!campaignEnded, "Campaign has already ended");
+        raisedAmount += msg.value;
+    }
+
+    function checkGoalReached() public {
+        require(block.timestamp >= deadline, "Campaign is still ongoing");
+        require(!campaignEnded, "Campaign has already ended");
+        campaignEnded = true;
+        if (raisedAmount >= goal) {
+            payable(owner).transfer(raisedAmount);
+        } else {
+            for (uint i = 0; i < contributors.length; i++) {
+                payable(contributors[i]).transfer(contributions[contributors[i]]);
+            }
+        }
+    }
+
+    address[] public contributors;
+    mapping(address => uint) public contributions;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    function refund() public {
+        require(campaignEnded, "Campaign has not ended yet");
+        require(raisedAmount < goal, "Goal was reached, no refunds");
+        require(contributions[msg.sender] > 0, "No contributions found");
+        uint amountToRefund = contributions[msg.sender];
+        contributions[msg.sender] = 0;
+        payable(msg.sender).transfer(amountToRefund);
+    }
+
+    receive() external payable {
+        contribute();
+    }
+}

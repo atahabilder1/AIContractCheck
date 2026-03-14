@@ -1,0 +1,102 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+
+contract WrappedToken is ERC20, Ownable, Pausable {
+
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) {
+        // Contract deployment, no initial supply needed for a wrapped token
+        // as it's usually minted/burned based on the underlying asset.
+    }
+
+    /**
+     * @dev Mints tokens to a specified address.
+     * Only callable by the owner.
+     * @param to The address to mint tokens to.
+     * @param amount The amount of tokens to mint.
+     */
+    function mint(address to, uint256 amount) public onlyOwner {
+        _mint(to, amount);
+    }
+
+    /**
+     * @dev Burns tokens from the caller's address.
+     * @param amount The amount of tokens to burn.
+     */
+    function burn(uint256 amount) public {
+        _burn(msg.sender, amount);
+    }
+
+    /**
+     * @dev Burns tokens from a specified address.
+     * Only callable by the owner.
+     * @param from The address to burn tokens from.
+     * @param amount The amount of tokens to burn.
+     */
+    function burnFrom(address from, uint256 amount) public onlyOwner {
+        _burn(from, amount);
+    }
+
+    /**
+     * @dev Pauses all token transfers and minting/burning operations.
+     * Only callable by the owner.
+     */
+    function pause() public onlyOwner {
+        _pause();
+    }
+
+    /**
+     * @dev Unpauses token transfers and minting/burning operations.
+     * Only callable by the owner.
+     */
+    function unpause() public onlyOwner {
+        _unpause();
+    }
+
+    /**
+     * @dev Emergency function to withdraw all Ether from the contract.
+     * This is useful if the contract accidentally receives Ether.
+     * Only callable by the owner.
+     */
+    function withdrawEther() public onlyOwner {
+        payable(owner()).transfer(address(this).balance);
+    }
+
+    /**
+     * @dev Emergency function to withdraw all ERC20 tokens held by this contract
+     * to a specified address.
+     * Only callable by the owner.
+     * Note: This function requires the owner to be aware of all token types
+     * that might be held by this contract. It's generally safer if this
+     * contract only holds its own wrapped tokens.
+     * @param tokenAddress The address of the ERC20 token to withdraw.
+     * @param to The address to send the tokens to.
+     * @param amount The amount of tokens to withdraw.
+     */
+    function withdrawTokens(address tokenAddress, address to, uint256 amount) public onlyOwner {
+        require(tokenAddress != address(0), "Token address cannot be zero");
+        require(to != address(0), "Recipient address cannot be zero");
+
+        // If the token is this contract's own token, it's a no-op as we can't
+        // send tokens to ourselves to withdraw them.
+        if (tokenAddress == address(this)) {
+            revert("Cannot withdraw self-token");
+        }
+
+        ERC20 token = ERC20(tokenAddress);
+        uint256 balance = token.balanceOf(address(this));
+        require(amount <= balance, "Insufficient token balance in contract");
+
+        token.transfer(to, amount);
+    }
+
+    /**
+     * @dev Override ERC20 transfer functions to respect the paused state.
+     */
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual override whenNotPaused {
+        super._beforeTokenTransfer(from, to, amount);
+    }
+}

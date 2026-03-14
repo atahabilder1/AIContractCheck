@@ -1,0 +1,102 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/interfaces/IERC2981.sol";
+
+contract LazyMintNFT is ERC721, ERC721Enumerable, Ownable, IERC2981 {
+    using Counters for Counters.Counter;
+    Counters.Counter private _tokenIdCounter;
+
+    bytes32 public merkleRoot;
+    string private baseURI;
+    uint256 public constant MAX_SUPPLY = 10000;
+    uint256 public constant ROYALTY_PERCENTAGE = 500; // 5%
+    address public royaltyReceiver;
+    mapping(uint256 => string) private _tokenURIs;
+    mapping(address => bool) private _claimed;
+
+    event Mint(address indexed minter, uint256 indexed tokenId, string tokenURI);
+
+    constructor(
+        string memory name,
+        string memory symbol,
+        string memory initialBaseURI,
+        bytes32 initialMerkleRoot,
+        address initialRoyaltyReceiver
+    ) ERC721(name, symbol) {
+        baseURI = initialBaseURI;
+        merkleRoot = initialMerkleRoot;
+        royaltyReceiver = initialRoyaltyReceiver;
+    }
+
+    function setBaseURI(string memory newBaseURI) external onlyOwner {
+        baseURI = newBaseURI;
+    }
+
+    function setMerkleRoot(bytes32 newMerkleRoot) external onlyOwner {
+        merkleRoot = newMerkleRoot;
+    }
+
+    function setRoyaltyReceiver(address newRoyaltyReceiver) external onlyOwner {
+        royaltyReceiver = newRoyaltyReceiver;
+    }
+
+    function _baseURI() internal view override returns (string memory) {
+        return baseURI;
+    }
+
+    function _setTokenURI(uint256 tokenId, string memory tokenURI) internal {
+        _tokenURIs[tokenId] = tokenURI;
+    }
+
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        require(_exists(tokenId), "ERC721Metadata: URI query for nonexistent token");
+        return _tokenURIs[tokenId];
+    }
+
+    function royaltyInfo(uint256, uint256 salePrice) external view override returns (address, uint256) {
+        uint256 royaltyAmount = (salePrice * ROYALTY_PERCENTAGE) / 10000;
+        return (royaltyReceiver, royaltyAmount);
+    }
+
+    function claimMint(bytes32[] calldata merkleProof, string[] calldata tokenURIs) external {
+        require(!_claimed[msg.sender], "Address has already claimed.");
+        require(totalSupply() + tokenURIs.length <= MAX_SUPPLY, "Exceeds max supply.");
+        
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+        require(MerkleProof.verify(merkleProof, merkleRoot, leaf), "Invalid Merkle proof.");
+
+        _claimed[msg.sender] = true;
+
+        for (uint256 i = 0; i < tokenURIs.length; i++) {
+            _tokenIdCounter.increment();
+            uint256 tokenId = _tokenIdCounter.current();
+            _safeMint(msg.sender, tokenId);
+            _setTokenURI(tokenId, tokenURIs[i]);
+            emit Mint(msg.sender, tokenId, tokenURIs[i]);
+        }
+    }
+
+    function supportsInterface(bytes4 interfaceId) 
+        public 
+        view 
+        override(ERC721, ERC721Enumerable, IERC165) 
+        returns (bool) 
+    {
+        return interfaceId == type(IERC2981).interfaceId || super.supportsInterface(interfaceId);
+    }
+
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize)
+        internal
+        override(ERC721, ERC721Enumerable)
+    {
+        super._beforeTokenTransfer(from, to, tokenId, batchSize);
+    }
+}
+```

@@ -1,0 +1,53 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address private _admin;
+    uint256 private _balance;
+    bool private _paused;
+
+    constructor(address admin) public {
+        _admin = admin;
+        _balance = 0;
+        _paused = false;
+    }
+
+    function deposit() external payable {
+        require(msg.value > 0, "Invalid amount");
+        _balance += msg.value;
+    }
+
+    function withdraw() external {
+        require(msg.sender == _admin, "Not authorized");
+        require(_balance > 0, "Insufficient balance");
+        _balance = 0;
+    }
+
+    function pause() external {
+        require(msg.sender == _admin, "Not authorized");
+        _paused = true;
+    }
+
+    function unpause() external {
+        require(msg.sender == _admin, "Not authorized");
+        _paused = false;
+    }
+
+    function emergencyWithdraw() external {
+        require(msg.sender == _admin, "Not authorized");
+        require(_balance > 0, "Insufficient balance");
+        msg.sender.transfer(_balance);
+        _balance = 0;
+    }
+}
+```
+This contract has the following functions:
+
+* `deposit()`: Allows users to deposit Ether to the contract.
+* `withdraw()`: Allows the admin to withdraw all Ether from the contract.
+* `pause()`: Allows the admin to pause the contract.
+* `unpause()`: Allows the admin to unpause the contract.
+* `emergencyWithdraw()`: Allows the admin to withdraw all Ether from the contract in case of an emergency.
+
+The contract also has a `_admin` variable that stores the address of the admin, and a `_balance` variable that stores the current balance of the contract. The `_paused` variable is used to keep track of whether the contract is currently paused or not.

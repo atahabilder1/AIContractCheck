@@ -1,0 +1,16 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    event Relayed(address indexed sender, address indexed receiver, uint256 amount);
+
+    function relay(address receiver, uint256 amount) external {
+        require(msg.sender == tx.origin, "Only EOA can relay");
+        require(amount > 0, "Invalid amount");
+
+        (bool success, ) = receiver.call{value: amount}("");
+        require(success, "Transfer failed");
+
+        emit Relayed(msg.sender, receiver, amount);
+    }
+}

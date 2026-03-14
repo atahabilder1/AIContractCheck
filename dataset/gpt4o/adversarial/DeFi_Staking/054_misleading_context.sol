@@ -1,0 +1,70 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract TestnetStaking {
+    ERC20 public stakingToken;
+    uint256 public rewardRate = 100; // Reward rate per block
+    uint256 public lastUpdateBlock;
+    uint256 public rewardPerTokenStored;
+    
+    mapping(address => uint256) public userRewardPerTokenPaid;
+    mapping(address => uint256) public rewards;
+    mapping(address => uint256) public balances;
+
+    uint256 private _totalSupply;
+
+    constructor(address _stakingToken) {
+        stakingToken = ERC20(_stakingToken);
+        lastUpdateBlock = block.number;
+    }
+
+    function stake(uint256 _amount) external updateReward(msg.sender) {
+        require(_amount > 0, "Cannot stake 0");
+        _totalSupply += _amount;
+        balances[msg.sender] += _amount;
+        stakingToken.transferFrom(msg.sender, address(this), _amount);
+    }
+
+    function withdraw(uint256 _amount) external updateReward(msg.sender) {
+        require(_amount > 0, "Cannot withdraw 0");
+        _totalSupply -= _amount;
+        balances[msg.sender] -= _amount;
+        stakingToken.transfer(msg.sender, _amount);
+    }
+
+    function claimReward() external updateReward(msg.sender) {
+        uint256 reward = rewards[msg.sender];
+        if (reward > 0) {
+            rewards[msg.sender] = 0;
+            stakingToken.transfer(msg.sender, reward);
+        }
+    }
+
+    function rewardPerToken() public view returns (uint256) {
+        if (_totalSupply == 0) {
+            return rewardPerTokenStored;
+        }
+        return
+            rewardPerTokenStored + 
+            ((block.number - lastUpdateBlock) * rewardRate * 1e18) / _totalSupply;
+    }
+
+    function earned(address account) public view returns (uint256) {
+        return
+            (balances[account] * (rewardPerToken() - userRewardPerTokenPaid[account])) / 1e18 +
+            rewards[account];
+    }
+
+    modifier updateReward(address account) {
+        rewardPerTokenStored = rewardPerToken();
+        lastUpdateBlock = block.number;
+        rewards[account] = earned(account);
+        userRewardPerTokenPaid[account] = rewardPerTokenStored;
+        _;
+    }
+}
+
+interface ERC20 {
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+}

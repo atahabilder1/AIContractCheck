@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract RoleBasedAccessControl {
+    address public admin;
+    mapping(address => bool) public minters;
+
+    event AdminChanged(address indexed previousAdmin, address indexed newAdmin);
+    event MinterAdded(address indexed account);
+    event MinterRemoved(address indexed account);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Caller is not the admin");
+        _;
+    }
+
+    modifier onlyMinter() {
+        require(minters[msg.sender], "Caller is not a minter");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+        minters[msg.sender] = true;
+        emit AdminChanged(address(0), msg.sender);
+        emit MinterAdded(msg.sender);
+    }
+
+    function addMinter(address account) public onlyAdmin {
+        require(!minters[account], "Account is already a minter");
+        minters[account] = true;
+        emit MinterAdded(account);
+    }
+
+    function removeMinter(address account) public onlyAdmin {
+        require(minters[account], "Account is not a minter");
+        minters[account] = false;
+        emit MinterRemoved(account);
+    }
+
+    function changeAdmin(address newAdmin) public onlyAdmin {
+        require(newAdmin != address(0), "New admin is the zero address");
+        emit AdminChanged(admin, newAdmin);
+        admin = newAdmin;
+    }
+}

@@ -1,0 +1,200 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract Timelock {
+    event NewAdmin(address indexed newAdmin);
+    event NewPendingAdmin(address indexed newPendingAdmin);
+    event NewDelay(uint256 indexed newDelay);
+    event QueueTransaction(bytes32 indexed txHash, address indexed target, uint256 value, bytes data, uint256 eta);
+    event CancelTransaction(bytes32 indexed txHash, address indexed target, uint256 value, bytes data, uint256 eta);
+    event ExecuteTransaction(bytes32 indexed txHash, address indexed target, uint256 value, bytes data, uint256 eta);
+    event QueueBatch(bytes32 indexed batchId, uint256 count);
+    event ExecuteBatch(bytes32 indexed batchId, uint256 count);
+    event CancelBatch(bytes32 indexed batchId, uint256 count);
+
+    uint256 public constant MINIMUM_DELAY = 1 days;
+    uint256 public constant MAXIMUM_DELAY = 30 days;
+
+    address public admin;
+    address public pendingAdmin;
+    uint256 public delay;
+    uint256 public gracePeriod;
+
+    mapping(bytes32 => bool) public queuedTransactions;
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Timelock: caller is not admin");
+        _;
+    }
+
+    modifier onlyTimelock() {
+        require(msg.sender == address(this), "Timelock: caller is not timelock");
+        _;
+    }
+
+    constructor(address _admin, uint256 _delay, uint256 _gracePeriod) {
+        require(_admin != address(0), "Timelock: zero admin");
+        require(_delay >= MINIMUM_DELAY && _delay <= MAXIMUM_DELAY, "Timelock: invalid delay");
+        require(_gracePeriod > 0, "Timelock: zero grace period");
+
+        admin = _admin;
+        delay = _delay;
+        gracePeriod = _gracePeriod;
+    }
+
+    receive() external payable {}
+
+    function setDelay(uint256 _delay) external onlyTimelock {
+        require(_delay >= MINIMUM_DELAY && _delay <= MAXIMUM_DELAY, "Timelock: invalid delay");
+        delay = _delay;
+        emit NewDelay(_delay);
+    }
+
+    function setGracePeriod(uint256 _gracePeriod) external onlyTimelock {
+        require(_gracePeriod > 0, "Timelock: zero grace period");
+        gracePeriod = _gracePeriod;
+    }
+
+    function setPendingAdmin(address _pendingAdmin) external onlyTimelock {
+        require(_pendingAdmin != address(0), "Timelock: zero address");
+        pendingAdmin = _pendingAdmin;
+        emit NewPendingAdmin(_pendingAdmin);
+    }
+
+    function acceptAdmin() external {
+        require(msg.sender == pendingAdmin, "Timelock: caller is not pending admin");
+        admin = msg.sender;
+        pendingAdmin = address(0);
+        emit NewAdmin(msg.sender);
+    }
+
+    function _getTxHash(
+        address target,
+        uint256 value,
+        bytes memory data,
+        uint256 eta
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encode(target, value, data, eta));
+    }
+
+    function queueTransaction(
+        address target,
+        uint256 value,
+        bytes calldata data,
+        uint256 eta
+    ) external onlyAdmin returns (bytes32 txHash) {
+        require(eta >= block.timestamp + delay, "Timelock: eta too soon");
+
+        txHash = _getTxHash(target, value, data, eta);
+        require(!queuedTransactions[txHash], "Timelock: tx already queued");
+
+        queuedTransactions[txHash] = true;
+        emit QueueTransaction(txHash, target, value, data, eta);
+    }
+
+    function cancelTransaction(
+        address target,
+        uint256 value,
+        bytes calldata data,
+        uint256 eta
+    ) external onlyAdmin {
+        bytes32 txHash = _getTxHash(target, value, data, eta);
+        require(queuedTransactions[txHash], "Timelock: tx not queued");
+
+        queuedTransactions[txHash] = false;
+        emit CancelTransaction(txHash, target, value, data, eta);
+    }
+
+    function executeTransaction(
+        address target,
+        uint256 value,
+        bytes calldata data,
+        uint256 eta
+    ) external payable onlyAdmin returns (bytes memory) {
+        bytes32 txHash = _getTxHash(target, value, data, eta);
+        require(queuedTransactions[txHash], "Timelock: tx not queued");
+        require(block.timestamp >= eta, "Timelock: tx not yet surpassed timelock");
+        require(block.timestamp <= eta + gracePeriod, "Timelock: tx is stale");
+
+        queuedTransactions[txHash] = false;
+
+        (bool success, bytes memory returnData) = target.call{value: value}(data);
+        require(success, "Timelock: tx execution reverted");
+
+        emit ExecuteTransaction(txHash, target, value, data, eta);
+        return returnData;
+    }
+
+    function queueBatch(
+        address[] calldata targets,
+        uint256[] calldata values,
+        bytes[] calldata datas,
+        uint256 eta
+    ) external onlyAdmin returns (bytes32 batchId) {
+        uint256 len = targets.length;
+        require(len > 0, "Timelock: empty batch");
+        require(len == values.length && len == datas.length, "Timelock: length mismatch");
+        require(eta >= block.timestamp + delay, "Timelock: eta too soon");
+
+        batchId = keccak256(abi.encode(targets, values, datas, eta));
+
+        for (uint256 i = 0; i < len; i++) {
+            bytes32 txHash = _getTxHash(targets[i], values[i], datas[i], eta);
+            require(!queuedTransactions[txHash], "Timelock: tx already queued");
+            queuedTransactions[txHash] = true;
+            emit QueueTransaction(txHash, targets[i], values[i], datas[i], eta);
+        }
+
+        emit QueueBatch(batchId, len);
+    }
+
+    function executeBatch(
+        address[] calldata targets,
+        uint256[] calldata values,
+        bytes[] calldata datas,
+        uint256 eta
+    ) external payable onlyAdmin {
+        uint256 len = targets.length;
+        require(len > 0, "Timelock: empty batch");
+        require(len == values.length && len == datas.length, "Timelock: length mismatch");
+        require(block.timestamp >= eta, "Timelock: tx not yet surpassed timelock");
+        require(block.timestamp <= eta + gracePeriod, "Timelock: tx is stale");
+
+        bytes32 batchId = keccak256(abi.encode(targets, values, datas, eta));
+
+        for (uint256 i = 0; i < len; i++) {
+            bytes32 txHash = _getTxHash(targets[i], values[i], datas[i], eta);
+            require(queuedTransactions[txHash], "Timelock: tx not queued");
+            queuedTransactions[txHash] = false;
+
+            (bool success, ) = targets[i].call{value: values[i]}(datas[i]);
+            require(success, "Timelock: tx execution reverted");
+
+            emit ExecuteTransaction(txHash, targets[i], values[i], datas[i], eta);
+        }
+
+        emit ExecuteBatch(batchId, len);
+    }
+
+    function cancelBatch(
+        address[] calldata targets,
+        uint256[] calldata values,
+        bytes[] calldata datas,
+        uint256 eta
+    ) external onlyAdmin {
+        uint256 len = targets.length;
+        require(len > 0, "Timelock: empty batch");
+        require(len == values.length && len == datas.length, "Timelock: length mismatch");
+
+        bytes32 batchId = keccak256(abi.encode(targets, values, datas, eta));
+
+        for (uint256 i = 0; i < len; i++) {
+            bytes32 txHash = _getTxHash(targets[i], values[i], datas[i], eta);
+            require(queuedTransactions[txHash], "Timelock: tx not queued");
+            queuedTransactions[txHash] = false;
+            emit CancelTransaction(txHash, targets[i], values[i], datas[i], eta);
+        }
+
+        emit CancelBatch(batchId, len);
+    }
+}

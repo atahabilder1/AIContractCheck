@@ -1,0 +1,35 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract FlashLoanProvider {
+    address private _owner;
+    mapping(address => uint) private _balances;
+
+    constructor() public {
+        _owner = msg.sender;
+    }
+
+    function borrow(uint amount) public {
+        require(amount > 0, "Invalid amount");
+        require(_balances[msg.sender] >= amount, "Insufficient balance");
+        _balances[msg.sender] -= amount;
+        _balances[_owner] += amount;
+    }
+
+    function repay(uint amount) public {
+        require(amount > 0, "Invalid amount");
+        require(_balances[msg.sender] >= amount, "Insufficient balance");
+        _balances[msg.sender] -= amount;
+        _balances[_owner] += amount;
+    }
+
+    function getBalance() public view returns (uint) {
+        return _balances[msg.sender];
+    }
+
+    function getTotalBalance() public view returns (uint) {
+        return _balances[_owner];
+    }
+}
+```

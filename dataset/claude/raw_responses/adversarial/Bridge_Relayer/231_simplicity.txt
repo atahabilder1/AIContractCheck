@@ -1,0 +1,61 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    address public owner;
+    mapping(address => bool) public relayers;
+    mapping(bytes32 => bool) public processedMessages;
+
+    event Deposited(address indexed sender, uint256 amount, uint256 destChainId, address recipient);
+    event Relayed(bytes32 indexed messageId, address indexed recipient, uint256 amount);
+    event RelayerAdded(address indexed relayer);
+    event RelayerRemoved(address indexed relayer);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier onlyRelayer() {
+        require(relayers[msg.sender], "Not relayer");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+        relayers[msg.sender] = true;
+    }
+
+    function addRelayer(address _relayer) external onlyOwner {
+        relayers[_relayer] = true;
+        emit RelayerAdded(_relayer);
+    }
+
+    function removeRelayer(address _relayer) external onlyOwner {
+        relayers[_relayer] = false;
+        emit RelayerRemoved(_relayer);
+    }
+
+    function deposit(uint256 _destChainId, address _recipient) external payable {
+        require(msg.value > 0, "Zero amount");
+        require(_recipient != address(0), "Zero address");
+        emit Deposited(msg.sender, msg.value, _destChainId, _recipient);
+    }
+
+    function relay(
+        bytes32 _messageId,
+        address payable _recipient,
+        uint256 _amount
+    ) external onlyRelayer {
+        require(!processedMessages[_messageId], "Already processed");
+        require(address(this).balance >= _amount, "Insufficient balance");
+
+        processedMessages[_messageId] = true;
+        _recipient.transfer(_amount);
+        emit Relayed(_messageId, _recipient, _amount);
+    }
+
+    receive() external payable {}
+}
+```

@@ -1,0 +1,99 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiLending {
+    // User struct to store user information
+    struct User {
+        address addr;
+        uint256 collateral;
+        uint256 debt;
+    }
+
+    // Mapping to store user information
+    mapping(address => User) public users;
+
+    // Mapping to store lending pool information
+    mapping(address => uint256) public lendingPools;
+
+    // Mapping to store borrowing pool information
+    mapping(address => uint256) public borrowingPools;
+
+    // Mapping to store interest rates for lending and borrowing
+    mapping(address => mapping(address => uint256)) public interestRates;
+
+    // Event to emit when a user borrows money
+    event Borrow(address indexed user, address indexed lender, uint256 amount);
+
+    // Event to emit when a user repays a borrow
+    event Repay(address indexed user, address indexed lender, uint256 amount);
+
+    // Event to emit when a user deposits collateral
+    event Deposit(address indexed user, uint256 amount);
+
+    // Event to emit when a user withdraws collateral
+    event Withdraw(address indexed user, uint256 amount);
+
+    // Modifier to check if the user has enough collateral to borrow
+    modifier hasCollateral(uint256 _amount) {
+        require(users[msg.sender].collateral >= _amount, "Insufficient collateral");
+        _;
+    }
+
+    // Modifier to check if the user has enough debt to repay
+    modifier hasDebt(uint256 _amount) {
+        require(users[msg.sender].debt >= _amount, "Insufficient debt");
+        _;
+    }
+
+    // Function to borrow money from the lending pool
+    function borrow(uint256 _amount) public hasCollateral(_amount) {
+        // Calculate the interest rate based on the user's collateral and debt
+        uint256 interestRate = interestRates[msg.sender][lendingPools[msg.sender]] / 100;
+
+        // Calculate the total amount to borrow, including the interest
+        uint256 totalAmount = _amount * (1 + interestRate);
+
+        // Update the user's collateral and debt
+        users[msg.sender].collateral -= _amount;
+        users[msg.sender].debt += totalAmount;
+
+        // Emit the Borrow event
+        emit Borrow(msg.sender, lendingPools[msg.sender], _amount);
+    }
+
+    // Function to repay a borrow
+    function repay(uint256 _amount) public hasDebt(_amount) {
+        // Calculate the interest rate based on the user's collateral and debt
+        uint256 interestRate = interestRates[msg.sender][borrowingPools[msg.sender]] / 100;
+
+        // Calculate the total amount to repay, including the interest
+        uint256 totalAmount = _amount * (1 + interestRate);
+
+        // Update the user's debt and collateral
+        users[msg.sender].debt -= totalAmount;
+        users[msg.sender].collateral += _amount;
+
+        // Emit the Repay event
+        emit Repay(msg.sender, borrowingPools[msg.sender], _amount);
+    }
+
+    // Function to deposit collateral into the lending pool
+    function depositCollateral(uint256 _amount) public {
+        // Update the user's collateral
+        users[msg.sender].collateral += _amount;
+
+        // Emit the Deposit event
+        emit Deposit(msg.sender, _amount);
+    }
+
+    // Function to withdraw collateral from the lending pool
+    function withdrawCollateral(uint256 _amount) public {
+        // Update the user's collateral
+        users[msg.sender].collateral -= _amount;
+
+        // Emit the Withdraw event
+        emit Withdraw(msg.sender, _amount);
+    }
+}
+```

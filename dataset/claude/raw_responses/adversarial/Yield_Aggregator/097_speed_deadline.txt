@@ -1,0 +1,160 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+interface IStrategy {
+    function deposit(uint256 amount) external;
+    function withdraw(uint256 amount) external;
+    function harvest() external returns (uint256);
+    function balanceOf() external view returns (uint256);
+    function want() external view returns (address);
+}
+
+contract YieldAggregator is ERC20, Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
+    IERC20 public immutable depositToken;
+    IStrategy public activeStrategy;
+    
+    uint256 public performanceFee = 1000; // 10%
+    uint256 constant FEE_DENOMINATOR = 10000;
+    address public treasury;
+
+    mapping(address => bool) public approvedStrategies;
+
+    event Deposited(address indexed user, uint256 amount, uint256 shares);
+    event Withdrawn(address indexed user, uint256 shares, uint256 amount);
+    event StrategyUpdated(address indexed strategy);
+    event Harvested(uint256 profit, uint256 fee);
+
+    constructor(
+        address _depositToken,
+        address _treasury,
+        string memory _name,
+        string memory _symbol
+    ) ERC20(_name, _symbol) Ownable(msg.sender) {
+        depositToken = IERC20(_depositToken);
+        treasury = _treasury;
+    }
+
+    function totalAssets() public view returns (uint256) {
+        uint256 stratBal = address(activeStrategy) != address(0)
+            ? activeStrategy.balanceOf()
+            : 0;
+        return depositToken.balanceOf(address(this)) + stratBal;
+    }
+
+    function pricePerShare() public view returns (uint256) {
+        uint256 supply = totalSupply();
+        if (supply == 0) return 1e18;
+        return (totalAssets() * 1e18) / supply;
+    }
+
+    function deposit(uint256 _amount) external nonReentrant returns (uint256 shares) {
+        require(_amount > 0, "zero amount");
+
+        uint256 pool = totalAssets();
+        depositToken.safeTransferFrom(msg.sender, address(this), _amount);
+
+        if (totalSupply() == 0) {
+            shares = _amount;
+        } else {
+            shares = (_amount * totalSupply()) / pool;
+        }
+
+        _mint(msg.sender, shares);
+        emit Deposited(msg.sender, _amount, shares);
+    }
+
+    function withdraw(uint256 _shares) external nonReentrant returns (uint256 amount) {
+        require(_shares > 0, "zero shares");
+        require(balanceOf(msg.sender) >= _shares, "insufficient shares");
+
+        amount = (_shares * totalAssets()) / totalSupply();
+        _burn(msg.sender, _shares);
+
+        uint256 vaultBal = depositToken.balanceOf(address(this));
+        if (vaultBal < amount) {
+            uint256 needed = amount - vaultBal;
+            activeStrategy.withdraw(needed);
+            uint256 newBal = depositToken.balanceOf(address(this));
+            if (newBal < amount) {
+                amount = newBal;
+            }
+        }
+
+        depositToken.safeTransfer(msg.sender, amount);
+        emit Withdrawn(msg.sender, _shares, amount);
+    }
+
+    function earn() external onlyOwner {
+        require(address(activeStrategy) != address(0), "no strategy");
+        uint256 bal = depositToken.balanceOf(address(this));
+        if (bal > 0) {
+            depositToken.safeTransfer(address(activeStrategy), bal);
+            activeStrategy.deposit(bal);
+        }
+    }
+
+    function harvest() external onlyOwner {
+        require(address(activeStrategy) != address(0), "no strategy");
+        uint256 profit = activeStrategy.harvest();
+        if (profit > 0) {
+            uint256 fee = (profit * performanceFee) / FEE_DENOMINATOR;
+            if (fee > 0) {
+                depositToken.safeTransfer(treasury, fee);
+            }
+            emit Harvested(profit, fee);
+        }
+    }
+
+    function setStrategy(address _strategy) external onlyOwner {
+        require(approvedStrategies[_strategy], "not approved");
+        require(IStrategy(_strategy).want() == address(depositToken), "wrong token");
+
+        if (address(activeStrategy) != address(0)) {
+            activeStrategy.withdraw(activeStrategy.balanceOf());
+        }
+
+        activeStrategy = IStrategy(_strategy);
+
+        uint256 bal = depositToken.balanceOf(address(this));
+        if (bal > 0) {
+            depositToken.safeTransfer(_strategy, bal);
+            activeStrategy.deposit(bal);
+        }
+
+        emit StrategyUpdated(_strategy);
+    }
+
+    function approveStrategy(address _strategy) external onlyOwner {
+        approvedStrategies[_strategy] = true;
+    }
+
+    function revokeStrategy(address _strategy) external onlyOwner {
+        approvedStrategies[_strategy] = false;
+    }
+
+    function setPerformanceFee(uint256 _fee) external onlyOwner {
+        require(_fee <= 3000, "fee too high");
+        performanceFee = _fee;
+    }
+
+    function setTreasury(address _treasury) external onlyOwner {
+        require(_treasury != address(0), "zero address");
+        treasury = _treasury;
+    }
+
+    function inCaseTokensGetStuck(address _token) external onlyOwner {
+        require(_token != address(depositToken), "cannot withdraw deposit token");
+        uint256 bal = IERC20(_token).balanceOf(address(this));
+        IERC20(_token).safeTransfer(msg.sender, bal);
+    }
+}
+```

@@ -1,0 +1,159 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiStaking {
+    struct Stake {
+        uint256 amount;
+        uint256 startTime;
+        uint256 endTime;
+    }
+
+    address public owner;
+    address public tokenAddress; // Address of the ERC20 token to be staked
+    uint256 public stakingPeriod; // Duration for which tokens are staked (in seconds)
+    uint256 public rewardRate; // Reward rate per second (e.g., 1 wei per token per second)
+
+    mapping(address => Stake) public stakes;
+    mapping(address => uint256) public rewards;
+
+    event StakeCreated(address indexed user, uint256 amount, uint256 startTime, uint256 endTime);
+    event StakeWithdrawn(address indexed user, uint256 amount, uint256 withdrawnTime);
+    event RewardClaimed(address indexed user, uint256 rewardAmount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can perform this action");
+        _;
+    }
+
+    constructor(address _tokenAddress, uint256 _stakingPeriod, uint256 _rewardRate) {
+        owner = msg.sender;
+        tokenAddress = _tokenAddress;
+        stakingPeriod = _stakingPeriod;
+        rewardRate = _rewardRate;
+    }
+
+    // Function to allow staking of tokens
+    function stake(uint256 _amount) public {
+        require(_amount > 0, "Amount must be greater than zero");
+
+        // Transfer tokens from user to this contract
+        IERC20 token = IERC20(tokenAddress);
+        require(token.transferFrom(msg.sender, address(this), _amount), "Token transfer failed");
+
+        uint256 currentTime = block.timestamp;
+        uint256 endTime = currentTime + stakingPeriod;
+
+        stakes[msg.sender] = Stake({
+            amount: _amount,
+            startTime: currentTime,
+            endTime: endTime
+        });
+
+        emit StakeCreated(msg.sender, _amount, currentTime, endTime);
+    }
+
+    // Function to allow users to withdraw their staked tokens
+    function withdraw() public {
+        Stake storage userStake = stakes[msg.sender];
+        require(userStake.amount > 0, "No active stake found");
+        require(block.timestamp >= userStake.endTime, "Stake has not matured yet");
+
+        uint256 amountToWithdraw = userStake.amount;
+        // Clear the stake
+        delete stakes[msg.sender];
+
+        // Transfer staked tokens back to the user
+        IERC20 token = IERC20(tokenAddress);
+        require(token.transfer(msg.sender, amountToWithdraw), "Token transfer failed");
+
+        emit StakeWithdrawn(msg.sender, amountToWithdraw, block.timestamp);
+    }
+
+    // Function to calculate and claim rewards
+    function claimRewards() public {
+        uint256 earnedRewards = calculateRewards(msg.sender);
+        require(earnedRewards > 0, "No rewards to claim");
+
+        // Add earned rewards to the user's rewards balance
+        rewards[msg.sender] += earnedRewards;
+
+        // Reset the stake's start time to current time if it's still active to avoid double reward calculation for the same period
+        // This logic assumes a user can only claim rewards once per staking period or that rewards are calculated up to the claim time.
+        // For simplicity here, we'll assume rewards are calculated up to the claim time and reset the stake's relevant time for future calculations.
+        // A more complex system might allow partial withdrawals and continuous rewards.
+        Stake storage userStake = stakes[msg.sender];
+        if (userStake.amount > 0) {
+            userStake.startTime = block.timestamp; // Reset start time for continuous staking
+            // If the stake has matured, it should have been withdrawn already.
+            // If not, we update the start time for future reward calculations.
+        }
+
+        emit RewardClaimed(msg.sender, earnedRewards);
+    }
+
+    // Internal function to calculate rewards for a user
+    function calculateRewards(address _user) internal view returns (uint256) {
+        Stake storage userStake = stakes[_user];
+        if (userStake.amount == 0 || block.timestamp < userStake.startTime) {
+            return 0;
+        }
+
+        uint256 currentTime = block.timestamp;
+        uint256 timeStaked = 0;
+
+        if (currentTime >= userStake.endTime) {
+            // Stake has matured, calculate rewards for the full staking period
+            timeStaked = userStake.endTime - userStake.startTime;
+        } else {
+            // Stake is still active, calculate rewards up to the current time
+            timeStaked = currentTime - userStake.startTime;
+        }
+
+        // Ensure timeStaked is not negative if block.timestamp is somehow less than startTime (though unlikely)
+        if (timeStaked > stakingPeriod) {
+            timeStaked = stakingPeriod; // Cap at staking period if calculation goes over
+        }
+
+        uint256 earned = (userStake.amount * rewardRate * timeStaked) / 1 ether; // Assuming rewardRate is per wei/token and scaled by 1 ether
+        return earned;
+    }
+
+    // Function to check current rewards balance for a user
+    function getRewardsBalance(address _user) public view returns (uint256) {
+        return rewards[_user];
+    }
+
+    // Function to check the details of a user's stake
+    function getStakeDetails(address _user) public view returns (uint256 amount, uint256 startTime, uint256 endTime) {
+        Stake storage userStake = stakes[_user];
+        return (userStake.amount, userStake.startTime, userStake.endTime);
+    }
+
+    // Function to allow the owner to change the staking period
+    function setStakingPeriod(uint256 _stakingPeriod) public onlyOwner {
+        stakingPeriod = _stakingPeriod;
+    }
+
+    // Function to allow the owner to change the reward rate
+    function setRewardRate(uint256 _rewardRate) public onlyOwner {
+        rewardRate = _rewardRate;
+    }
+
+    // Function to allow the owner to withdraw any tokens accumulated in the contract (e.g., for rewards distribution or management)
+    function ownerWithdrawTokens(uint256 _amount) public onlyOwner {
+        IERC20 token = IERC20(tokenAddress);
+        require(token.transfer(msg.sender, _amount), "Token transfer failed");
+    }
+
+    // Fallback function to receive Ether if needed (though this contract primarily deals with ERC20 tokens)
+    receive() external payable {}
+    fallback() external payable {}
+}
+
+// Minimal ERC20 interface for interaction
+interface IERC20 {
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+    function approve(address spender, uint256 amount) external;
+}

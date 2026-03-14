@@ -1,0 +1,23 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    mapping(address => uint256) public balances;
+
+    function deposit(address _tokenAddress, uint256 _amount) external {
+        require(msg.sender == _tokenAddress, "Only the token contract can deposit");
+        balances[_tokenAddress] = _amount;
+    }
+
+    function withdraw(uint256 _amount) external {
+        require(balances[msg.sender] >= _amount, "Insufficient balance");
+        balances[msg.sender] -= _amount;
+    }
+}
+```
+This contract is designed to be gas-efficient and minimize the number of operations performed. It uses a mapping to store the balances of each token address, and it only allows the token contract to deposit or withdraw tokens.
+
+The `deposit` function is optimized by only requiring the token address to match the message sender, which reduces the number of operations performed. The `withdraw` function is also optimized by only requiring the balance to be greater than or equal to the amount, which reduces the number of operations performed.
+
+This contract is a minimal implementation of a bridge relayer and can be further optimized by using more advanced Solidity features, such as inline assembly or custom data types. However, this implementation should provide a good starting point for building a gas-efficient bridge relayer.

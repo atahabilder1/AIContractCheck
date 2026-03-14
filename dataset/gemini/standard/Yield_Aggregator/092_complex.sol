@@ -1,0 +1,334 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract YieldVault is Ownable {
+    using SafeERC20 for IERC20;
+    using SafeMath for uint256;
+
+    IERC20 public want; // The token the vault invests in
+    string public name;
+    string public symbol;
+
+    uint256 public totalShares;
+    mapping(address => uint256) public shares; // User shares
+
+    struct Strategy {
+        address controller;
+        uint256 allocation; // Percentage of vault assets to allocate
+        bool enabled;
+    }
+
+    Strategy[] public strategies;
+    mapping(address => bool) public isStrategy;
+
+    uint256 public performanceFee = 1000; // 10% performance fee (10000 = 100%)
+    uint256 public withdrawalFee = 50; // 0.5% withdrawal fee (10000 = 100%)
+    address public keeper; // Address that can trigger harvests
+    address public feeRecipient; // Address to send performance fees to
+
+    address public controller; // The main controller for the vault
+
+    uint256 public totalAssets; // Total want tokens held by the vault
+
+    event Deposit(address indexed user, uint256 amount, uint256 shares);
+    event Withdraw(address indexed user, uint256 amount, uint256 shares);
+    event Harvest(address indexed strategy, uint256 harvestedAmount, uint256 profit);
+    event StrategyAdded(address indexed controller, uint256 allocation, bool enabled);
+    event StrategyEnabled(address indexed controller, bool enabled);
+    event PerformanceFeeUpdated(uint256 newFee);
+    event WithdrawalFeeUpdated(uint256 newFee);
+    event KeeperUpdated(address newKeeper);
+    event FeeRecipientUpdated(address newFeeRecipient);
+    event ControllerUpdated(address newController);
+
+    constructor(
+        address _want,
+        string memory _name,
+        string memory _symbol,
+        address _keeper,
+        address _feeRecipient,
+        address _controller
+    ) {
+        want = IERC20(_want);
+        name = _name;
+        symbol = _symbol;
+        keeper = _keeper;
+        feeRecipient = _feeRecipient;
+        controller = _controller;
+        totalShares = 0;
+        totalAssets = 0;
+    }
+
+    // --- Core Vault Functions ---
+
+    function deposit(uint256 _amount) external {
+        require(_amount > 0, "Deposit amount must be greater than zero");
+        uint256 _balance = want.balanceOf(address(this));
+        want.transferFrom(msg.sender, address(this), _amount);
+        uint256 _newBalance = want.balanceOf(address(this));
+        totalAssets = totalAssets.add(_amount);
+
+        uint256 _shares;
+        if (totalShares == 0) {
+            _shares = _amount; // First deposit, 1 share per 1 token
+        } else {
+            _shares = _amount.mul(totalShares).div(_balance);
+        }
+
+        shares[msg.sender] = shares[msg.sender].add(_shares);
+        totalShares = totalShares.add(_shares);
+
+        emit Deposit(msg.sender, _amount, _shares);
+    }
+
+    function withdraw(uint256 _sharesToWithdraw) external {
+        require(_sharesToWithdraw > 0, "Shares to withdraw must be greater than zero");
+        require(_sharesToWithdraw <= shares[msg.sender], "Insufficient shares");
+
+        uint256 _amount = _sharesToWithdraw.mul(totalAssets).div(totalShares);
+        require(_amount > 0, "Withdrawal amount is zero");
+
+        // Apply withdrawal fee
+        uint256 _feeAmount = _amount.mul(withdrawalFee).div(10000);
+        uint256 _amountToWithdraw = _amount.sub(_feeAmount);
+
+        shares[msg.sender] = shares[msg.sender].sub(_sharesToWithdraw);
+        totalShares = totalShares.sub(_sharesToWithdraw);
+        totalAssets = totalAssets.sub(_amount);
+
+        want.transfer(msg.sender, _amountToWithdraw);
+
+        if (_feeAmount > 0) {
+            want.transfer(feeRecipient, _feeAmount);
+        }
+
+        emit Withdraw(msg.sender, _amountToWithdraw, _sharesToWithdraw);
+    }
+
+    function withdrawAll() external {
+        withdraw(shares[msg.sender]);
+    }
+
+    function emergencyWithdraw(address _asset) external onlyOwner {
+        require(IERC20(_asset).balanceOf(address(this)) > 0, "No assets to withdraw");
+        uint256 amount = IERC20(_asset).balanceOf(address(this));
+        IERC20(_asset).transfer(owner(), amount);
+    }
+
+    // --- Strategy Management ---
+
+    function addStrategy(address _controller, uint256 _allocation, bool _enabled) external onlyOwner {
+        require(_controller != address(0), "Invalid controller address");
+        require(_allocation > 0 && _allocation <= 10000, "Allocation must be between 1 and 10000");
+        require(!isStrategy[_controller], "Strategy already exists");
+
+        uint256 totalAllocation = 0;
+        for (uint i = 0; i < strategies.length; i++) {
+            if (strategies[i].enabled) {
+                totalAllocation = totalAllocation.add(strategies[i].allocation);
+            }
+        }
+        require(totalAllocation.add(_allocation) <= 10000, "Total allocation exceeds 10000");
+
+        strategies.push(Strategy({
+            controller: _controller,
+            allocation: _allocation,
+            enabled: _enabled
+        }));
+        isStrategy[_controller] = true;
+
+        emit StrategyAdded(_controller, _allocation, _enabled);
+    }
+
+    function updateStrategyAllocation(address _controller, uint256 _newAllocation) external onlyOwner {
+        require(isStrategy[_controller], "Strategy not found");
+        require(_newAllocation > 0 && _newAllocation <= 10000, "New allocation must be between 1 and 10000");
+
+        uint256 totalAllocation = 0;
+        uint256 strategyIndex;
+        for (uint i = 0; i < strategies.length; i++) {
+            if (strategies[i].controller == _controller) {
+                strategyIndex = i;
+                break;
+            }
+        }
+
+        for (uint i = 0; i < strategies.length; i++) {
+            if (i != strategyIndex && strategies[i].enabled) {
+                totalAllocation = totalAllocation.add(strategies[i].allocation);
+            }
+        }
+        totalAllocation = totalAllocation.add(_newAllocation);
+        require(totalAllocation <= 10000, "Total allocation exceeds 10000");
+
+        strategies[strategyIndex].allocation = _newAllocation;
+        emit StrategyAdded(_controller, _newAllocation, strategies[strategyIndex].enabled);
+    }
+
+    function setStrategyEnabled(address _controller, bool _enabled) external onlyOwner {
+        require(isStrategy[_controller], "Strategy not found");
+
+        uint256 totalAllocation = 0;
+        uint256 strategyIndex;
+        for (uint i = 0; i < strategies.length; i++) {
+            if (strategies[i].controller == _controller) {
+                strategyIndex = i;
+                break;
+            }
+        }
+
+        for (uint i = 0; i < strategies.length; i++) {
+            if (i != strategyIndex && strategies[i].enabled) {
+                totalAllocation = totalAllocation.add(strategies[i].allocation);
+            }
+        }
+
+        if (_enabled) {
+            totalAllocation = totalAllocation.add(strategies[strategyIndex].allocation);
+            require(totalAllocation <= 10000, "Total allocation exceeds 10000");
+        }
+
+        strategies[strategyIndex].enabled = _enabled;
+        emit StrategyEnabled(_controller, _enabled);
+    }
+
+    // --- Harvesting and Fees ---
+
+    function harvest() external {
+        require(msg.sender == keeper, "Only keeper can harvest");
+        require(strategies.length > 0, "No strategies available");
+
+        uint256 _assets = want.balanceOf(address(this));
+        uint256 _totalAllocatedAssets = _assets.mul(getUsableAllocation()).div(10000); // Assets to be distributed to strategies
+
+        uint256 _harvestedTotal = 0;
+        for (uint i = 0; i < strategies.length; i++) {
+            if (strategies[i].enabled) {
+                uint256 _strategyAllocation = strategies[i].allocation.mul(_totalAllocatedAssets).div(10000);
+                uint256 _strategyBalanceBefore = want.balanceOf(strategies[i].controller);
+                uint256 _amountToTransfer = _strategyAllocation.mul(totalAssets).div(_totalAllocatedAssets); // Approximation of want tokens to send to strategy
+
+                // Transfer want tokens to strategy
+                want.transfer(strategies[i].controller, _amountToTransfer);
+
+                // Strategy performs its actions and returns want tokens + rewards
+                // This is a simplified simulation; a real strategy would have a specific harvest function
+                // For this example, we assume the strategy returns more want tokens than it received.
+                // The actual profit calculation would happen within the strategy.
+                // For simplicity, we'll assume the strategy returns all its want tokens back to the vault.
+                // The strategy's internal logic would be responsible for generating yield and returning it.
+                // A more robust implementation would involve a separate `harvest` call on each strategy.
+
+                uint256 _strategyBalanceAfter = want.balanceOf(strategies[i].controller);
+                uint256 _earned = _strategyBalanceAfter.sub(_strategyBalanceBefore);
+
+                // In a real scenario, the strategy would return the *increased* amount of want tokens.
+                // For this example, we'll assume the strategy returns its principal plus the earned amount.
+                // The strategy would typically have a `harvest()` function that returns the profit.
+
+                // For this simplified example, let's assume the strategy returns its principal + profit.
+                // The actual mechanism for strategies to return profit needs to be defined and implemented.
+                // This is a placeholder for the actual strategy interaction.
+                // We'll simulate a "profit" for demonstration.
+                uint256 _profit = _earned; // Placeholder for actual profit calculation
+                _harvestedTotal = _harvestedTotal.add(_profit);
+
+                emit Harvest(strategies[i].controller, _earned, _profit);
+            }
+        }
+
+        // Calculate performance fee
+        uint256 _performanceFeeAmount = _harvestedTotal.mul(performanceFee).div(10000);
+        uint256 _profitToVault = _harvestedTotal.sub(_performanceFeeAmount);
+
+        // Send performance fee
+        if (_performanceFeeAmount > 0) {
+            want.transfer(feeRecipient, _performanceFeeAmount);
+        }
+
+        // Add profit to totalAssets
+        totalAssets = totalAssets.add(_profitToVault);
+    }
+
+
+    function getUsableAllocation() public view returns (uint256) {
+        uint256 _totalAllocation = 0;
+        for (uint i = 0; i < strategies.length; i++) {
+            if (strategies[i].enabled) {
+                _totalAllocation = _totalAllocation.add(strategies[i].allocation);
+            }
+        }
+        return _totalAllocation;
+    }
+
+    // --- Admin Functions ---
+
+    function setPerformanceFee(uint256 _newFee) external onlyOwner {
+        require(_newFee <= 10000, "Fee cannot exceed 100%");
+        performanceFee = _newFee;
+        emit PerformanceFeeUpdated(_newFee);
+    }
+
+    function setWithdrawalFee(uint256 _newFee) external onlyOwner {
+        require(_newFee <= 10000, "Fee cannot exceed 100%");
+        withdrawalFee = _newFee;
+        emit WithdrawalFeeUpdated(_newFee);
+    }
+
+    function setKeeper(address _keeper) external onlyOwner {
+        require(_keeper != address(0), "Invalid keeper address");
+        keeper = _keeper;
+        emit KeeperUpdated(_keeper);
+    }
+
+    function setFeeRecipient(address _feeRecipient) external onlyOwner {
+        require(_feeRecipient != address(0), "Invalid fee recipient address");
+        feeRecipient = _feeRecipient;
+        emit FeeRecipientUpdated(_feeRecipient);
+    }
+
+    function setController(address _controller) external onlyOwner {
+        require(_controller != address(0), "Invalid controller address");
+        controller = _controller;
+        emit ControllerUpdated(_controller);
+    }
+
+    // --- View Functions ---
+
+    function balanceOf(address _user) external view returns (uint256) {
+        return shares[_user];
+    }
+
+    function balanceOfWant() external view returns (uint256) {
+        return want.balanceOf(address(this));
+    }
+
+    function getVaultInfo() external view returns (string memory _name, string memory _symbol, address _want, uint256 _totalAssets, uint256 _totalShares) {
+        return (name, symbol, address(want), totalAssets, totalShares);
+    }
+
+    function getStrategy(uint256 _index) external view returns (address controller, uint256 allocation, bool enabled) {
+        require(_index < strategies.length, "Index out of bounds");
+        Strategy storage s = strategies[_index];
+        return (s.controller, s.allocation, s.enabled);
+    }
+
+    function getNumberOfStrategies() external view returns (uint256) {
+        return strategies.length;
+    }
+
+    function pricePerShare() public view returns (uint256) {
+        if (totalShares == 0) {
+            return 1e18; // Default to 1 token per share if no shares exist
+        }
+        // totalAssets is in the smallest unit of the token (e.g., wei for ETH, or base units for ERC20)
+        // We need to scale it to a common unit for pricePerShare calculation, typically 1e18 for ERC20 tokens.
+        // Assuming `want` is a standard ERC20 token with 18 decimals.
+        return totalAssets.mul(1e18).div(totalShares);
+    }
+}

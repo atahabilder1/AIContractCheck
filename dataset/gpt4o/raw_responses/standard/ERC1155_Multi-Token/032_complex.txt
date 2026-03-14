@@ -1,0 +1,92 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Burnable.sol";
+import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
+
+contract CraftableERC1155 is ERC1155, ERC1155Burnable, ERC1155Supply, Ownable {
+    using Strings for uint256;
+
+    string private baseURI;
+    uint256 private nextTokenId = 1;
+
+    struct CraftRecipe {
+        uint256[] requiredTokenIds;
+        uint256[] requiredAmounts;
+        uint256 resultTokenId;
+        uint256 resultAmount;
+    }
+
+    mapping(uint256 => CraftRecipe) public craftRecipes;
+
+    event TokenCrafted(address indexed crafter, uint256 indexed resultTokenId, uint256 resultAmount);
+
+    constructor(string memory _uri) ERC1155(_uri) {
+        baseURI = _uri;
+    }
+
+    function setBaseURI(string memory newuri) external onlyOwner {
+        baseURI = newuri;
+    }
+
+    function uri(uint256 tokenId) public view override returns (string memory) {
+        require(exists(tokenId), "ERC1155: URI query for nonexistent token");
+        return string(abi.encodePacked(baseURI, tokenId.toString(), ".json"));
+    }
+
+    function setCraftRecipe(
+        uint256 recipeId,
+        uint256[] calldata requiredTokenIds,
+        uint256[] calldata requiredAmounts,
+        uint256 resultTokenId,
+        uint256 resultAmount
+    ) external onlyOwner {
+        require(requiredTokenIds.length == requiredAmounts.length, "Input arrays must be of same length");
+        craftRecipes[recipeId] = CraftRecipe({
+            requiredTokenIds: requiredTokenIds,
+            requiredAmounts: requiredAmounts,
+            resultTokenId: resultTokenId,
+            resultAmount: resultAmount
+        });
+    }
+
+    function craft(uint256 recipeId) external {
+        CraftRecipe memory recipe = craftRecipes[recipeId];
+        require(recipe.resultAmount > 0, "Invalid recipe");
+
+        for (uint256 i = 0; i < recipe.requiredTokenIds.length; i++) {
+            uint256 requiredTokenId = recipe.requiredTokenIds[i];
+            uint256 requiredAmount = recipe.requiredAmounts[i];
+            require(balanceOf(msg.sender, requiredTokenId) >= requiredAmount, "Insufficient token balance");
+            _burn(msg.sender, requiredTokenId, requiredAmount);
+        }
+
+        _mint(msg.sender, recipe.resultTokenId, recipe.resultAmount, "");
+        emit TokenCrafted(msg.sender, recipe.resultTokenId, recipe.resultAmount);
+    }
+
+    function mint(address to, uint256 amount, bytes memory data) external onlyOwner {
+        _mint(to, nextTokenId, amount, data);
+        nextTokenId++;
+    }
+
+    function mintBatch(address to, uint256[] memory amounts, bytes memory data) external onlyOwner {
+        uint256[] memory ids = new uint256[](amounts.length);
+        for (uint256 i = 0; i < amounts.length; i++) {
+            ids[i] = nextTokenId++;
+        }
+        _mintBatch(to, ids, amounts, data);
+    }
+
+    function _beforeTokenTransfer(address operator, address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data)
+        internal
+        override(ERC1155, ERC1155Supply)
+    {
+        super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
+    }
+}
+```

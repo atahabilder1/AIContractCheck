@@ -1,0 +1,136 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract StableToken is ERC20, Ownable {
+    constructor() ERC20("LendStable", "LSUSD") Ownable(msg.sender) {}
+
+    function mint(address to, uint256 amount) external onlyOwner {
+        _mint(to, amount);
+    }
+
+    function burn(address from, uint256 amount) external onlyOwner {
+        _burn(from, amount);
+    }
+}
+
+contract CollateralizedLending is Ownable {
+    StableToken public stableToken;
+
+    uint256 public constant COLLATERAL_RATIO = 150; // 150% collateralization
+    uint256 public constant LIQUIDATION_RATIO = 120; // 120% liquidation threshold
+    uint256 public constant LIQUIDATION_BONUS = 10; // 10% bonus for liquidators
+    uint256 public ethPriceUSD = 2000e18; // price with 18 decimals
+
+    struct Position {
+        uint256 collateralETH;
+        uint256 borrowedAmount;
+    }
+
+    mapping(address => Position) public positions;
+
+    event Deposited(address indexed user, uint256 amount);
+    event Borrowed(address indexed user, uint256 amount);
+    event Repaid(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
+    event Liquidated(address indexed user, address indexed liquidator, uint256 debtRepaid, uint256 collateralSeized);
+    event PriceUpdated(uint256 newPrice);
+
+    constructor() Ownable(msg.sender) {
+        stableToken = new StableToken();
+    }
+
+    function setEthPrice(uint256 _price) external onlyOwner {
+        require(_price > 0, "Invalid price");
+        ethPriceUSD = _price;
+        emit PriceUpdated(_price);
+    }
+
+    function deposit() external payable {
+        require(msg.value > 0, "Must deposit ETH");
+        positions[msg.sender].collateralETH += msg.value;
+        emit Deposited(msg.sender, msg.value);
+    }
+
+    function borrow(uint256 amount) external {
+        require(amount > 0, "Must borrow > 0");
+        Position storage pos = positions[msg.sender];
+
+        uint256 newBorrowed = pos.borrowedAmount + amount;
+        uint256 collateralValue = (pos.collateralETH * ethPriceUSD) / 1e18;
+        uint256 requiredCollateral = (newBorrowed * COLLATERAL_RATIO) / 100;
+
+        require(collateralValue >= requiredCollateral, "Insufficient collateral");
+
+        pos.borrowedAmount = newBorrowed;
+        stableToken.mint(msg.sender, amount);
+        emit Borrowed(msg.sender, amount);
+    }
+
+    function repay(uint256 amount) external {
+        Position storage pos = positions[msg.sender];
+        require(amount > 0 && amount <= pos.borrowedAmount, "Invalid repay amount");
+
+        stableToken.burn(msg.sender, amount);
+        pos.borrowedAmount -= amount;
+        emit Repaid(msg.sender, amount);
+    }
+
+    function withdraw(uint256 amount) external {
+        Position storage pos = positions[msg.sender];
+        require(amount > 0 && amount <= pos.collateralETH, "Invalid withdraw amount");
+
+        uint256 remainingCollateral = pos.collateralETH - amount;
+        if (pos.borrowedAmount > 0) {
+            uint256 collateralValue = (remainingCollateral * ethPriceUSD) / 1e18;
+            uint256 requiredCollateral = (pos.borrowedAmount * COLLATERAL_RATIO) / 100;
+            require(collateralValue >= requiredCollateral, "Would undercollateralize position");
+        }
+
+        pos.collateralETH = remainingCollateral;
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "ETH transfer failed");
+        emit Withdrawn(msg.sender, amount);
+    }
+
+    function liquidate(address user) external {
+        Position storage pos = positions[user];
+        require(pos.borrowedAmount > 0, "No debt to liquidate");
+
+        uint256 collateralValue = (pos.collateralETH * ethPriceUSD) / 1e18;
+        uint256 liquidationThreshold = (pos.borrowedAmount * LIQUIDATION_RATIO) / 100;
+        require(collateralValue < liquidationThreshold, "Position is healthy");
+
+        uint256 debtToRepay = pos.borrowedAmount;
+        uint256 collateralToSeize = (debtToRepay * 1e18) / ethPriceUSD;
+        uint256 bonus = (collateralToSeize * LIQUIDATION_BONUS) / 100;
+        uint256 totalSeized = collateralToSeize + bonus;
+
+        if (totalSeized > pos.collateralETH) {
+            totalSeized = pos.collateralETH;
+        }
+
+        stableToken.burn(msg.sender, debtToRepay);
+        pos.borrowedAmount = 0;
+        pos.collateralETH -= totalSeized;
+
+        (bool success, ) = msg.sender.call{value: totalSeized}("");
+        require(success, "ETH transfer failed");
+
+        emit Liquidated(user, msg.sender, debtToRepay, totalSeized);
+    }
+
+    function getCollateralRatio(address user) external view returns (uint256) {
+        Position storage pos = positions[user];
+        if (pos.borrowedAmount == 0) return type(uint256).max;
+        uint256 collateralValue = (pos.collateralETH * ethPriceUSD) / 1e18;
+        return (collateralValue * 100) / pos.borrowedAmount;
+    }
+
+    receive() external payable {
+        positions[msg.sender].collateralETH += msg.value;
+        emit Deposited(msg.sender, msg.value);
+    }
+}

@@ -1,0 +1,72 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+contract GasOptimizedAuction {
+    address payable public highestBidder;
+    uint256 public highestBid;
+    uint256 public auctionEndTime;
+    bool public ended = false;
+
+    event Bid(address bidder, uint256 amount);
+    event AuctionEnded(address winner, uint256 amount);
+
+    modifier onlyBeforeEnd() {
+        require(!ended && block.timestamp < auctionEndTime, "Auction has ended or is not yet active");
+        _;
+    }
+
+    modifier onlyAfterEnd() {
+        require(ended, "Auction has not ended yet");
+        _;
+    }
+
+    constructor(uint256 _biddingTime) {
+        auctionEndTime = block.timestamp + _biddingTime;
+    }
+
+    function bid() external payable onlyBeforeEnd {
+        require(msg.value > highestBid, "Bid is too low");
+
+        if (highestBidder != address(0)) {
+            // Refund previous highest bidder
+            (bool success, ) = highestBidder.call{value: highestBid}("");
+            require(success, "Refund failed");
+        }
+
+        highestBidder = payable(msg.sender);
+        highestBid = msg.value;
+
+        emit Bid(msg.sender, msg.value);
+    }
+
+    function endAuction() external {
+        require(block.timestamp >= auctionEndTime, "Auction not ended yet");
+        require(!ended, "Auction already ended");
+
+        ended = true;
+        emit AuctionEnded(highestBidder, highestBid);
+    }
+
+    // Fallback function to receive Ether, can be used for bidding if no other function is called
+    receive() external payable onlyBeforeEnd {
+        bid();
+    }
+
+    // Function to withdraw funds if the contract is the highest bidder (e.g., if auction ends with no bids)
+    function withdraw() external onlyAfterEnd {
+        require(msg.sender == highestBidder, "Only the highest bidder can withdraw");
+        require(highestBidder == address(this), "You are not the highest bidder"); // Should not happen in normal flow
+        (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
+        require(success, "Withdrawal failed");
+    }
+
+    // Function to reclaim funds if auction ends with no bids and contract owner needs to withdraw
+    function reclaimFunds() external {
+        require(msg.sender == tx.origin, "Only the original sender can reclaim funds"); // Prevent reentrancy
+        require(ended && highestBidder == address(0), "Auction must be ended with no bids");
+        (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
+        require(success, "Reclaim failed");
+    }
+}
+```

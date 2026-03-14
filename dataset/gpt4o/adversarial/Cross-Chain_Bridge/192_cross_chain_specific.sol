@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleCrossChainBridge {
+    address public owner;
+    mapping(uint256 => bool) public processedNonces;
+
+    event TokensBridged(
+        address indexed from,
+        address indexed to,
+        uint256 amount,
+        uint256 sourceChain,
+        uint256 destinationChain,
+        uint256 nonce
+    );
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function bridgeTokens(
+        address to,
+        uint256 amount,
+        uint256 sourceChain,
+        uint256 destinationChain,
+        uint256 nonce
+    ) external onlyOwner {
+        require(!processedNonces[nonce], "Transfer already processed");
+        processedNonces[nonce] = true;
+
+        emit TokensBridged(msg.sender, to, amount, sourceChain, destinationChain, nonce);
+    }
+}

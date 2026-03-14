@@ -1,0 +1,106 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract DAOVoting {
+    IERC20 public governanceToken;
+    uint256 public proposalCount;
+    uint256 public votingPeriod;
+    uint256 public quorumPercentage;
+
+    struct Proposal {
+        uint256 id;
+        address proposer;
+        string description;
+        uint256 forVotes;
+        uint256 againstVotes;
+        uint256 startTime;
+        uint256 endTime;
+        bool executed;
+        mapping(address => bool) hasVoted;
+    }
+
+    mapping(uint256 => Proposal) public proposals;
+
+    event ProposalCreated(uint256 indexed id, address indexed proposer, string description, uint256 endTime);
+    event Voted(uint256 indexed proposalId, address indexed voter, bool support, uint256 weight);
+    event ProposalExecuted(uint256 indexed id, bool passed);
+
+    modifier onlyTokenHolder() {
+        require(governanceToken.balanceOf(msg.sender) > 0, "Not a token holder");
+        _;
+    }
+
+    constructor(address _token, uint256 _votingPeriod, uint256 _quorumPercentage) {
+        require(_token != address(0), "Invalid token address");
+        require(_quorumPercentage <= 100, "Quorum must be <= 100");
+        governanceToken = IERC20(_token);
+        votingPeriod = _votingPeriod;
+        quorumPercentage = _quorumPercentage;
+    }
+
+    function createProposal(string calldata _description) external onlyTokenHolder returns (uint256) {
+        proposalCount++;
+        Proposal storage p = proposals[proposalCount];
+        p.id = proposalCount;
+        p.proposer = msg.sender;
+        p.description = _description;
+        p.startTime = block.timestamp;
+        p.endTime = block.timestamp + votingPeriod;
+
+        emit ProposalCreated(proposalCount, msg.sender, _description, p.endTime);
+        return proposalCount;
+    }
+
+    function vote(uint256 _proposalId, bool _support) external onlyTokenHolder {
+        Proposal storage p = proposals[_proposalId];
+        require(p.id != 0, "Proposal does not exist");
+        require(block.timestamp <= p.endTime, "Voting has ended");
+        require(!p.hasVoted[msg.sender], "Already voted");
+
+        uint256 weight = governanceToken.balanceOf(msg.sender);
+        p.hasVoted[msg.sender] = true;
+
+        if (_support) {
+            p.forVotes += weight;
+        } else {
+            p.againstVotes += weight;
+        }
+
+        emit Voted(_proposalId, msg.sender, _support, weight);
+    }
+
+    function executeProposal(uint256 _proposalId) external {
+        Proposal storage p = proposals[_proposalId];
+        require(p.id != 0, "Proposal does not exist");
+        require(block.timestamp > p.endTime, "Voting not ended");
+        require(!p.executed, "Already executed");
+
+        p.executed = true;
+
+        uint256 totalVotes = p.forVotes + p.againstVotes;
+        uint256 totalSupply = governanceToken.totalSupply();
+        bool quorumReached = totalVotes * 100 >= quorumPercentage * totalSupply;
+        bool passed = quorumReached && p.forVotes > p.againstVotes;
+
+        emit ProposalExecuted(_proposalId, passed);
+    }
+
+    function hasVoted(uint256 _proposalId, address _voter) external view returns (bool) {
+        return proposals[_proposalId].hasVoted[_voter];
+    }
+
+    function getProposal(uint256 _proposalId) external view returns (
+        address proposer,
+        string memory description,
+        uint256 forVotes,
+        uint256 againstVotes,
+        uint256 startTime,
+        uint256 endTime,
+        bool executed
+    ) {
+        Proposal storage p = proposals[_proposalId];
+        return (p.proposer, p.description, p.forVotes, p.againstVotes, p.startTime, p.endTime, p.executed);
+    }
+}

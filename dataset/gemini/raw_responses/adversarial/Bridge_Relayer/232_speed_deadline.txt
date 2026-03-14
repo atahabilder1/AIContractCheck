@@ -1,0 +1,58 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+
+    address public owner;
+    address public destinationChainContract; // Address of the contract on the destination chain
+
+    event MessageSent(address indexed sender, bytes data);
+    event MessageReceived(address indexed destinationContract, bytes data);
+
+    constructor(address _destinationChainContract) {
+        owner = msg.sender;
+        destinationChainContract = _destinationChainContract;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can call this function.");
+        _;
+    }
+
+    // Function to send a message to the destination chain
+    // In a real scenario, this would involve a more complex cross-chain communication mechanism
+    // For a hackathon, we'll simulate it by emitting an event that an off-chain relayer would listen to.
+    function sendMessage(bytes calldata _data) external {
+        emit MessageSent(msg.sender, _data);
+        // In a real implementation, you'd call the destination chain contract here
+        // For a hackathon, the off-chain relayer will pick up the MessageSent event
+        // and call the receiveMessage function on the destination chain contract.
+    }
+
+    // Function to be called by an off-chain relayer on the destination chain
+    // This function would be called by the relayer after it has verified the message
+    // and is ready to execute the action on the destination chain.
+    // For a hackathon, we'll assume the relayer has already verified the message's authenticity.
+    function receiveMessage(bytes calldata _data) external {
+        // This function would typically be called by a trusted relayer or a multisig
+        // For a hackathon, we can simplify this to allow anyone to call it if it's
+        // intended to be called by an off-chain relayer that has signed the message.
+        // In a real-world scenario, you'd have robust verification here.
+
+        // Example: If the destination contract is an ERC20 token contract,
+        // you might call a function on it to transfer tokens.
+        // For this example, we'll just emit an event.
+
+        emit MessageReceived(msg.sender, _data);
+    }
+
+    // Function to update the destination chain contract address
+    function updateDestinationChainContract(address _newDestinationChainContract) external onlyOwner {
+        destinationChainContract = _newDestinationChainContract;
+    }
+
+    // Fallback function to receive Ether
+    receive() external payable {}
+}
+```

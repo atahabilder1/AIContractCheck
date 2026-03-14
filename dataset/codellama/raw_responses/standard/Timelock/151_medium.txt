@@ -1,0 +1,71 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    // Configuration variables
+    uint256 public delay;
+    uint256 public gracePeriod;
+
+    // Admin controls
+    address public admin;
+    bool public paused;
+
+    // Batch transaction execution
+    mapping(uint256 => Transaction[]) public batches;
+
+    struct Transaction {
+        address from;
+        address to;
+        uint256 value;
+        bytes data;
+    }
+
+    constructor(uint256 _delay, uint256 _gracePeriod) public {
+        delay = _delay;
+        gracePeriod = _gracePeriod;
+        admin = msg.sender;
+        paused = false;
+    }
+
+    function setAdmin(address _newAdmin) public {
+        require(msg.sender == admin, "Only admin can set new admin");
+        admin = _newAdmin;
+    }
+
+    function pause() public {
+        require(msg.sender == admin, "Only admin can pause");
+        paused = true;
+    }
+
+    function unpause() public {
+        require(msg.sender == admin, "Only admin can unpause");
+        paused = false;
+    }
+
+    function addTransaction(address from, address to, uint256 value, bytes memory data) public {
+        require(msg.sender == admin, "Only admin can add transaction");
+        require(paused == false, "Timelock is paused");
+        Transaction memory transaction = Transaction({
+            from: from,
+            to: to,
+            value: value,
+            data: data
+        });
+        batches[block.timestamp + delay].push(transaction);
+    }
+
+    function executeTransaction(uint256 timestamp) public {
+        require(msg.sender == admin, "Only admin can execute transaction");
+        require(paused == false, "Timelock is paused");
+        require(block.timestamp > timestamp + delay, "Transaction is not ready");
+        require(block.timestamp <= timestamp + delay + gracePeriod, "Transaction is not in grace period");
+        Transaction[] memory transactions = batches[timestamp];
+        for (uint256 i = 0; i < transactions.length; i++) {
+            Transaction memory transaction = transactions[i];
+            require(transaction.from == msg.sender, "Transaction is not from sender");
+            transaction.to.call(transaction.data);
+        }
+    }
+}
+```

@@ -1,0 +1,330 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+contract CrossChainBridge is ReentrancyGuard, Pausable, Ownable {
+    using ECDSA for bytes32;
+    using SafeERC20 for IERC20;
+
+    struct BridgeMessage {
+        uint256 sourceChainId;
+        uint256 destChainId;
+        address sender;
+        address recipient;
+        address token;
+        uint256 amount;
+        uint256 nonce;
+        bytes32 dataHash;
+    }
+
+    struct RateLimitConfig {
+        uint256 maxAmount;
+        uint256 windowDuration;
+        uint256 currentAmount;
+        uint256 windowStart;
+    }
+
+    // Validator management
+    mapping(address => bool) public validators;
+    uint256 public validatorCount;
+    uint256 public requiredConfirmations;
+
+    // Replay protection
+    mapping(bytes32 => bool) public processedMessages;
+    mapping(address => uint256) public nonces;
+
+    // Merkle roots per source chain
+    mapping(uint256 => bytes32) public merkleRoots;
+    mapping(uint256 => uint256) public merkleRootTimestamps;
+
+    // Rate limiting per token
+    mapping(address => RateLimitConfig) public rateLimits;
+
+    // Message confirmations: messageHash => validator => confirmed
+    mapping(bytes32 => mapping(address => bool)) public confirmations;
+    mapping(bytes32 => uint256) public confirmationCount;
+
+    // Supported tokens and chains
+    mapping(address => bool) public supportedTokens;
+    mapping(uint256 => bool) public supportedChains;
+
+    // Emergency
+    address public guardian;
+    uint256 public constant MERKLE_ROOT_DELAY = 15 minutes;
+
+    // Events
+    event MessageSent(
+        bytes32 indexed messageHash,
+        uint256 indexed destChainId,
+        address indexed sender,
+        address recipient,
+        address token,
+        uint256 amount,
+        uint256 nonce
+    );
+    event MessageConfirmed(bytes32 indexed messageHash, address indexed validator);
+    event MessageExecuted(bytes32 indexed messageHash, address indexed recipient, uint256 amount);
+    event ValidatorAdded(address indexed validator);
+    event ValidatorRemoved(address indexed validator);
+    event MerkleRootUpdated(uint256 indexed chainId, bytes32 root);
+    event RateLimitUpdated(address indexed token, uint256 maxAmount, uint256 windowDuration);
+    event TokenAdded(address indexed token);
+    event TokenRemoved(address indexed token);
+    event ChainAdded(uint256 indexed chainId);
+    event ChainRemoved(uint256 indexed chainId);
+    event GuardianUpdated(address indexed oldGuardian, address indexed newGuardian);
+
+    modifier onlyValidator() {
+        require(validators[msg.sender], "Not a validator");
+        _;
+    }
+
+    modifier onlyGuardianOrOwner() {
+        require(msg.sender == guardian || msg.sender == owner(), "Not guardian or owner");
+        _;
+    }
+
+    constructor(
+        address[] memory _validators,
+        uint256 _requiredConfirmations,
+        address _guardian
+    ) Ownable() {
+        require(_validators.length >= _requiredConfirmations, "Invalid confirmation threshold");
+        require(_requiredConfirmations > 0, "Need at least 1 confirmation");
+        require(_guardian != address(0), "Invalid guardian");
+
+        for (uint256 i = 0; i < _validators.length; i++) {
+            require(_validators[i] != address(0), "Invalid validator");
+            require(!validators[_validators[i]], "Duplicate validator");
+            validators[_validators[i]] = true;
+            emit ValidatorAdded(_validators[i]);
+        }
+        validatorCount = _validators.length;
+        requiredConfirmations = _requiredConfirmations;
+        guardian = _guardian;
+    }
+
+    // --- Core Bridge Functions ---
+
+    function sendMessage(
+        uint256 _destChainId,
+        address _recipient,
+        address _token,
+        uint256 _amount,
+        bytes32 _dataHash
+    ) external whenNotPaused nonReentrant returns (bytes32) {
+        require(supportedChains[_destChainId], "Unsupported chain");
+        require(supportedTokens[_token], "Unsupported token");
+        require(_recipient != address(0), "Invalid recipient");
+        require(_amount > 0, "Zero amount");
+
+        _checkRateLimit(_token, _amount);
+
+        uint256 nonce = nonces[msg.sender]++;
+
+        BridgeMessage memory message = BridgeMessage({
+            sourceChainId: block.chainid,
+            destChainId: _destChainId,
+            sender: msg.sender,
+            recipient: _recipient,
+            token: _token,
+            amount: _amount,
+            nonce: nonce,
+            dataHash: _dataHash
+        });
+
+        bytes32 messageHash = hashMessage(message);
+        require(!processedMessages[messageHash], "Message already exists");
+
+        IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
+
+        emit MessageSent(messageHash, _destChainId, msg.sender, _recipient, _token, _amount, nonce);
+        return messageHash;
+    }
+
+    function confirmMessage(bytes32 _messageHash) external onlyValidator whenNotPaused {
+        require(!processedMessages[_messageHash], "Already processed");
+        require(!confirmations[_messageHash][msg.sender], "Already confirmed");
+
+        confirmations[_messageHash][msg.sender] = true;
+        confirmationCount[_messageHash]++;
+
+        emit MessageConfirmed(_messageHash, msg.sender);
+    }
+
+    function executeMessage(
+        BridgeMessage calldata _message,
+        bytes32[] calldata _merkleProof
+    ) external whenNotPaused nonReentrant {
+        bytes32 messageHash = hashMessage(_message);
+
+        require(!processedMessages[messageHash], "Already processed");
+        require(_message.destChainId == block.chainid, "Wrong chain");
+        require(supportedTokens[_message.token], "Unsupported token");
+        require(
+            confirmationCount[messageHash] >= requiredConfirmations,
+            "Insufficient confirmations"
+        );
+
+        // Verify merkle proof
+        bytes32 root = merkleRoots[_message.sourceChainId];
+        require(root != bytes32(0), "No merkle root");
+        require(
+            block.timestamp >= merkleRootTimestamps[_message.sourceChainId] + MERKLE_ROOT_DELAY,
+            "Merkle root too recent"
+        );
+
+        bytes32 leaf = keccak256(abi.encodePacked(messageHash));
+        require(MerkleProof.verify(_merkleProof, root, leaf), "Invalid merkle proof");
+
+        _checkRateLimit(_message.token, _message.amount);
+
+        processedMessages[messageHash] = true;
+
+        IERC20(_message.token).safeTransfer(_message.recipient, _message.amount);
+
+        emit MessageExecuted(messageHash, _message.recipient, _message.amount);
+    }
+
+    // --- Merkle Root Management ---
+
+    function updateMerkleRoot(uint256 _chainId, bytes32 _root) external onlyValidator {
+        require(supportedChains[_chainId], "Unsupported chain");
+        merkleRoots[_chainId] = _root;
+        merkleRootTimestamps[_chainId] = block.timestamp;
+        emit MerkleRootUpdated(_chainId, _root);
+    }
+
+    // --- Rate Limiting ---
+
+    function _checkRateLimit(address _token, uint256 _amount) internal {
+        RateLimitConfig storage limit = rateLimits[_token];
+        if (limit.maxAmount == 0) return;
+
+        if (block.timestamp >= limit.windowStart + limit.windowDuration) {
+            limit.windowStart = block.timestamp;
+            limit.currentAmount = 0;
+        }
+
+        require(limit.currentAmount + _amount <= limit.maxAmount, "Rate limit exceeded");
+        limit.currentAmount += _amount;
+    }
+
+    function setRateLimit(
+        address _token,
+        uint256 _maxAmount,
+        uint256 _windowDuration
+    ) external onlyOwner {
+        require(_windowDuration > 0, "Invalid window");
+        rateLimits[_token] = RateLimitConfig({
+            maxAmount: _maxAmount,
+            windowDuration: _windowDuration,
+            currentAmount: 0,
+            windowStart: block.timestamp
+        });
+        emit RateLimitUpdated(_token, _maxAmount, _windowDuration);
+    }
+
+    // --- Validator Management ---
+
+    function addValidator(address _validator) external onlyOwner {
+        require(_validator != address(0), "Invalid address");
+        require(!validators[_validator], "Already validator");
+        validators[_validator] = true;
+        validatorCount++;
+        emit ValidatorAdded(_validator);
+    }
+
+    function removeValidator(address _validator) external onlyOwner {
+        require(validators[_validator], "Not a validator");
+        require(validatorCount - 1 >= requiredConfirmations, "Would break threshold");
+        validators[_validator] = false;
+        validatorCount--;
+        emit ValidatorRemoved(_validator);
+    }
+
+    function setRequiredConfirmations(uint256 _required) external onlyOwner {
+        require(_required > 0 && _required <= validatorCount, "Invalid threshold");
+        requiredConfirmations = _required;
+    }
+
+    // --- Token & Chain Management ---
+
+    function addSupportedToken(address _token) external onlyOwner {
+        require(_token != address(0), "Invalid token");
+        supportedTokens[_token] = true;
+        emit TokenAdded(_token);
+    }
+
+    function removeSupportedToken(address _token) external onlyOwner {
+        supportedTokens[_token] = false;
+        emit TokenRemoved(_token);
+    }
+
+    function addSupportedChain(uint256 _chainId) external onlyOwner {
+        supportedChains[_chainId] = true;
+        emit ChainAdded(_chainId);
+    }
+
+    function removeSupportedChain(uint256 _chainId) external onlyOwner {
+        supportedChains[_chainId] = false;
+        emit ChainRemoved(_chainId);
+    }
+
+    // --- Emergency ---
+
+    function pause() external onlyGuardianOrOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    function setGuardian(address _guardian) external onlyOwner {
+        require(_guardian != address(0), "Invalid guardian");
+        emit GuardianUpdated(guardian, _guardian);
+        guardian = _guardian;
+    }
+
+    function emergencyWithdraw(address _token, uint256 _amount) external onlyOwner {
+        require(paused(), "Must be paused");
+        IERC20(_token).safeTransfer(owner(), _amount);
+    }
+
+    // --- View Functions ---
+
+    function hashMessage(BridgeMessage memory _message) public pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                _message.sourceChainId,
+                _message.destChainId,
+                _message.sender,
+                _message.recipient,
+                _message.token,
+                _message.amount,
+                _message.nonce,
+                _message.dataHash
+            )
+        );
+    }
+
+    function isMessageConfirmedBy(
+        bytes32 _messageHash,
+        address _validator
+    ) external view returns (bool) {
+        return confirmations[_messageHash][_validator];
+    }
+
+    function isMessageReady(bytes32 _messageHash) external view returns (bool) {
+        return !processedMessages[_messageHash] &&
+            confirmationCount[_messageHash] >= requiredConfirmations;
+    }
+}

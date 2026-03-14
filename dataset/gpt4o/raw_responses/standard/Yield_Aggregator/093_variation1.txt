@@ -1,0 +1,124 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IUniswapV2Pair {
+    function mint(address to) external returns (uint liquidity);
+    function burn(address to) external returns (uint amount0, uint amount1);
+    function transferFrom(address from, address to, uint value) external returns (bool);
+    function transfer(address to, uint value) external returns (bool);
+    function balanceOf(address owner) external view returns (uint);
+    function approve(address spender, uint value) external returns (bool);
+}
+
+interface IUniswapV2Router {
+    function swapExactTokensForTokens(
+        uint amountIn,
+        uint amountOutMin,
+        address[] calldata path,
+        address to,
+        uint deadline
+    ) external returns (uint[] memory amounts);
+
+    function addLiquidity(
+        address tokenA,
+        address tokenB,
+        uint amountADesired,
+        uint amountBDesired,
+        uint amountAMin,
+        uint amountBMin,
+        address to,
+        uint deadline
+    ) external returns (uint amountA, uint amountB, uint liquidity);
+}
+
+interface IERC20 {
+    function transfer(address recipient, uint amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint amount) external returns (bool);
+    function approve(address spender, uint amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint);
+    function decimals() external view returns (uint8);
+}
+
+contract AutoCompoundVault {
+    IUniswapV2Pair public immutable lpToken;
+    IUniswapV2Router public immutable router;
+    IERC20 public immutable rewardToken;
+    address public immutable tokenA;
+    address public immutable tokenB;
+
+    constructor(
+        address _lpToken,
+        address _router,
+        address _rewardToken,
+        address _tokenA,
+        address _tokenB
+    ) {
+        lpToken = IUniswapV2Pair(_lpToken);
+        router = IUniswapV2Router(_router);
+        rewardToken = IERC20(_rewardToken);
+        tokenA = _tokenA;
+        tokenB = _tokenB;
+
+        IERC20(_rewardToken).approve(_router, type(uint).max);
+        IERC20(_tokenA).approve(_router, type(uint).max);
+        IERC20(_tokenB).approve(_router, type(uint).max);
+        lpToken.approve(_router, type(uint).max);
+    }
+
+    function autoCompound() external {
+        // Step 1: Harvest rewards
+        lpToken.burn(address(this));
+
+        uint rewardBalance = rewardToken.balanceOf(address(this));
+
+        if (rewardBalance > 0) {
+            // Step 2: Swap half rewards to tokenA and tokenB
+            address[] memory pathA = new address[](2);
+            pathA[0] = address(rewardToken);
+            pathA[1] = tokenA;
+
+            address[] memory pathB = new address[](2);
+            pathB[0] = address(rewardToken);
+            pathB[1] = tokenB;
+
+            uint halfReward = rewardBalance / 2;
+
+            if (tokenA != address(rewardToken)) {
+                router.swapExactTokensForTokens(
+                    halfReward,
+                    0, // Accept any amount of tokenA
+                    pathA,
+                    address(this),
+                    block.timestamp
+                );
+            }
+
+            if (tokenB != address(rewardToken)) {
+                router.swapExactTokensForTokens(
+                    halfReward,
+                    0, // Accept any amount of tokenB
+                    pathB,
+                    address(this),
+                    block.timestamp
+                );
+            }
+
+            // Step 3: Add liquidity
+            uint tokenABalance = IERC20(tokenA).balanceOf(address(this));
+            uint tokenBBalance = IERC20(tokenB).balanceOf(address(this));
+
+            router.addLiquidity(
+                tokenA,
+                tokenB,
+                tokenABalance,
+                tokenBBalance,
+                0, // Min amount of tokenA
+                0, // Min amount of tokenB
+                address(this),
+                block.timestamp
+            );
+        }
+    }
+}
+```

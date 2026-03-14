@@ -1,0 +1,55 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
+interface IYieldProtocol {
+    function deposit(uint256 amount) external;
+    function withdraw(uint256 amount) external;
+    function getRewards() external;
+}
+
+contract YieldAggregator {
+    IERC20 public immutable token;
+    IYieldProtocol public immutable yieldProtocol;
+    mapping(address => uint256) public deposits;
+
+    constructor(address _token, address _yieldProtocol) {
+        token = IERC20(_token);
+        yieldProtocol = IYieldProtocol(_yieldProtocol);
+    }
+
+    function deposit(uint256 amount) external {
+        require(amount > 0, "Amount should be greater than zero");
+        token.transferFrom(msg.sender, address(this), amount);
+        token.approve(address(yieldProtocol), amount);
+        yieldProtocol.deposit(amount);
+        deposits[msg.sender] += amount;
+    }
+
+    function withdraw(uint256 amount) external {
+        require(deposits[msg.sender] >= amount, "Insufficient balance");
+        yieldProtocol.withdraw(amount);
+        token.transfer(msg.sender, amount);
+        deposits[msg.sender] -= amount;
+    }
+
+    function claimRewards() external {
+        yieldProtocol.getRewards();
+    }
+
+    function getUserDeposit(address user) external view returns (uint256) {
+        return deposits[user];
+    }
+}
+```

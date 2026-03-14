@@ -1,0 +1,65 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Proxy {
+    // Storage slot for the address of the current implementation
+    bytes32 private constant IMPLEMENTATION_SLOT = keccak256("proxy.implementation");
+
+    // Event to log implementation upgrades
+    event Upgraded(address indexed implementation);
+
+    constructor(address _implementation) {
+        _setImplementation(_implementation);
+    }
+
+    fallback() external payable {
+        _delegate(_implementation());
+    }
+
+    receive() external payable {
+        _delegate(_implementation());
+    }
+
+    function _delegate(address implementation) internal {
+        assembly {
+            // Copy msg.data. We take full control of memory in this inline assembly block
+            calldatacopy(0, 0, calldatasize())
+            // Delegate call to the implementation
+            let result := delegatecall(gas(), implementation, 0, calldatasize(), 0, 0)
+            // Copy the returned data
+            returndatacopy(0, 0, returndatasize())
+            // Handle result
+            switch result
+            case 0 { revert(0, returndatasize()) }
+            default { return(0, returndatasize()) }
+        }
+    }
+
+    function upgradeTo(address newImplementation) external {
+        require(msg.sender == _admin(), "Proxy: Only admin can upgrade");
+        _setImplementation(newImplementation);
+        emit Upgraded(newImplementation);
+    }
+
+    function _setImplementation(address newImplementation) private {
+        require(newImplementation != address(0), "Proxy: new implementation is the zero address");
+        bytes32 slot = IMPLEMENTATION_SLOT;
+        assembly {
+            sstore(slot, newImplementation)
+        }
+    }
+
+    function _implementation() internal view returns (address impl) {
+        bytes32 slot = IMPLEMENTATION_SLOT;
+        assembly {
+            impl := sload(slot)
+        }
+    }
+
+    function _admin() internal view returns (address) {
+        // This can be customized to fit the desired admin control mechanism
+        return msg.sender; // Simplified for example purposes
+    }
+}
+```

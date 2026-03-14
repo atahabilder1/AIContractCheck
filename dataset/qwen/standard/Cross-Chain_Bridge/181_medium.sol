@@ -1,0 +1,74 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+contract CrossChainBridge {
+    address public owner;
+    mapping(uint256 => bool) public nonces;
+    mapping(address => bool) public isRelayer;
+
+    event TransferInitiated(address indexed sender, address indexed receiver, uint256 amount, uint256 nonce);
+    event TransferExecuted(address indexed receiver, uint256 amount, uint256 nonce);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    modifier onlyRelayer() {
+        require(isRelayer[msg.sender], "Not a relayer");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function addRelayer(address _relayer) external onlyOwner {
+        isRelayer[_relayer] = true;
+    }
+
+    function removeRelayer(address _relayer) external onlyOwner {
+        isRelayer[_relayer] = false;
+    }
+
+    function initiateTransfer(address _receiver, uint256 _amount, uint256 _nonce) external {
+        require(!nonces[_nonce], "Nonce already used");
+        nonces[_nonce] = true;
+        emit TransferInitiated(msg.sender, _receiver, _amount, _nonce);
+    }
+
+    function executeTransfer(address _receiver, uint256 _amount, uint256 _nonce, bytes memory _signature) external onlyRelayer {
+        require(nonces[_nonce], "Nonce not used");
+        require(verifySignature(_receiver, _amount, _nonce, _signature), "Invalid signature");
+        nonces[_nonce] = false;
+        payable(_receiver).transfer(_amount);
+        emit TransferExecuted(_receiver, _amount, _nonce);
+    }
+
+    function verifySignature(address _receiver, uint256 _amount, uint256 _nonce, bytes memory _signature) public view returns (bool) {
+        bytes32 message = keccak256(abi.encodePacked(_receiver, _amount, _nonce));
+        bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", message));
+        return recoverSigner(messageHash, _signature) == owner;
+    }
+
+    function recoverSigner(bytes32 messageHash, bytes memory signature) public pure returns (address) {
+        require(signature.length == 65, "Invalid signature length");
+
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+
+        assembly {
+            r := mload(add(signature, 32))
+            s := mload(add(signature, 64))
+            v := byte(0, mload(add(signature, 96)))
+        }
+
+        if (v < 27) {
+            v += 27;
+        }
+
+        require(v == 27 || v == 28, "Invalid v value in signature");
+        return ecrecover(messageHash, v, r, s);
+    }
+}

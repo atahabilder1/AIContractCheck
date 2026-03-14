@@ -1,0 +1,149 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract GameAssets is ERC1155, Ownable {
+
+    // Struct to hold token type information
+    struct TokenType {
+        string name;
+        string uri; // Base URI for metadata
+        uint256 supply; // Total supply of this token type
+        uint256 maxSupply; // Maximum supply for this token type (0 for unlimited)
+        uint8 rarity; // Rarity level (e.g., 1 for common, 5 for legendary)
+    }
+
+    // Mapping from token ID to TokenType struct
+    mapping(uint256 => TokenType) public tokenTypes;
+
+    // Counter for the next available token ID
+    uint256 public nextTokenId;
+
+    // Event to log when a new token type is created
+    event TokenTypeCreated(
+        uint256 indexed tokenId,
+        string name,
+        string uri,
+        uint256 maxSupply,
+        uint8 rarity
+    );
+
+    // Event to log when tokens are minted
+    event TokensMinted(
+        uint256 indexed tokenId,
+        address indexed to,
+        uint256 amount
+    );
+
+    constructor() ERC1155("ipfs://game-assets/") {
+        nextTokenId = 1; // Start token IDs from 1
+    }
+
+    /**
+     * @dev Creates a new token type. Only the contract owner can call this.
+     * @param name The name of the token type.
+     * @param uri The base URI for the token's metadata.
+     * @param maxSupply The maximum number of tokens that can be minted for this type. Set to 0 for unlimited.
+     * @param rarity The rarity level of the token type.
+     */
+    function createTokenType(
+        string memory name,
+        string memory uri,
+        uint256 maxSupply,
+        uint8 rarity
+    ) public onlyOwner {
+        uint256 newTokenId = nextTokenId;
+
+        tokenTypes[newTokenId] = TokenType({
+            name: name,
+            uri: uri,
+            supply: 0,
+            maxSupply: maxSupply,
+            rarity: rarity
+        });
+
+        emit TokenTypeCreated(newTokenId, name, uri, maxSupply, rarity);
+
+        nextTokenId++;
+    }
+
+    /**
+     * @dev Mints a specified amount of a given token type to a recipient.
+     * @param tokenId The ID of the token type to mint.
+     * @param to The address to mint the tokens to.
+     * @param amount The amount of tokens to mint.
+     */
+    function mint(uint256 tokenId, address to, uint256 amount) public onlyOwner {
+        TokenType storage tokenType = tokenTypes[tokenId];
+
+        require(tokenId > 0 && tokenId < nextTokenId, "TokenType: Invalid token ID");
+        require(tokenType.name != "", "TokenType: Token type does not exist");
+        require(to != address(0), "TokenType: Cannot mint to zero address");
+        require(amount > 0, "TokenType: Amount must be greater than zero");
+
+        // Check if max supply is reached if not unlimited
+        if (tokenType.maxSupply > 0) {
+            require(tokenType.supply + amount <= tokenType.maxSupply, "TokenType: Max supply reached");
+        }
+
+        tokenType.supply += amount;
+
+        _mint(to, tokenId, amount, ""); // The last argument is for packed data, which we don't use here
+
+        emit TokensMinted(tokenId, to, amount);
+    }
+
+    /**
+     * @dev Mints a specified amount of a given token type to the caller.
+     * @param tokenId The ID of the token type to mint.
+     * @param amount The amount of tokens to mint.
+     */
+    function mintToSender(uint256 tokenId, uint256 amount) public {
+        mint(tokenId, msg.sender, amount);
+    }
+
+    /**
+     * @dev Returns the total supply of a given token type.
+     * @param tokenId The ID of the token type.
+     * @return The total supply.
+     */
+    function totalSupply(uint256 tokenId) public view returns (uint256) {
+        return tokenTypes[tokenId].supply;
+    }
+
+    /**
+     * @dev Returns the maximum supply of a given token type.
+     * @param tokenId The ID of the token type.
+     * @return The maximum supply.
+     */
+    function maxSupply(uint256 tokenId) public view returns (uint256) {
+        return tokenTypes[tokenId].maxSupply;
+    }
+
+    /**
+     * @dev Returns the rarity of a given token type.
+     * @param tokenId The ID of the token type.
+     * @return The rarity level.
+     */
+    function rarity(uint256 tokenId) public view returns (uint8) {
+        return tokenTypes[tokenId].rarity;
+    }
+
+    /**
+     * @dev Returns the base URI for a given token type.
+     * @param tokenId The ID of the token type.
+     * @return The base URI.
+     */
+    function uri(uint256 tokenId) public view virtual override returns (string memory) {
+        // This function is required by the ERC1155 standard for token metadata.
+        // We are overriding it to use our custom token type URIs.
+        TokenType storage tokenType = tokenTypes[tokenId];
+        if (tokenType.name == "") {
+            // If token type doesn't exist, fall back to the base URI of the contract
+            return super.uri(tokenId);
+        }
+        return tokenType.uri;
+    }
+}

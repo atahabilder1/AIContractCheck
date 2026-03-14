@@ -1,0 +1,98 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract GovernanceContract is ReentrancyGuard, Ownable {
+    using SafeMath for uint256;
+
+    struct Proposal {
+        uint256 id;
+        address proposer;
+        string description;
+        uint256 eta;
+        uint256 votesFor;
+        uint256 votesAgainst;
+        bool executed;
+        mapping(address => uint256) votes;
+    }
+
+    IERC20 public token;
+    uint256 public quorum;
+    uint256 public proposalThreshold;
+    uint256 public votingPeriod;
+    uint256 public constant MIN_VOTING_PERIOD = 1 days;
+    uint256 public constant MAX_VOTING_PERIOD = 7 days;
+    uint256 public constant MIN_PROPOSAL_THRESHOLD = 1000 * 10**18; // 1000 tokens
+    uint256 public constant MAX_PROPOSAL_THRESHOLD = 100000 * 10**18; // 100,000 tokens
+
+    uint256 public proposalCount;
+    mapping(uint256 => Proposal) public proposals;
+
+    constructor(address _token, uint256 _quorum, uint256 _proposalThreshold, uint256 _votingPeriod) {
+        require(_token != address(0), "Invalid token address");
+        require(_quorum >= 1 && _quorum <= 100, "Quorum must be between 1% and 100%");
+        require(_proposalThreshold >= MIN_PROPOSAL_THRESHOLD && _proposalThreshold <= MAX_PROPOSAL_THRESHOLD, "Proposal threshold must be between 1000 tokens and 100,000 tokens");
+        require(_votingPeriod >= MIN_VOTING_PERIOD && _votingPeriod <= MAX_VOTING_PERIOD, "Voting period must be between 1 day and 7 days");
+
+        token = IERC20(_token);
+        quorum = _quorum;
+        proposalThreshold = _proposalThreshold;
+        votingPeriod = _votingPeriod;
+    }
+
+    function propose(string memory description) external nonReentrant returns (uint256) {
+        require(token.balanceOf(msg.sender) >= proposalThreshold, "Must hold at least proposal threshold tokens to propose");
+
+        Proposal storage proposal = proposals[proposalCount];
+        proposal.id = proposalCount;
+        proposal.proposer = msg.sender;
+        proposal.description = description;
+        proposal.eta = block.timestamp + votingPeriod;
+
+        proposalCount++;
+        return proposalCount - 1;
+    }
+
+    function vote(uint256 proposalId, bool support) external nonReentrant {
+        require(block.timestamp < proposals[proposalId].eta, "Voting period ended");
+        require(!proposals[proposalId].executed, "Proposal already executed");
+
+        Proposal storage proposal = proposals[proposalId];
+        require(token.balanceOf(msg.sender) > 0, "Must hold tokens to vote");
+        require(token.allowance(msg.sender, address(this)) >= 1, "Must approve contract to spend tokens");
+
+        if (support) {
+            proposal.votes[msg.sender] = 1;
+            proposal.votesFor++;
+        } else {
+            proposal.votes[msg.sender] = 2;
+            proposal.votesAgainst++;
+        }
+    }
+
+    function execute(uint256 proposalId) external nonReentrant {
+        require(block.timestamp >= proposals[proposalId].eta, "Voting period not yet ended");
+        require(!proposals[proposalId].executed, "Proposal already executed");
+
+        Proposal storage proposal = proposals[proposalId];
+        require(proposal.votesFor.mul(100) >= quorum.mul(token.totalSupply()).div(100), "Not enough votes for the proposal");
+
+        proposal.executed = true;
+        // Execute the proposal
+    }
+
+    function delegate(address to) external nonReentrant {
+        require(token.balanceOf(msg.sender) > 0, "Must hold tokens to delegate");
+        require(token.allowance(msg.sender, address(this)) > 0, "Must approve contract to spend tokens");
+
+        // Implement delegation logic
+    }
+
+    function getProposal(uint256 proposalId) external view returns (Proposal memory) {
+        return proposals[proposalId];
+    }
+}

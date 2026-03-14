@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address public owner;
+    mapping(uint256 => bool) public processedMessages;
+    uint256 public nextMessageId;
+
+    event MessageSent(uint256 indexed messageId, address indexed sender, bytes payload);
+    event MessageReceived(uint256 indexed messageId, address indexed sender, bytes payload);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+        nextMessageId = 1;
+    }
+
+    function sendMessage(address destinationContract, bytes calldata payload) external {
+        uint256 messageId = nextMessageId++;
+        emit MessageSent(messageId, msg.sender, payload);
+        // In a real-world scenario, this would involve interaction with another chain's contract.
+        // For this simplified example, we just log the event.
+    }
+
+    function receiveMessage(uint256 messageId, address sender, bytes calldata payload) external {
+        // Minimal validation for speed: check if message has already been processed.
+        require(!processedMessages[messageId], "Message already processed");
+        processedMessages[messageId] = true;
+
+        emit MessageReceived(messageId, sender, payload);
+
+        // In a real-world scenario, you would parse the payload and execute logic
+        // based on the cross-chain intent. This often involves calling other contracts
+        // or performing state changes.
+        // For example, if payload represents a token transfer, you might:
+        // (IERC20(tokenAddress).transferFrom(sender, recipientAddress, amount);)
+    }
+
+    function setOwner(address newOwner) external onlyOwner {
+        owner = newOwner;
+    }
+}

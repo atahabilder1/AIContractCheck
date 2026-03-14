@@ -1,0 +1,58 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract RoleBasedAccessControl {
+    mapping(address => bool) public admins;
+    mapping(address => bool) public users;
+
+    event AdminAdded(address indexed admin);
+    event AdminRemoved(address indexed admin);
+    event UserAdded(address indexed user);
+    event UserRemoved(address indexed user);
+
+    constructor() {
+        admins[msg.sender] = true;
+        emit AdminAdded(msg.sender);
+    }
+
+    modifier onlyAdmin() {
+        require(admins[msg.sender], "Not an admin");
+        _;
+    }
+
+    function addAdmin(address _admin) external onlyAdmin {
+        require(!admins[_admin], "Already an admin");
+        admins[_admin] = true;
+        emit AdminAdded(_admin);
+    }
+
+    function removeAdmin(address _admin) external onlyAdmin {
+        require(admins[_admin], "Not an admin");
+        require(_admin != msg.sender, "Cannot remove self");
+        admins[_admin] = false;
+        emit AdminRemoved(_admin);
+    }
+
+    function addUser(address _user) external onlyAdmin {
+        require(!users[_user], "Already a user");
+        users[_user] = true;
+        emit UserAdded(_user);
+    }
+
+    function removeUser(address _user) external onlyAdmin {
+        require(users[_user], "Not a user");
+        users[_user] = false;
+        emit UserRemoved(_user);
+    }
+
+    modifier onlyUser() {
+        require(users[msg.sender], "Not a user");
+        _;
+    }
+
+    function performUserAction() external onlyUser {
+        // User-specific functionality
+    }
+}
+```

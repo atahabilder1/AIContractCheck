@@ -1,0 +1,83 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract StakableNFT is ERC721Enumerable, Ownable {
+    IERC20 public rewardToken;
+    uint256 public rewardRate; // Reward per block per NFT staked
+
+    struct StakeInfo {
+        uint256 tokenId;
+        uint256 stakedFromBlock;
+    }
+
+    mapping(address => StakeInfo[]) public stakes;
+    mapping(uint256 => address) public tokenOwner;
+
+    constructor(string memory name, string memory symbol, IERC20 _rewardToken, uint256 _rewardRate) ERC721(name, symbol) {
+        rewardToken = _rewardToken;
+        rewardRate = _rewardRate;
+    }
+
+    function stake(uint256 tokenId) external {
+        require(ownerOf(tokenId) == msg.sender, "Not the owner");
+        _transfer(msg.sender, address(this), tokenId);
+
+        stakes[msg.sender].push(StakeInfo({
+            tokenId: tokenId,
+            stakedFromBlock: block.number
+        }));
+
+        tokenOwner[tokenId] = msg.sender;
+    }
+
+    function unstake(uint256 tokenId) external {
+        require(tokenOwner[tokenId] == msg.sender, "Not the staker");
+
+        uint256 reward = _calculateReward(msg.sender, tokenId);
+        rewardToken.transfer(msg.sender, reward);
+
+        _removeStake(msg.sender, tokenId);
+        _transfer(address(this), msg.sender, tokenId);
+    }
+
+    function _calculateReward(address staker, uint256 tokenId) internal view returns (uint256) {
+        uint256 stakedFromBlock;
+        for (uint256 i = 0; i < stakes[staker].length; i++) {
+            if (stakes[staker][i].tokenId == tokenId) {
+                stakedFromBlock = stakes[staker][i].stakedFromBlock;
+                break;
+            }
+        }
+        return (block.number - stakedFromBlock) * rewardRate;
+    }
+
+    function _removeStake(address staker, uint256 tokenId) internal {
+        uint256 length = stakes[staker].length;
+        for (uint256 i = 0; i < length; i++) {
+            if (stakes[staker][i].tokenId == tokenId) {
+                stakes[staker][i] = stakes[staker][length - 1];
+                stakes[staker].pop();
+                delete tokenOwner[tokenId];
+                break;
+            }
+        }
+    }
+
+    function claimRewards(uint256 tokenId) external {
+        require(tokenOwner[tokenId] == msg.sender, "Not the staker");
+
+        uint256 reward = _calculateReward(msg.sender, tokenId);
+        rewardToken.transfer(msg.sender, reward);
+
+        for (uint256 i = 0; i < stakes[msg.sender].length; i++) {
+            if (stakes[msg.sender][i].tokenId == tokenId) {
+                stakes[msg.sender][i].stakedFromBlock = block.number;
+                break;
+            }
+        }
+    }
+}

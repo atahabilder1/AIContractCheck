@@ -1,0 +1,102 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiStaking {
+    address public owner;
+    mapping(address => uint256) public balances;
+    uint256 public totalStaked;
+    uint256 public rewardRate; // rewards per token per second
+    uint256 public lastRewardTimestamp;
+
+    event Staked(address indexed user, uint256 amount);
+    event Unstaked(address indexed user, uint256 amount);
+    event RewardClaimed(address indexed user, uint256 reward);
+
+    constructor(uint256 _rewardRate) {
+        owner = msg.sender;
+        rewardRate = _rewardRate;
+        lastRewardTimestamp = block.timestamp;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    function stake(uint256 _amount) public {
+        require(_amount > 0, "Amount must be greater than 0");
+        // In a real-world scenario, you would transfer tokens from the user to the contract.
+        // For this standalone example, we'll just update the balance.
+        // Example: ERC20 token.transferFrom(msg.sender, address(this), _amount);
+        balances[msg.sender] += _amount;
+        totalStaked += _amount;
+        lastRewardTimestamp = block.timestamp;
+        emit Staked(msg.sender, _amount);
+    }
+
+    function unstake(uint256 _amount) public {
+        require(_amount > 0, "Amount must be greater than 0");
+        require(balances[msg.sender] >= _amount, "Insufficient balance");
+
+        // Calculate and distribute rewards before unstaking
+        _distributeRewards();
+
+        balances[msg.sender] -= _amount;
+        totalStaked -= _amount;
+        lastRewardTimestamp = block.timestamp;
+
+        // In a real-world scenario, you would transfer tokens back to the user.
+        // Example: ERC20 token.transfer(msg.sender, _amount);
+        emit Unstaked(msg.sender, _amount);
+    }
+
+    function claimRewards() public {
+        _distributeRewards();
+        // Rewards are typically transferred to the user here.
+        // For this standalone example, we assume rewards are tracked and can be claimed.
+        // In a real contract, you'd need a way to track user rewards, e.g.,
+        // mapping(address => uint256) public userRewards;
+        // and then transfer the rewards.
+        // For simplicity, we'll just emit an event indicating rewards were calculated.
+        emit RewardClaimed(msg.sender, 0); // Reward amount is not tracked in this simplified version
+    }
+
+    function _distributeRewards() internal {
+        uint256 rewards = _calculateRewards(msg.sender);
+        if (rewards > 0) {
+            // In a real contract, you would add these rewards to the user's claimable balance.
+            // For simplicity, we just update lastRewardTimestamp to prevent re-calculation
+            // for the same period if no new actions occur.
+            // A more robust implementation would track individual user rewards.
+            lastRewardTimestamp = block.timestamp;
+            emit RewardClaimed(msg.sender, rewards); // Emit with 0 as reward is not tracked per user
+        }
+    }
+
+    function _calculateRewards(address _user) internal view returns (uint256) {
+        if (totalStaked == 0 || balances[_user] == 0) {
+            return 0;
+        }
+
+        uint256 timeElapsed = block.timestamp - lastRewardTimestamp;
+        // Ensure no overflow with large reward rates or time elapsed
+        uint256 rewardPerToken = (rewardRate * timeElapsed) / 1e18; // Assuming rewardRate is scaled by 1e18
+
+        return (balances[_user] * rewardPerToken) / 1e18; // Assuming balances are also scaled by 1e18
+    }
+
+    function setRewardRate(uint256 _rewardRate) public onlyOwner {
+        // Update rewards for all users before changing the rate
+        _distributeRewards();
+        rewardRate = _rewardRate;
+        lastRewardTimestamp = block.timestamp;
+    }
+
+    function getStakedBalance(address _user) public view returns (uint256) {
+        return balances[_user];
+    }
+
+    function getTotalStaked() public view returns (uint256) {
+        return totalStaked;
+    }
+}

@@ -1,0 +1,45 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract YieldVault {
+    address public strategy;
+    uint256 public totalShares;
+    mapping(address => uint256) public shares;
+
+    event Deposit(address indexed user, uint256 amount, uint256 sharesReceived);
+    event Withdraw(address indexed user, uint256 amount, uint256 sharesBurned);
+
+    constructor(address _strategy) {
+        strategy = _strategy;
+    }
+
+    function deposit(uint256 _amount) external {
+        require(_amount > 0, "Deposit amount must be greater than 0");
+        uint256 _shares = 0;
+        if (totalShares == 0) {
+            _shares = _amount;
+        } else {
+            _shares = (_amount * totalShares) / getStrategyBalance();
+        }
+        totalShares += _shares;
+        shares[msg.sender] += _shares;
+        (bool success, ) = strategy.call{value: _amount}("");
+        require(success, "Deposit to strategy failed");
+        emit Deposit(msg.sender, _amount, _shares);
+    }
+
+    function withdraw(uint256 _shares) external {
+        require(_shares > 0, "Withdraw shares must be greater than 0");
+        require(_shares <= shares[msg.sender], "Insufficient shares");
+        uint256 _amount = (_shares * getStrategyBalance()) / totalShares;
+        totalShares -= _shares;
+        shares[msg.sender] -= _shares;
+        (bool success, ) = msg.sender.call{value: _amount}("");
+        require(success, "Withdrawal failed");
+        emit Withdraw(msg.sender, _amount, _shares);
+    }
+
+    function getStrategyBalance() public view returns (uint256) {
+        return address(this).balance;
+    }
+}

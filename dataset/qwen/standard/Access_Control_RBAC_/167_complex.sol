@@ -1,0 +1,92 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
+
+contract AccessControlSystem is Ownable {
+    using EnumerableSet for EnumerableSet.AddressSet;
+
+    struct Role {
+        bytes32 name;
+        bytes32 parentRole;
+        uint256 expirationTime;
+        EnumerableSet.AddressSet members;
+        uint256 requiredSignatures;
+    }
+
+    mapping(bytes32 => Role) private roles;
+    mapping(bytes32 => mapping(address => bool)) private roleApprovals;
+
+    event RoleCreated(bytes32 indexed role, bytes32 indexed parentRole, uint256 expirationTime, uint256 requiredSignatures);
+    event RoleMemberAdded(bytes32 indexed role, address indexed member, uint256 expirationTime);
+    event RoleMemberRemoved(bytes32 indexed role, address indexed member);
+    event RoleApproval(bytes32 indexed role, address indexed approver, address indexed member);
+    event RoleChange(bytes32 indexed role, bytes32 indexed oldRole, bytes32 indexed newRole, uint256 expirationTime);
+
+    modifier onlyRole(bytes32 _role) {
+        require(isMemberOf(_role, msg.sender), "AccessControlSystem: caller does not have the required role");
+        _;
+    }
+
+    modifier onlyRoleOrOwner(bytes32 _role) {
+        require(isMemberOf(_role, msg.sender) || owner() == msg.sender, "AccessControlSystem: caller does not have the required role or is not the owner");
+        _;
+    }
+
+    function createRole(bytes32 _role, bytes32 _parentRole, uint256 _expirationTime, uint256 _requiredSignatures) external onlyOwner {
+        require(!roles[_role].members.exists(msg.sender), "AccessControlSystem: role already exists");
+        roles[_role] = Role({
+            name: _role,
+            parentRole: _parentRole,
+            expirationTime: _expirationTime,
+            requiredSignatures: _requiredSignatures
+        });
+        emit RoleCreated(_role, _parentRole, _expirationTime, _requiredSignatures);
+    }
+
+    function addMemberToRole(bytes32 _role, address _member, uint256 _expirationTime) external onlyRoleOrOwner(_role) {
+        require(!roles[_role].members.contains(_member), "AccessControlSystem: member already in role");
+        roles[_role].members.add(_member);
+        emit RoleMemberAdded(_role, _member, _expirationTime);
+    }
+
+    function removeMemberFromRole(bytes32 _role, address _member) external onlyRoleOrOwner(_role) {
+        require(roles[_role].members.contains(_member), "AccessControlSystem: member not in role");
+        roles[_role].members.remove(_member);
+        emit RoleMemberRemoved(_role, _member);
+    }
+
+    function approveRoleChange(bytes32 _role, address _member) external onlyRoleOrOwner(_role) {
+        require(!roleApprovals[_role][_member], "AccessControlSystem: already approved");
+        roleApprovals[_role][_member] = true;
+        emit RoleApproval(_role, msg.sender, _member);
+    }
+
+    function changeRole(bytes32 _oldRole, bytes32 _newRole, address _member, uint256 _expirationTime) external onlyRoleOrOwner(_oldRole) {
+        require(isMemberOf(_oldRole, _member), "AccessControlSystem: member not in old role");
+        require(countApprovals(_oldRole, _member) >= roles[_oldRole].requiredSignatures, "AccessControlSystem: not enough approvals");
+        removeMemberFromRole(_oldRole, _member);
+        addMemberToRole(_newRole, _member, _expirationTime);
+        emit RoleChange(_role, _oldRole, _newRole, _expirationTime);
+    }
+
+    function getRoleMembers(bytes32 _role) external view returns (address[] memory) {
+        return roles[_role].members.values();
+    }
+
+    function isMemberOf(bytes32 _role, address _member) public view returns (bool) {
+        return roles[_role].members.contains(_member) && block.timestamp < roles[_role].expirationTime;
+    }
+
+    function countApprovals(bytes32 _role, address _member) internal view returns (uint256) {
+        uint256 count = 0;
+        for (uint256 i = 0; i < roles[_role].members.length(); i++) {
+            if (roleApprovals[_role][roles[_role].members.at(i)]) {
+                count++;
+            }
+        }
+        return count;
+    }
+}

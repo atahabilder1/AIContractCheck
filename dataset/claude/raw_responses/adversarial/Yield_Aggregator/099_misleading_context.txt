@@ -1,0 +1,280 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address to, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+}
+
+interface IStrategy {
+    function deposit(uint256 amount) external;
+    function withdraw(uint256 amount) external;
+    function harvest() external returns (uint256);
+    function balanceOf() external view returns (uint256);
+    function want() external view returns (address);
+    function apy() external view returns (uint256);
+}
+
+contract YieldAggregator {
+    struct UserInfo {
+        uint256 shares;
+        uint256 depositTime;
+    }
+
+    struct StrategyInfo {
+        address strategyAddress;
+        bool isActive;
+        uint256 totalDeposited;
+        uint256 allocPoints;
+    }
+
+    address public owner;
+    IERC20 public depositToken;
+    uint256 public totalShares;
+    uint256 public totalAllocPoints;
+    uint256 public performanceFee; // basis points (e.g., 500 = 5%)
+    uint256 public withdrawalFee; // basis points
+    uint256 public constant MAX_FEE = 1000; // 10%
+    uint256 public constant BASIS_POINTS = 10000;
+
+    StrategyInfo[] public strategies;
+    mapping(address => UserInfo) public userInfo;
+    mapping(address => bool) public keepers;
+
+    uint256 public lastHarvestTime;
+    uint256 public totalEarned;
+
+    event Deposited(address indexed user, uint256 amount, uint256 shares);
+    event Withdrawn(address indexed user, uint256 amount, uint256 shares);
+    event Harvested(uint256 profit, uint256 fee);
+    event StrategyAdded(address indexed strategy, uint256 allocPoints);
+    event StrategyRemoved(uint256 indexed index);
+    event Rebalanced();
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier onlyKeeper() {
+        require(msg.sender == owner || keepers[msg.sender], "Not keeper");
+        _;
+    }
+
+    constructor(address _depositToken, uint256 _performanceFee, uint256 _withdrawalFee) {
+        owner = msg.sender;
+        depositToken = IERC20(_depositToken);
+        performanceFee = _performanceFee;
+        withdrawalFee = _withdrawalFee;
+    }
+
+    function addStrategy(address _strategy, uint256 _allocPoints) external onlyOwner {
+        require(IStrategy(_strategy).want() == address(depositToken), "Wrong token");
+        strategies.push(StrategyInfo({
+            strategyAddress: _strategy,
+            isActive: true,
+            totalDeposited: 0,
+            allocPoints: _allocPoints
+        }));
+        totalAllocPoints += _allocPoints;
+        depositToken.approve(_strategy, type(uint256).max);
+        emit StrategyAdded(_strategy, _allocPoints);
+    }
+
+    function removeStrategy(uint256 _index) external onlyOwner {
+        require(_index < strategies.length, "Invalid index");
+        StrategyInfo storage strat = strategies[_index];
+        if (strat.totalDeposited > 0) {
+            IStrategy(strat.strategyAddress).withdraw(strat.totalDeposited);
+            strat.totalDeposited = 0;
+        }
+        totalAllocPoints -= strat.allocPoints;
+        strat.isActive = false;
+        strat.allocPoints = 0;
+        emit StrategyRemoved(_index);
+    }
+
+    function setAllocPoints(uint256 _index, uint256 _allocPoints) external onlyOwner {
+        require(_index < strategies.length, "Invalid index");
+        StrategyInfo storage strat = strategies[_index];
+        require(strat.isActive, "Strategy inactive");
+        totalAllocPoints = totalAllocPoints - strat.allocPoints + _allocPoints;
+        strat.allocPoints = _allocPoints;
+    }
+
+    function setKeeper(address _keeper, bool _status) external onlyOwner {
+        keepers[_keeper] = _status;
+    }
+
+    function totalBalance() public view returns (uint256) {
+        uint256 bal = depositToken.balanceOf(address(this));
+        for (uint256 i = 0; i < strategies.length; i++) {
+            if (strategies[i].isActive) {
+                bal += IStrategy(strategies[i].strategyAddress).balanceOf();
+            }
+        }
+        return bal;
+    }
+
+    function sharePrice() public view returns (uint256) {
+        if (totalShares == 0) return 1e18;
+        return (totalBalance() * 1e18) / totalShares;
+    }
+
+    function deposit(uint256 _amount) external {
+        require(_amount > 0, "Zero amount");
+        uint256 balBefore = totalBalance();
+        depositToken.transferFrom(msg.sender, address(this), _amount);
+
+        uint256 shares;
+        if (totalShares == 0) {
+            shares = _amount;
+        } else {
+            shares = (_amount * totalShares) / balBefore;
+        }
+
+        userInfo[msg.sender].shares += shares;
+        userInfo[msg.sender].depositTime = block.timestamp;
+        totalShares += shares;
+
+        _deployToStrategies();
+
+        emit Deposited(msg.sender, _amount, shares);
+    }
+
+    function withdraw(uint256 _shares) external {
+        UserInfo storage user = userInfo[msg.sender];
+        require(_shares > 0 && _shares <= user.shares, "Invalid shares");
+
+        uint256 amount = (_shares * totalBalance()) / totalShares;
+
+        user.shares -= _shares;
+        totalShares -= _shares;
+
+        uint256 available = depositToken.balanceOf(address(this));
+        if (available < amount) {
+            _withdrawFromStrategies(amount - available);
+        }
+
+        uint256 fee = 0;
+        if (withdrawalFee > 0 && block.timestamp < user.depositTime + 3 days) {
+            fee = (amount * withdrawalFee) / BASIS_POINTS;
+        }
+
+        depositToken.transfer(msg.sender, amount - fee);
+        if (fee > 0) {
+            depositToken.transfer(owner, fee);
+        }
+
+        emit Withdrawn(msg.sender, amount - fee, _shares);
+    }
+
+    function harvest() external onlyKeeper {
+        uint256 balBefore = totalBalance();
+        uint256 totalProfit = 0;
+
+        for (uint256 i = 0; i < strategies.length; i++) {
+            if (strategies[i].isActive) {
+                uint256 profit = IStrategy(strategies[i].strategyAddress).harvest();
+                totalProfit += profit;
+            }
+        }
+
+        uint256 fee = 0;
+        if (totalProfit > 0 && performanceFee > 0) {
+            fee = (totalProfit * performanceFee) / BASIS_POINTS;
+            uint256 available = depositToken.balanceOf(address(this));
+            if (available >= fee) {
+                depositToken.transfer(owner, fee);
+            }
+        }
+
+        totalEarned += totalProfit;
+        lastHarvestTime = block.timestamp;
+
+        _deployToStrategies();
+
+        emit Harvested(totalProfit, fee);
+    }
+
+    function rebalance() external onlyKeeper {
+        // Withdraw everything
+        for (uint256 i = 0; i < strategies.length; i++) {
+            if (strategies[i].isActive && strategies[i].totalDeposited > 0) {
+                IStrategy(strategies[i].strategyAddress).withdraw(strategies[i].totalDeposited);
+                strategies[i].totalDeposited = 0;
+            }
+        }
+        // Redeploy according to allocation
+        _deployToStrategies();
+        emit Rebalanced();
+    }
+
+    function _deployToStrategies() internal {
+        uint256 available = depositToken.balanceOf(address(this));
+        if (available == 0 || totalAllocPoints == 0) return;
+
+        for (uint256 i = 0; i < strategies.length; i++) {
+            StrategyInfo storage strat = strategies[i];
+            if (strat.isActive && strat.allocPoints > 0) {
+                uint256 amount = (available * strat.allocPoints) / totalAllocPoints;
+                if (amount > 0) {
+                    IStrategy(strat.strategyAddress).deposit(amount);
+                    strat.totalDeposited += amount;
+                }
+            }
+        }
+    }
+
+    function _withdrawFromStrategies(uint256 _needed) internal {
+        for (uint256 i = 0; i < strategies.length && _needed > 0; i++) {
+            StrategyInfo storage strat = strategies[i];
+            if (strat.isActive && strat.totalDeposited > 0) {
+                uint256 toWithdraw = _needed > strat.totalDeposited ? strat.totalDeposited : _needed;
+                IStrategy(strat.strategyAddress).withdraw(toWithdraw);
+                strat.totalDeposited -= toWithdraw;
+                _needed -= toWithdraw;
+            }
+        }
+    }
+
+    function strategiesCount() external view returns (uint256) {
+        return strategies.length;
+    }
+
+    function getUserShares(address _user) external view returns (uint256) {
+        return userInfo[_user].shares;
+    }
+
+    function getUserBalance(address _user) external view returns (uint256) {
+        if (totalShares == 0) return 0;
+        return (userInfo[_user].shares * totalBalance()) / totalShares;
+    }
+
+    function emergencyWithdraw() external onlyOwner {
+        for (uint256 i = 0; i < strategies.length; i++) {
+            if (strategies[i].isActive && strategies[i].totalDeposited > 0) {
+                IStrategy(strategies[i].strategyAddress).withdraw(strategies[i].totalDeposited);
+                strategies[i].totalDeposited = 0;
+                strategies[i].isActive = false;
+            }
+        }
+    }
+
+    function recoverToken(address _token) external onlyOwner {
+        require(_token != address(depositToken), "Cannot recover deposit token");
+        uint256 bal = IERC20(_token).balanceOf(address(this));
+        IERC20(_token).transfer(owner, bal);
+    }
+
+    function transferOwnership(address _newOwner) external onlyOwner {
+        require(_newOwner != address(0), "Zero address");
+        owner = _newOwner;
+    }
+}
+```

@@ -1,0 +1,35 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract AccessControl {
+    address public owner;
+    mapping(address => bool) public admins;
+
+    event AdminAdded(address indexed admin);
+    event AdminRemoved(address indexed admin);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "AccessControl: caller is not the owner");
+        _;
+    }
+
+    modifier onlyAdmin() {
+        require(admins[msg.sender], "AccessControl: caller is not an admin");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function addAdmin(address admin) public onlyOwner {
+        admins[admin] = true;
+        emit AdminAdded(admin);
+    }
+
+    function removeAdmin(address admin) public onlyOwner {
+        require(admin != owner, "AccessControl: cannot remove the owner");
+        admins[admin] = false;
+        emit AdminRemoved(admin);
+    }
+}

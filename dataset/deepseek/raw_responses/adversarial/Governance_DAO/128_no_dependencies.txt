@@ -1,0 +1,45 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Governance {
+    struct Proposal {
+        uint id;
+        string name;
+        uint voteCount;
+        mapping(address => bool) voters;
+    }
+
+    address public owner;
+    uint public proposalCount;
+    mapping(uint => Proposal) public proposals;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function createProposal(string memory _name) public onlyOwner {
+        proposalCount++;
+        Proposal storage proposal = proposals[proposalCount];
+        proposal.id = proposalCount;
+        proposal.name = _name;
+    }
+
+    function vote(uint _id) public {
+        require(!proposals[_id].voters[msg.sender], "Already voted");
+        proposals[_id].voters[msg.sender] = true;
+        proposals[_id].voteCount++;
+    }
+
+    function getProposal(uint _id) public view returns (uint, string memory, uint) {
+        require(_id > 0 && _id <= proposalCount, "Proposal does not exist");
+        Proposal storage p = proposals[_id];
+        return (p.id, p.name, p.voteCount);
+    }
+}
+```

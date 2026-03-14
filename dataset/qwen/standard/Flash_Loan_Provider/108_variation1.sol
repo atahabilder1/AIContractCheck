@@ -1,0 +1,58 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IFlashLoanReceiver {
+    function executeOperation(
+        address sender,
+        address token,
+        uint256 amount,
+        uint256 fee,
+        bytes calldata params
+    ) external returns (bool);
+}
+
+contract FlashLoanAndMint {
+    uint256 public constant MINT_FEE = 0.01 ether; // 1% mint fee
+    uint256 public totalSupply;
+    mapping(address => uint256) public balanceOf;
+    string public name = "Protocol Native Token";
+    string public symbol = "PNT";
+    uint8 public decimals = 18;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Mint(address indexed to, uint256 amount);
+    event FlashLoan(address indexed token, uint256 amount, uint256 fee);
+
+    function mint(address to, uint256 amount) external payable {
+        require(msg.value >= MINT_FEE, "Insufficient mint fee");
+        totalSupply += amount;
+        balanceOf[to] += amount;
+        emit Mint(to, amount);
+        emit Transfer(address(0), to, amount);
+    }
+
+    function flashLoan(
+        address receiverAddress,
+        address token,
+        uint256 amount,
+        bytes calldata params
+    ) external {
+        uint256 fee = amount / 100; // 1% fee
+        IFlashLoanReceiver receiver = IFlashLoanReceiver(receiverAddress);
+
+        require(
+            receiver.executeOperation(msg.sender, token, amount, fee, params),
+            "Flash loan not approved"
+        );
+
+        emit FlashLoan(token, amount, fee);
+    }
+
+    function transfer(address recipient, uint256 amount) external returns (bool) {
+        require(balanceOf[msg.sender] >= amount, "Insufficient balance");
+        balanceOf[msg.sender] -= amount;
+        balanceOf[recipient] += amount;
+        emit Transfer(msg.sender, recipient, amount);
+        return true;
+    }
+}

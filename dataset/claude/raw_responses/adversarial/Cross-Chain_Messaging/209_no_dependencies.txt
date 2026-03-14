@@ -1,0 +1,262 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainMessaging {
+    struct Message {
+        uint256 messageId;
+        uint256 sourceChainId;
+        uint256 destinationChainId;
+        address sender;
+        address recipient;
+        bytes payload;
+        uint256 timestamp;
+        MessageStatus status;
+        uint256 nonce;
+    }
+
+    enum MessageStatus {
+        Pending,
+        Relayed,
+        Confirmed,
+        Failed
+    }
+
+    address public owner;
+    address public relayer;
+
+    uint256 public messageCount;
+    uint256 public currentChainId;
+    uint256 public messageFee;
+
+    mapping(uint256 => Message) public messages;
+    mapping(uint256 => bool) public supportedChains;
+    mapping(bytes32 => bool) public processedMessages;
+    mapping(address => uint256) public nonces;
+    mapping(address => uint256[]) public userSentMessages;
+    mapping(address => uint256[]) public userReceivedMessages;
+
+    event MessageSent(
+        uint256 indexed messageId,
+        uint256 indexed destinationChainId,
+        address indexed sender,
+        address recipient,
+        bytes payload,
+        uint256 nonce
+    );
+
+    event MessageRelayed(
+        uint256 indexed messageId,
+        uint256 indexed sourceChainId,
+        address indexed recipient,
+        bytes payload
+    );
+
+    event MessageConfirmed(uint256 indexed messageId);
+    event MessageFailed(uint256 indexed messageId, string reason);
+    event ChainAdded(uint256 chainId);
+    event ChainRemoved(uint256 chainId);
+    event RelayerUpdated(address oldRelayer, address newRelayer);
+    event FeeUpdated(uint256 oldFee, uint256 newFee);
+    event FeesWithdrawn(address to, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier onlyRelayer() {
+        require(msg.sender == relayer, "Not relayer");
+        _;
+    }
+
+    constructor(uint256 _chainId, uint256 _messageFee) {
+        owner = msg.sender;
+        relayer = msg.sender;
+        currentChainId = _chainId;
+        messageFee = _messageFee;
+    }
+
+    function sendMessage(
+        uint256 _destinationChainId,
+        address _recipient,
+        bytes calldata _payload
+    ) external payable returns (uint256) {
+        require(supportedChains[_destinationChainId], "Chain not supported");
+        require(_recipient != address(0), "Invalid recipient");
+        require(_payload.length > 0, "Empty payload");
+        require(msg.value >= messageFee, "Insufficient fee");
+
+        uint256 nonce = nonces[msg.sender]++;
+        uint256 messageId = messageCount++;
+
+        messages[messageId] = Message({
+            messageId: messageId,
+            sourceChainId: currentChainId,
+            destinationChainId: _destinationChainId,
+            sender: msg.sender,
+            recipient: _recipient,
+            payload: _payload,
+            timestamp: block.timestamp,
+            status: MessageStatus.Pending,
+            nonce: nonce
+        });
+
+        userSentMessages[msg.sender].push(messageId);
+
+        emit MessageSent(
+            messageId,
+            _destinationChainId,
+            msg.sender,
+            _recipient,
+            _payload,
+            nonce
+        );
+
+        return messageId;
+    }
+
+    function relayMessage(
+        uint256 _sourceChainId,
+        uint256 _originalMessageId,
+        address _sender,
+        address _recipient,
+        bytes calldata _payload,
+        uint256 _nonce
+    ) external onlyRelayer returns (uint256) {
+        require(supportedChains[_sourceChainId], "Source chain not supported");
+
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(
+                _sourceChainId,
+                _originalMessageId,
+                _sender,
+                _recipient,
+                _payload,
+                _nonce
+            )
+        );
+        require(!processedMessages[messageHash], "Already processed");
+        processedMessages[messageHash] = true;
+
+        uint256 messageId = messageCount++;
+
+        messages[messageId] = Message({
+            messageId: messageId,
+            sourceChainId: _sourceChainId,
+            destinationChainId: currentChainId,
+            sender: _sender,
+            recipient: _recipient,
+            payload: _payload,
+            timestamp: block.timestamp,
+            status: MessageStatus.Relayed,
+            nonce: _nonce
+        });
+
+        userReceivedMessages[_recipient].push(messageId);
+
+        emit MessageRelayed(messageId, _sourceChainId, _recipient, _payload);
+
+        return messageId;
+    }
+
+    function confirmMessage(uint256 _messageId) external onlyRelayer {
+        require(_messageId < messageCount, "Invalid message ID");
+        Message storage message = messages[_messageId];
+        require(
+            message.status == MessageStatus.Pending ||
+                message.status == MessageStatus.Relayed,
+            "Cannot confirm"
+        );
+
+        message.status = MessageStatus.Confirmed;
+        emit MessageConfirmed(_messageId);
+    }
+
+    function failMessage(uint256 _messageId, string calldata _reason) external onlyRelayer {
+        require(_messageId < messageCount, "Invalid message ID");
+        Message storage message = messages[_messageId];
+        require(
+            message.status == MessageStatus.Pending ||
+                message.status == MessageStatus.Relayed,
+            "Cannot fail"
+        );
+
+        message.status = MessageStatus.Failed;
+        emit MessageFailed(_messageId, _reason);
+    }
+
+    function addSupportedChain(uint256 _chainId) external onlyOwner {
+        require(_chainId != currentChainId, "Cannot add current chain");
+        require(!supportedChains[_chainId], "Already supported");
+        supportedChains[_chainId] = true;
+        emit ChainAdded(_chainId);
+    }
+
+    function removeSupportedChain(uint256 _chainId) external onlyOwner {
+        require(supportedChains[_chainId], "Not supported");
+        supportedChains[_chainId] = false;
+        emit ChainRemoved(_chainId);
+    }
+
+    function setRelayer(address _relayer) external onlyOwner {
+        require(_relayer != address(0), "Invalid relayer");
+        address oldRelayer = relayer;
+        relayer = _relayer;
+        emit RelayerUpdated(oldRelayer, _relayer);
+    }
+
+    function setMessageFee(uint256 _fee) external onlyOwner {
+        uint256 oldFee = messageFee;
+        messageFee = _fee;
+        emit FeeUpdated(oldFee, _fee);
+    }
+
+    function withdrawFees(address payable _to) external onlyOwner {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No fees to withdraw");
+        (bool success, ) = _to.call{value: balance}("");
+        require(success, "Transfer failed");
+        emit FeesWithdrawn(_to, balance);
+    }
+
+    function getMessage(uint256 _messageId) external view returns (Message memory) {
+        require(_messageId < messageCount, "Invalid message ID");
+        return messages[_messageId];
+    }
+
+    function getSentMessages(address _user) external view returns (uint256[] memory) {
+        return userSentMessages[_user];
+    }
+
+    function getReceivedMessages(address _user) external view returns (uint256[] memory) {
+        return userReceivedMessages[_user];
+    }
+
+    function getMessageHash(
+        uint256 _sourceChainId,
+        uint256 _messageId,
+        address _sender,
+        address _recipient,
+        bytes calldata _payload,
+        uint256 _nonce
+    ) external pure returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    _sourceChainId,
+                    _messageId,
+                    _sender,
+                    _recipient,
+                    _payload,
+                    _nonce
+                )
+            );
+    }
+
+    function transferOwnership(address _newOwner) external onlyOwner {
+        require(_newOwner != address(0), "Invalid owner");
+        owner = _newOwner;
+    }
+}
+```

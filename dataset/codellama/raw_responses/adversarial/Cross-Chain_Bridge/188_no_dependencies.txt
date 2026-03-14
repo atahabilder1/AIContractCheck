@@ -1,0 +1,39 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    struct Bridge {
+        address source;
+        address destination;
+        uint256 tokenId;
+        uint256 amount;
+    }
+
+    event BridgeCreated(address indexed source, address indexed destination, uint256 tokenId, uint256 amount);
+
+    mapping(address => mapping(uint256 => Bridge)) public bridges;
+
+    function createBridge(address source, address destination, uint256 tokenId, uint256 amount) public {
+        require(amount > 0, "Invalid amount");
+        require(source != address(0), "Invalid source address");
+        require(destination != address(0), "Invalid destination address");
+
+        Bridge memory bridge = Bridge(source, destination, tokenId, amount);
+        bridges[source][tokenId] = bridge;
+
+        emit BridgeCreated(source, destination, tokenId, amount);
+    }
+
+    function getBridge(address source, uint256 tokenId) public view returns (Bridge memory) {
+        return bridges[source][tokenId];
+    }
+}
+```
+This is a basic implementation of a cross-chain bridge in Solidity. It allows for the creation of bridges between different blockchains, and also allows for the retrieval of a bridge's details.
+
+The `Bridge` struct is used to store the details of a bridge, including the source and destination addresses, the token ID, and the amount of tokens to be bridged.
+
+The `createBridge` function is used to create a new bridge, and it takes the source and destination addresses, the token ID, and the amount of tokens to be bridged as inputs. It also emits a `BridgeCreated` event to notify listeners that a new bridge has been created.
+
+The `getBridge` function is used to retrieve the details of a bridge, and it takes the source address and the token ID as inputs. It returns the `Bridge` struct corresponding to the input parameters.

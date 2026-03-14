@@ -1,0 +1,69 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Governance {
+    address private _owner;
+    mapping(address => bool) private _members;
+    mapping(address => uint256) private _votes;
+    uint256 private _proposalCount;
+    mapping(uint256 => Proposal) private _proposals;
+    uint256 private _quorum;
+    uint256 private _majority;
+
+    struct Proposal {
+        string description;
+        address proposer;
+        uint256 voteCount;
+    }
+
+    event ProposalCreated(address indexed proposer, uint256 indexed proposalId, string description);
+    event VoteCast(address indexed voter, uint256 indexed proposalId, bool indexed vote);
+    event ProposalPassed(uint256 indexed proposalId);
+    event ProposalFailed(uint256 indexed proposalId);
+
+    constructor(uint256 quorum, uint256 majority) public {
+        _owner = msg.sender;
+        _quorum = quorum;
+        _majority = majority;
+    }
+
+    function addMember(address member) public {
+        require(msg.sender == _owner, "Only owner can add members");
+        require(!_members[member], "Member already exists");
+        _members[member] = true;
+    }
+
+    function removeMember(address member) public {
+        require(msg.sender == _owner, "Only owner can remove members");
+        require(_members[member], "Member does not exist");
+        _members[member] = false;
+    }
+
+    function createProposal(string memory description) public {
+        require(_members[msg.sender], "Only members can create proposals");
+        _proposalCount++;
+        _proposals[_proposalCount] = Proposal({
+            description: description,
+            proposer: msg.sender,
+            voteCount: 0
+        });
+        emit ProposalCreated(msg.sender, _proposalCount, description);
+    }
+
+    function vote(uint256 proposalId, bool vote) public {
+        require(_members[msg.sender], "Only members can vote");
+        require(proposalId > 0 && proposalId <= _proposalCount, "Invalid proposal ID");
+        Proposal storage proposal = _proposals[proposalId];
+        require(proposal.voteCount < _quorum, "Proposal has already reached quorum");
+        proposal.voteCount++;
+        _votes[msg.sender] = vote;
+        emit VoteCast(msg.sender, proposalId, vote);
+        if (proposal.voteCount >= _quorum) {
+            if (proposal.voteCount >= _majority) {
+                emit ProposalPassed(proposalId);
+            } else {
+                emit ProposalFailed(proposalId);
+            }
+        }
+    }
+}

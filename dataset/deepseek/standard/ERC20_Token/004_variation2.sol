@@ -1,0 +1,42 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract FeeOnTransferToken is ERC20, Ownable {
+    address public treasuryAddress;
+    uint256 public feePercentage;
+
+    event TransferWithFee(address indexed from, address indexed to, uint256 value, uint256 fee);
+
+    constructor(string memory name, string memory symbol, uint256 initialSupply, address _treasuryAddress, uint256 _feePercentage) ERC20(name, symbol) {
+        _mint(msg.sender, initialSupply);
+        treasuryAddress = _treasuryAddress;
+        feePercentage = _feePercentage;
+    }
+
+    function transfer(address recipient, uint256 amount) public override returns (bool) {
+        require(amount > 0, "Transfer amount must be greater than zero");
+
+        uint256 fee = amount * feePercentage / 100;
+        uint256 netAmount = amount - fee;
+
+        _transfer(_msgSender(), recipient, netAmount);
+        _transfer(_msgSender(), treasuryAddress, fee);
+
+        emit TransferWithFee(_msgSender(), recipient, netAmount, fee);
+        emit Transfer(address(0), treasuryAddress, fee); // For compatibility with ERC20 events
+
+        return true;
+    }
+
+    function setTreasuryAddress(address _treasuryAddress) public onlyOwner {
+        treasuryAddress = _treasuryAddress;
+    }
+
+    function setFeePercentage(uint256 _feePercentage) public onlyOwner {
+        require(_feePercentage <= 100, "Fee percentage must be between 0 and 100");
+        feePercentage = _feePercentage;
+    }
+}

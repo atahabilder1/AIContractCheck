@@ -1,0 +1,150 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract ERC1155 {
+    event TransferSingle(address indexed operator, address indexed from, address indexed to, uint256 id, uint256 value);
+    event TransferBatch(address indexed operator, address indexed from, address indexed to, uint256[] ids, uint256[] values);
+    event ApprovalForAll(address indexed account, address indexed operator, bool approved);
+    event URI(string value, uint256 indexed id);
+
+    mapping(uint256 => mapping(address => uint256)) public balanceOf;
+    mapping(address => mapping(address => bool)) public isApprovedForAll;
+
+    string private _uri;
+    address public owner;
+    uint256 private _currentId;
+
+    constructor(string memory uri_) {
+        _uri = uri_;
+        owner = msg.sender;
+    }
+
+    function uri(uint256) external view returns (string memory) {
+        return _uri;
+    }
+
+    function balanceOfBatch(address[] calldata accounts, uint256[] calldata ids) external view returns (uint256[] memory batchBalances) {
+        require(accounts.length == ids.length, "LENGTH");
+        batchBalances = new uint256[](accounts.length);
+        unchecked {
+            for (uint256 i; i < accounts.length; ++i) {
+                batchBalances[i] = balanceOf[ids[i]][accounts[i]];
+            }
+        }
+    }
+
+    function setApprovalForAll(address operator, bool approved) external {
+        isApprovedForAll[msg.sender][operator] = approved;
+        emit ApprovalForAll(msg.sender, operator, approved);
+    }
+
+    function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes calldata data) external {
+        require(msg.sender == from || isApprovedForAll[from][msg.sender], "UNAUTHORIZED");
+        require(to != address(0), "ZERO_ADDR");
+
+        balanceOf[id][from] -= amount;
+        unchecked {
+            balanceOf[id][to] += amount;
+        }
+
+        emit TransferSingle(msg.sender, from, to, id, amount);
+
+        if (to.code.length > 0) {
+            require(
+                IERC1155Receiver(to).onERC1155Received(msg.sender, from, id, amount, data) == 0xf23a6e61,
+                "UNSAFE_RECIPIENT"
+            );
+        }
+    }
+
+    function safeBatchTransferFrom(address from, address to, uint256[] calldata ids, uint256[] calldata amounts, bytes calldata data) external {
+        require(ids.length == amounts.length, "LENGTH");
+        require(msg.sender == from || isApprovedForAll[from][msg.sender], "UNAUTHORIZED");
+        require(to != address(0), "ZERO_ADDR");
+
+        unchecked {
+            for (uint256 i; i < ids.length; ++i) {
+                balanceOf[ids[i]][from] -= amounts[i];
+                balanceOf[ids[i]][to] += amounts[i];
+            }
+        }
+
+        emit TransferBatch(msg.sender, from, to, ids, amounts);
+
+        if (to.code.length > 0) {
+            require(
+                IERC1155Receiver(to).onERC1155BatchReceived(msg.sender, from, ids, amounts, data) == 0xbc197c81,
+                "UNSAFE_RECIPIENT"
+            );
+        }
+    }
+
+    function mint(address to, uint256 id, uint256 amount, bytes calldata data) external {
+        require(msg.sender == owner, "UNAUTHORIZED");
+        require(to != address(0), "ZERO_ADDR");
+
+        unchecked {
+            balanceOf[id][to] += amount;
+        }
+
+        emit TransferSingle(msg.sender, address(0), to, id, amount);
+
+        if (to.code.length > 0) {
+            require(
+                IERC1155Receiver(to).onERC1155Received(msg.sender, address(0), id, amount, data) == 0xf23a6e61,
+                "UNSAFE_RECIPIENT"
+            );
+        }
+    }
+
+    function mintBatch(address to, uint256[] calldata ids, uint256[] calldata amounts, bytes calldata data) external {
+        require(msg.sender == owner, "UNAUTHORIZED");
+        require(to != address(0), "ZERO_ADDR");
+        require(ids.length == amounts.length, "LENGTH");
+
+        unchecked {
+            for (uint256 i; i < ids.length; ++i) {
+                balanceOf[ids[i]][to] += amounts[i];
+            }
+        }
+
+        emit TransferBatch(msg.sender, address(0), to, ids, amounts);
+
+        if (to.code.length > 0) {
+            require(
+                IERC1155Receiver(to).onERC1155BatchReceived(msg.sender, address(0), ids, amounts, data) == 0xbc197c81,
+                "UNSAFE_RECIPIENT"
+            );
+        }
+    }
+
+    function burn(address from, uint256 id, uint256 amount) external {
+        require(msg.sender == from || isApprovedForAll[from][msg.sender], "UNAUTHORIZED");
+        balanceOf[id][from] -= amount;
+        emit TransferSingle(msg.sender, from, address(0), id, amount);
+    }
+
+    function burnBatch(address from, uint256[] calldata ids, uint256[] calldata amounts) external {
+        require(ids.length == amounts.length, "LENGTH");
+        require(msg.sender == from || isApprovedForAll[from][msg.sender], "UNAUTHORIZED");
+
+        unchecked {
+            for (uint256 i; i < ids.length; ++i) {
+                balanceOf[ids[i]][from] -= amounts[i];
+            }
+        }
+
+        emit TransferBatch(msg.sender, from, address(0), ids, amounts);
+    }
+
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return interfaceId == 0xd9b67a26 || interfaceId == 0x0e89341c || interfaceId == 0x01ffc9a7;
+    }
+}
+
+interface IERC1155Receiver {
+    function onERC1155Received(address operator, address from, uint256 id, uint256 value, bytes calldata data) external returns (bytes4);
+    function onERC1155BatchReceived(address operator, address from, uint256[] calldata ids, uint256[] calldata values, bytes calldata data) external returns (bytes4);
+}
+```

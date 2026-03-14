@@ -1,0 +1,58 @@
+```
+// SPDX-License-Identifier: Unlicense
+pragma solidity ^0.8.0;
+
+contract UUPS {
+    // Upgradeable contracts
+    address public currentImplementation;
+    address public newImplementation;
+    uint256 public timelock;
+
+    // Rollback information
+    uint256 public rollbackTimelock;
+    address public rollbackImplementation;
+
+    // Storage layout validation
+    bytes32 public storageLayoutHash;
+
+    constructor(address _initialImplementation) {
+        currentImplementation = _initialImplementation;
+        storageLayoutHash = keccak256(storageLayout());
+    }
+
+    function upgrade(address _newImplementation, uint256 _timelock) external {
+        require(msg.sender == address(this), "Only the contract can upgrade itself");
+        require(_newImplementation != address(0), "Invalid new implementation");
+        require(_timelock > block.timestamp, "Timelock must be in the future");
+
+        newImplementation = _newImplementation;
+        timelock = _timelock;
+    }
+
+    function rollback(uint256 _timelock) external {
+        require(msg.sender == address(this), "Only the contract can rollback itself");
+        require(_timelock > block.timestamp, "Timelock must be in the future");
+
+        rollbackTimelock = _timelock;
+        rollbackImplementation = currentImplementation;
+    }
+
+    function validateStorageLayout(bytes32 _storageLayoutHash) external view {
+        require(storageLayoutHash == _storageLayoutHash, "Invalid storage layout");
+    }
+
+    function storageLayout() internal view returns (bytes32) {
+        bytes32 layout = keccak256(type(StorageLayout).creationCode);
+        return layout;
+    }
+}
+
+contract StorageLayout {
+    uint256 public version;
+    address public currentImplementation;
+    address public newImplementation;
+    uint256 public timelock;
+    uint256 public rollbackTimelock;
+    address public rollbackImplementation;
+}
+```

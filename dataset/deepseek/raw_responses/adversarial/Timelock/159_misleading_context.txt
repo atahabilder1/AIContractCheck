@@ -1,0 +1,40 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    // Address of the owner who can execute the transactions
+    address public owner;
+
+    // Mapping to store the release time for each transaction
+    mapping(bytes32 => uint256) public releaseTimes;
+
+    // Event to notify when a new timelock is set
+    event TimelockSet(bytes32 indexed transaction, uint256 time);
+
+    // Modifier to restrict functions to the owner only
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Caller is not the owner");
+        _;
+    }
+
+    // Constructor to set the owner
+    constructor() {
+        owner = msg.sender;
+    }
+
+    // Function to set a new timelock for a specific transaction
+    function setTimelock(bytes32 transaction, uint256 time) public onlyOwner {
+        releaseTimes[transaction] = block.timestamp + time;
+        emit TimelockSet(transaction, block.timestamp + time);
+    }
+
+    // Function to execute a transaction if the timelock has been reached
+    function executeTransaction(bytes32 transaction) public {
+        require(block.timestamp >= releaseTimes[transaction], "Timelock not reached");
+        // Here you can add the logic to execute the transaction
+        // For example, you might want to transfer tokens or execute a function on another contract
+        // Example: (bool success, ) = recipient.call{value: amount}(""); require(success);
+    }
+}
+```

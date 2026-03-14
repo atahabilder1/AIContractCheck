@@ -1,0 +1,34 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract SerialNumberERC1155 is ERC1155, Ownable {
+    uint256 private _currentTokenId;
+    mapping(uint256 => uint256) private _serialNumbers;
+
+    constructor() ERC1155("") {}
+
+    function mint(address to, uint256 amount, string memory uri) external onlyOwner {
+        _currentTokenId++;
+        _mint(to, _currentTokenId, amount, "");
+        _setURI(_currentTokenId, uri);
+    }
+
+    function getSerialNumber(uint256 tokenId) external view returns (uint256) {
+        require(_exists(tokenId), "Token ID does not exist");
+        return _serialNumbers[tokenId];
+    }
+
+    function _setURI(uint256 tokenId, string memory uri) internal {
+        _serialNumbers[tokenId] = _serialNumbers[tokenId] + 1;
+        emit URI(uri, tokenId);
+    }
+
+    function _exists(uint256 tokenId) internal view returns (bool) {
+        return _serialNumbers[tokenId] > 0;
+    }
+}
+```

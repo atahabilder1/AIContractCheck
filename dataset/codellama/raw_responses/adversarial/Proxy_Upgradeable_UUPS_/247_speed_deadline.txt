@@ -1,0 +1,32 @@
+```
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+contract Proxy {
+    address private _implementation;
+
+    constructor(address implementation) public {
+        _implementation = implementation;
+    }
+
+    fallback() external {
+        _implementation.delegatecall(msg.data);
+    }
+
+    function upgrade(address newImplementation) public {
+        _implementation = newImplementation;
+    }
+}
+
+contract UUPS is Proxy {
+    constructor(address implementation) public Proxy(implementation) {}
+
+    function upgrade(address newImplementation) public {
+        _implementation = newImplementation;
+    }
+}
+```
+This is a basic implementation of a Proxy/Upgradeable (UUPS) contract in Solidity. It allows you to upgrade the implementation of a contract without losing the state of the contract. The `Proxy` contract is a simple proxy contract that forwards all calls to the implementation contract. The `UUPS` contract is an extension of the `Proxy` contract that adds the ability to upgrade the implementation.
+
+You can use this contract as a starting point for your hackathon project. Just be aware that this is a basic implementation and you may need to add additional functionality or security measures depending on your project requirements.

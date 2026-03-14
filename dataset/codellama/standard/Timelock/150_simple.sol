@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract TimeLock {
+    address public owner;
+    uint public delay;
+    mapping (address => uint) public queuedTransactions;
+
+    constructor(address _owner, uint _delay) public {
+        owner = _owner;
+        delay = _delay;
+    }
+
+    function queueTransaction(address _recipient, uint _amount) public {
+        require(msg.sender == owner, "Only the owner can queue transactions");
+        queuedTransactions[_recipient] = _amount;
+    }
+
+    function executeTransaction(address _recipient) public {
+        require(msg.sender == owner, "Only the owner can execute transactions");
+        require(block.timestamp >= queuedTransactions[_recipient].add(delay), "Transaction has not yet reached the delay period");
+        payable(_recipient).transfer(queuedTransactions[_recipient]);
+        delete queuedTransactions[_recipient];
+    }
+}

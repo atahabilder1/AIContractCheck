@@ -1,0 +1,63 @@
+
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiLending {
+    address public owner;
+    mapping(address => uint) public lendingHistory;
+    uint public lendingFee;
+    uint public interestRate;
+    uint public totalLending;
+    uint public totalBorrowing;
+
+    constructor() public {
+        owner = msg.sender;
+        lendingFee = 0.1 ether;
+        interestRate = 10;
+        totalLending = 0;
+        totalBorrowing = 0;
+    }
+
+    modifier onlyOwner {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    function lendEther(uint _amount) public payable {
+        require(_amount > 0, "Amount must be greater than 0");
+        require(msg.value >= _amount, "Not enough funds to lend");
+        totalLending += _amount;
+        lendingHistory[msg.sender] += _amount;
+        payable(owner).transfer(msg.value);
+    }
+
+    function borrowEther(uint _amount) public payable {
+        require(_amount > 0, "Amount must be greater than 0");
+        require(totalLending >= _amount, "Not enough lending balance");
+        totalBorrowing += _amount;
+        lendingHistory[msg.sender] -= _amount;
+        payable(msg.sender).transfer(msg.value);
+    }
+
+    function getLendingHistory(address _address) public view returns (uint) {
+        return lendingHistory[_address];
+    }
+
+    function getTotalLending() public view returns (uint) {
+        return totalLending;
+    }
+
+    function getTotalBorrowing() public view returns (uint) {
+        return totalBorrowing;
+    }
+
+    function getLendingFee() public view returns (uint) {
+        return lendingFee;
+    }
+
+    function getInterestRate() public view returns (uint) {
+        return interestRate;
+    }
+}
+```

@@ -1,0 +1,63 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract WrappedTokenBridge {
+    // Mapping of deposits per chain
+    mapping(uint256 => mapping(address => uint256)) public deposits;
+
+    // Mapping of bridged tokens per chain
+    mapping(uint256 => mapping(address => uint256)) public bridgedTokens;
+
+    // Total supply of wrapped tokens
+    uint256 public totalSupply;
+
+    // Constructor
+    constructor() public {
+        totalSupply = 0;
+    }
+
+    // Function to deposit tokens on a specific chain
+    function deposit(uint256 _chainId, uint256 _amount) public {
+        // Get the current supply of wrapped tokens for the specified chain
+        uint256 currentSupply = deposits[_chainId][address(this)];
+
+        // Update the supply of wrapped tokens for the specified chain
+        deposits[_chainId][address(this)] = currentSupply + _amount;
+
+        // Update the total supply of wrapped tokens
+        totalSupply += _amount;
+    }
+
+    // Function to withdraw tokens from the bridge
+    function withdraw(uint256 _amount) public {
+        // Check if the sender has enough wrapped tokens to withdraw
+        require(balanceOf(msg.sender) >= _amount, "Insufficient balance");
+
+        // Update the balance of the sender
+        balances[msg.sender] -= _amount;
+
+        // Update the total supply of wrapped tokens
+        totalSupply -= _amount;
+    }
+
+    // Function to get the balance of a specific token for a given address
+    function balanceOf(address _owner) public view returns (uint256) {
+        // Get the current supply of wrapped tokens for the specified chain
+        uint256 currentSupply = deposits[getChainId()][address(this)];
+
+        // Get the balance of the owner for the specified token
+        uint256 balance = currentSupply - _amount;
+
+        return balance;
+    }
+
+    // Function to get the total supply of wrapped tokens
+    function totalSupply() public view returns (uint256) {
+        return totalSupply;
+    }
+
+    // Function to get the chain id of the current chain
+    function getChainId() public view returns (uint256) {
+        return block.chainid;
+    }
+}

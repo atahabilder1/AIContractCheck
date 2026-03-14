@@ -1,0 +1,91 @@
+SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+contract Auction {
+
+    // The address of the admin account
+    address public admin;
+
+    // The address of the auction creator
+    address public creator;
+
+    // The current highest bidder
+    address public highestBidder;
+
+    // The current highest bid
+    uint public highestBid;
+
+    // The timestamp of the last bid
+    uint public lastBidTime;
+
+    // The minimum bid increase
+    uint public minBidIncrease;
+
+    // The auction end time
+    uint public endTime;
+
+    // Whether the auction is paused
+    bool public paused;
+
+    constructor(uint _minBidIncrease, uint _endTime) public {
+        admin = msg.sender;
+        creator = msg.sender;
+        minBidIncrease = _minBidIncrease;
+        endTime = _endTime;
+    }
+
+    // Function to withdraw all funds from the contract
+    function withdraw() external {
+        require(msg.sender == admin, "Only the admin can withdraw");
+        require(address(this).balance > 0, "The contract balance is 0");
+
+        uint balance = address(this).balance;
+        payable(admin).transfer(balance);
+    }
+
+    // Function to pause the auction
+    function pause() external {
+        require(msg.sender == admin, "Only the admin can pause");
+        paused = true;
+    }
+
+    // Function to resume the auction
+    function resume() external {
+        require(msg.sender == admin, "Only the admin can resume");
+        paused = false;
+    }
+
+    // Function to place a bid
+    function placeBid(uint _bid) external {
+        require(msg.sender != highestBidder, "The highest bidder cannot bid again");
+        require(_bid > highestBid, "The bid must be higher than the current highest bid");
+        require(_bid >= minBidIncrease, "The bid must be at least the minimum bid increase");
+        require(block.timestamp < endTime, "The auction has ended");
+
+        highestBid = _bid;
+        highestBidder = msg.sender;
+        lastBidTime = block.timestamp;
+    }
+
+    // Function to get the current highest bid
+    function getHighestBid() external view returns (uint) {
+        return highestBid;
+    }
+
+    // Function to get the current highest bidder
+    function getHighestBidder() external view returns (address) {
+        return highestBidder;
+    }
+
+    // Function to get the current auction state
+    function getAuctionState() external view returns (string memory) {
+        if (paused) {
+            return "paused";
+        } else if (block.timestamp >= endTime) {
+            return "ended";
+        } else {
+            return "active";
+        }
+    }
+}

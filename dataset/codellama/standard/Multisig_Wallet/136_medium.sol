@@ -1,0 +1,107 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultisigWallet {
+    address[] public owners;
+    uint public threshold;
+    mapping(address => bool) public isOwner;
+    mapping(address => uint) public ownerToIndex;
+    mapping(uint => Transaction) public transactionQueue;
+
+    struct Transaction {
+        address payable to;
+        uint amount;
+        bytes data;
+        bool executed;
+    }
+
+    event OwnerAdded(address indexed owner);
+    event OwnerRemoved(address indexed owner);
+    event TransactionQueued(uint indexed transactionId);
+    event TransactionExecuted(uint indexed transactionId);
+
+    constructor(address[] memory _owners, uint _threshold) {
+        require(_threshold > 0, "Threshold must be greater than 0");
+        require(_owners.length > 0, "At least one owner must be specified");
+
+        for (uint i = 0; i < _owners.length; i++) {
+            require(_owners[i] != address(0), "Owner cannot be the zero address");
+            require(!isOwner[_owners[i]], "Owner must be unique");
+
+            owners.push(_owners[i]);
+            isOwner[_owners[i]] = true;
+            ownerToIndex[_owners[i]] = i;
+
+            emit OwnerAdded(_owners[i]);
+        }
+
+        threshold = _threshold;
+    }
+
+    function addOwner(address _owner) public {
+        require(msg.sender == address(this), "Only the wallet can add owners");
+        require(_owner != address(0), "Owner cannot be the zero address");
+        require(!isOwner[_owner], "Owner must be unique");
+
+        owners.push(_owner);
+        isOwner[_owner] = true;
+        ownerToIndex[_owner] = owners.length - 1;
+
+        emit OwnerAdded(_owner);
+    }
+
+    function removeOwner(address _owner) public {
+        require(msg.sender == address(this), "Only the wallet can remove owners");
+        require(isOwner[_owner], "Owner must exist");
+
+        uint index = ownerToIndex[_owner];
+        address lastOwner = owners[owners.length - 1];
+
+        owners[index] = lastOwner;
+        isOwner[_owner] = false;
+        isOwner[lastOwner] = true;
+        ownerToIndex[lastOwner] = index;
+
+        owners.pop();
+
+        emit OwnerRemoved(_owner);
+    }
+
+    function queueTransaction(address payable _to, uint _amount, bytes memory _data) public returns (uint) {
+        require(msg.sender == address(this), "Only the wallet can queue transactions");
+
+        Transaction memory transaction = Transaction({
+            to: _to,
+            amount: _amount,
+            data: _data,
+            executed: false
+        });
+
+        uint transactionId = transactionQueue.length++;
+        transactionQueue[transactionId] = transaction;
+
+        emit TransactionQueued(transactionId);
+
+        return transactionId;
+    }
+
+    function executeTransaction(uint _transactionId) public {
+        require(msg.sender == address(this), "Only the wallet can execute transactions");
+        require(transactionQueue[_transactionId].executed == false, "Transaction has already been executed");
+
+        Transaction memory transaction = transactionQueue[_transactionId];
+        require(transaction.to.send(transaction.amount), "Transaction failed");
+
+        transactionQueue[_transactionId].executed = true;
+
+        emit TransactionExecuted(_transactionId);
+    }
+
+    function getTransactionCount() public view returns (uint) {
+        return transactionQueue.length;
+    }
+
+    function getTransaction(uint _transactionId) public view returns (Transaction memory) {
+        return transactionQueue[_transactionId];
+    }
+}

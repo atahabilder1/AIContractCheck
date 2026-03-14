@@ -1,0 +1,53 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Bridge {
+    // Mapping of ERC20 tokens to their corresponding fee structures
+    mapping(address => mapping(address => uint)) public tokenFees;
+
+    // Mapping of ETH transfers to their corresponding fee structures
+    mapping(address => uint) public ethFees;
+
+    // Mapping of chain IDs to their corresponding fee structures
+    mapping(uint => uint) public chainFees;
+
+    constructor() public {
+        // Initialize the fee structures for each token and chain
+        // ...
+    }
+
+    function transferToken(address token, address recipient, uint amount) public {
+        // Check if the token is valid
+        require(tokenFees[token][recipient] > 0, "Invalid token");
+
+        // Calculate the fee for the transfer
+        uint fee = tokenFees[token][recipient] * amount / 100;
+
+        // Transfer the tokens and pay the fee
+        Transfer(token, recipient, amount - fee);
+    }
+
+    function transferEth(address recipient, uint amount) public {
+        // Check if the recipient is valid
+        require(ethFees[recipient] > 0, "Invalid recipient");
+
+        // Calculate the fee for the transfer
+        uint fee = ethFees[recipient] * amount / 100;
+
+        // Transfer the ETH and pay the fee
+        Transfer(msg.sender, recipient, amount - fee);
+    }
+
+    function transferNative(address recipient, uint amount) public {
+        // Check if the recipient is valid
+        require(chainFees[msg.sender] > 0, "Invalid recipient");
+
+        // Calculate the fee for the transfer
+        uint fee = chainFees[msg.sender] * amount / 100;
+
+        // Transfer the native coins and pay the fee
+        Transfer(msg.sender, recipient, amount - fee);
+    }
+}
+```

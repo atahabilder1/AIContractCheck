@@ -1,0 +1,87 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Crowdfunding {
+    address payable public owner;
+    uint256 public goalAmount;
+    uint256 public deadline;
+    uint256 public totalRaised;
+    mapping(address => uint256) public contributions;
+    bool public goalReached = false;
+    bool public campaignClosed = false;
+
+    event Contribution(address indexed contributor, uint256 amount);
+    event Refund(address indexed contributor, uint256 amount);
+    event GoalReached(uint256 totalAmount);
+    event CampaignClosed();
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can call this function");
+        _;
+    }
+
+    modifier onlyBeforeDeadline() {
+        require(block.timestamp < deadline, "Campaign has already ended");
+        _;
+    }
+
+    modifier onlyAfterDeadline() {
+        require(block.timestamp >= deadline, "Campaign is still active");
+        _;
+    }
+
+    modifier onlyIfCampaignClosed() {
+        require(campaignClosed, "Campaign is not yet closed");
+        _;
+    }
+
+    constructor(uint256 _goalAmount, uint256 _durationInDays) {
+        owner = payable(msg.sender);
+        goalAmount = _goalAmount;
+        deadline = block.timestamp + (_durationInDays * 1 days);
+    }
+
+    function contribute() public payable onlyBeforeDeadline {
+        require(msg.value > 0, "Contribution must be greater than zero");
+        contributions[msg.sender] += msg.value;
+        totalRaised += msg.value;
+        emit Contribution(msg.sender, msg.value);
+    }
+
+    function checkGoalStatus() public {
+        if (block.timestamp >= deadline && !campaignClosed) {
+            if (totalRaised >= goalAmount) {
+                goalReached = true;
+                emit GoalReached(totalRaised);
+            }
+            campaignClosed = true;
+            emit CampaignClosed();
+        }
+    }
+
+    function withdrawFunds() public onlyOwner onlyAfterDeadline onlyIfCampaignClosed {
+        require(goalReached, "Goal not reached, funds will be refunded");
+        uint256 amountToWithdraw = address(this).balance;
+        require(amountToWithdraw > 0, "No funds to withdraw");
+        (bool success, ) = owner.call{value: amountToWithdraw}("");
+        require(success, "Withdrawal failed");
+    }
+
+    function refund() public onlyAfterDeadline onlyIfCampaignClosed {
+        require(!goalReached, "Goal was reached, no refunds");
+        uint256 refundAmount = contributions[msg.sender];
+        require(refundAmount > 0, "No contributions to refund");
+        contributions[msg.sender] = 0;
+        (bool success, ) = payable(msg.sender).call{value: refundAmount}("");
+        require(success, "Refund failed");
+        emit Refund(msg.sender, refundAmount);
+    }
+
+    receive() external payable {
+        contribute();
+    }
+
+    fallback() external payable {
+        contribute();
+    }
+}

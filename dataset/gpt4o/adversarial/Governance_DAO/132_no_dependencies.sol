@@ -1,0 +1,77 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleDAO {
+    struct Proposal {
+        string description;
+        uint256 voteCountYes;
+        uint256 voteCountNo;
+        uint256 endTime;
+        bool executed;
+    }
+
+    address public chairperson;
+    uint256 public proposalCount;
+    mapping(uint256 => Proposal) public proposals;
+    mapping(address => mapping(uint256 => bool)) public hasVoted;
+
+    event ProposalCreated(uint256 proposalId, string description, uint256 endTime);
+    event Voted(uint256 proposalId, address voter, bool support);
+    event ProposalExecuted(uint256 proposalId, bool success);
+
+    modifier onlyChairperson() {
+        require(msg.sender == chairperson, "Only chairperson can call this function");
+        _;
+    }
+
+    modifier activeProposal(uint256 proposalId) {
+        require(block.timestamp < proposals[proposalId].endTime, "Proposal voting period has ended");
+        _;
+    }
+
+    modifier inactiveProposal(uint256 proposalId) {
+        require(block.timestamp >= proposals[proposalId].endTime, "Proposal voting period is still active");
+        require(!proposals[proposalId].executed, "Proposal already executed");
+        _;
+    }
+
+    constructor() {
+        chairperson = msg.sender;
+    }
+
+    function createProposal(string memory description, uint256 votingPeriod) public onlyChairperson {
+        require(votingPeriod > 0, "Voting period must be greater than zero");
+        uint256 endTime = block.timestamp + votingPeriod;
+        proposals[proposalCount] = Proposal({
+            description: description,
+            voteCountYes: 0,
+            voteCountNo: 0,
+            endTime: endTime,
+            executed: false
+        });
+        emit ProposalCreated(proposalCount, description, endTime);
+        proposalCount++;
+    }
+
+    function vote(uint256 proposalId, bool support) public activeProposal(proposalId) {
+        require(!hasVoted[msg.sender][proposalId], "You have already voted on this proposal");
+        
+        hasVoted[msg.sender][proposalId] = true;
+
+        if (support) {
+            proposals[proposalId].voteCountYes++;
+        } else {
+            proposals[proposalId].voteCountNo++;
+        }
+
+        emit Voted(proposalId, msg.sender, support);
+    }
+
+    function executeProposal(uint256 proposalId) public inactiveProposal(proposalId) {
+        Proposal storage proposal = proposals[proposalId];
+        proposal.executed = true;
+
+        bool success = proposal.voteCountYes > proposal.voteCountNo;
+        emit ProposalExecuted(proposalId, success);
+    }
+}

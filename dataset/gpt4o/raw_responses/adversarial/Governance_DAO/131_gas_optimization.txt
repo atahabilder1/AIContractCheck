@@ -1,0 +1,55 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+contract GasOptimizedDAO {
+    struct Proposal {
+        uint256 id;
+        string description;
+        uint256 voteCount;
+        bool executed;
+    }
+
+    address public owner;
+    uint256 public proposalCount;
+    mapping(uint256 => Proposal) public proposals;
+    mapping(uint256 => mapping(address => bool)) public votes;
+
+    event ProposalCreated(uint256 indexed id, string description);
+    event Voted(uint256 indexed proposalId, address indexed voter);
+    event Executed(uint256 indexed proposalId);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function createProposal(string calldata description) external onlyOwner {
+        proposals[proposalCount] = Proposal(proposalCount, description, 0, false);
+        emit ProposalCreated(proposalCount, description);
+        proposalCount++;
+    }
+
+    function vote(uint256 proposalId) external {
+        Proposal storage proposal = proposals[proposalId];
+        require(!votes[proposalId][msg.sender], "Already voted");
+        require(!proposal.executed, "Already executed");
+
+        votes[proposalId][msg.sender] = true;
+        proposal.voteCount++;
+        emit Voted(proposalId, msg.sender);
+    }
+
+    function executeProposal(uint256 proposalId) external onlyOwner {
+        Proposal storage proposal = proposals[proposalId];
+        require(!proposal.executed, "Already executed");
+
+        proposal.executed = true;
+        emit Executed(proposalId);
+    }
+}
+```

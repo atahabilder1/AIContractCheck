@@ -1,0 +1,30 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract WrappedToken is ERC20, ERC20Permit, ReentrancyGuard {
+    constructor() ERC20("WrappedToken", "WTT") ERC20Permit("WrappedToken") {
+        // Initialization code
+    }
+
+    function deposit(uint256 amount) external nonReentrant {
+        _mint(msg.sender, amount);
+        // Transfer the tokens to the contract
+    }
+
+    function withdraw(uint256 amount) external nonReentrant {
+        _burn(msg.sender, amount);
+        // Transfer the tokens back to the user
+    }
+
+    function flashMint(uint256 amount) external nonReentrant {
+        // Mint the requested amount to the caller
+        _mint(msg.sender, amount);
+        // Transfer the tokens to the caller
+    }
+}
+```

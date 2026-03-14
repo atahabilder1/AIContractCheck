@@ -1,0 +1,150 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+contract LPToken is ERC20 {
+    address public pool;
+
+    modifier onlyPool() {
+        require(msg.sender == pool, "Only pool");
+        _;
+    }
+
+    constructor() ERC20("AMM LP Token", "LP") {
+        pool = msg.sender;
+    }
+
+    function mint(address to, uint256 amount) external onlyPool {
+        _mint(to, amount);
+    }
+
+    function burn(address from, uint256 amount) external onlyPool {
+        _burn(from, amount);
+    }
+}
+
+contract SimpleAMM is ReentrancyGuard {
+    IERC20 public immutable tokenA;
+    IERC20 public immutable tokenB;
+    LPToken public immutable lpToken;
+
+    uint256 public reserveA;
+    uint256 public reserveB;
+
+    uint256 public constant FEE_NUMERATOR = 3;
+    uint256 public constant FEE_DENOMINATOR = 1000;
+
+    event LiquidityAdded(address indexed provider, uint256 amountA, uint256 amountB, uint256 lpMinted);
+    event LiquidityRemoved(address indexed provider, uint256 amountA, uint256 amountB, uint256 lpBurned);
+    event Swap(address indexed user, address indexed tokenIn, uint256 amountIn, uint256 amountOut);
+
+    constructor(address _tokenA, address _tokenB) {
+        require(_tokenA != _tokenB, "Identical tokens");
+        tokenA = IERC20(_tokenA);
+        tokenB = IERC20(_tokenB);
+        lpToken = new LPToken();
+    }
+
+    function addLiquidity(uint256 amountA, uint256 amountB) external nonReentrant returns (uint256 lpMinted) {
+        require(amountA > 0 && amountB > 0, "Zero amount");
+
+        if (reserveA == 0 && reserveB == 0) {
+            lpMinted = _sqrt(amountA * amountB);
+        } else {
+            uint256 lpFromA = (amountA * lpToken.totalSupply()) / reserveA;
+            uint256 lpFromB = (amountB * lpToken.totalSupply()) / reserveB;
+            lpMinted = lpFromA < lpFromB ? lpFromA : lpFromB;
+        }
+
+        require(lpMinted > 0, "Insufficient liquidity minted");
+
+        tokenA.transferFrom(msg.sender, address(this), amountA);
+        tokenB.transferFrom(msg.sender, address(this), amountB);
+
+        reserveA += amountA;
+        reserveB += amountB;
+
+        lpToken.mint(msg.sender, lpMinted);
+        emit LiquidityAdded(msg.sender, amountA, amountB, lpMinted);
+    }
+
+    function removeLiquidity(uint256 lpAmount) external nonReentrant returns (uint256 amountA, uint256 amountB) {
+        require(lpAmount > 0, "Zero amount");
+        uint256 totalSupply = lpToken.totalSupply();
+
+        amountA = (lpAmount * reserveA) / totalSupply;
+        amountB = (lpAmount * reserveB) / totalSupply;
+        require(amountA > 0 && amountB > 0, "Insufficient liquidity burned");
+
+        lpToken.burn(msg.sender, lpAmount);
+
+        reserveA -= amountA;
+        reserveB -= amountB;
+
+        tokenA.transfer(msg.sender, amountA);
+        tokenB.transfer(msg.sender, amountB);
+
+        emit LiquidityRemoved(msg.sender, amountA, amountB, lpAmount);
+    }
+
+    function swapAForB(uint256 amountIn) external nonReentrant returns (uint256 amountOut) {
+        amountOut = _swap(tokenA, tokenB, amountIn, reserveA, reserveB);
+        reserveA += amountIn;
+        reserveB -= amountOut;
+    }
+
+    function swapBForA(uint256 amountIn) external nonReentrant returns (uint256 amountOut) {
+        amountOut = _swap(tokenB, tokenA, amountIn, reserveB, reserveA);
+        reserveB += amountIn;
+        reserveA -= amountOut;
+    }
+
+    function _swap(
+        IERC20 tokenIn,
+        IERC20 tokenOut,
+        uint256 amountIn,
+        uint256 reserveIn,
+        uint256 reserveOut
+    ) internal returns (uint256 amountOut) {
+        require(amountIn > 0, "Zero amount");
+        require(reserveIn > 0 && reserveOut > 0, "No liquidity");
+
+        uint256 amountInWithFee = amountIn * (FEE_DENOMINATOR - FEE_NUMERATOR);
+        amountOut = (amountInWithFee * reserveOut) / (reserveIn * FEE_DENOMINATOR + amountInWithFee);
+        require(amountOut > 0, "Insufficient output");
+
+        tokenIn.transferFrom(msg.sender, address(this), amountIn);
+        tokenOut.transfer(msg.sender, amountOut);
+
+        emit Swap(msg.sender, address(tokenIn), amountIn, amountOut);
+    }
+
+    function getAmountOut(uint256 amountIn, uint256 resIn, uint256 resOut) external pure returns (uint256) {
+        uint256 amountInWithFee = amountIn * (FEE_DENOMINATOR - FEE_NUMERATOR);
+        return (amountInWithFee * resOut) / (resIn * FEE_DENOMINATOR + amountInWithFee);
+    }
+
+    function getReserves() external view returns (uint256, uint256) {
+        return (reserveA, reserveB);
+    }
+
+    function _sqrt(uint256 y) internal pure returns (uint256 z) {
+        if (y > 3) {
+            z = y;
+            uint256 x = y / 2 + 1;
+            while (x < z) {
+                z = x;
+                x = (y / x + x) / 2;
+            }
+        } else if (y != 0) {
+            z = 1;
+        }
+    }
+}
+```
+
+Constant-product AMM (x*y=k) with 0.3% swap fee, LP token minting/burning, and reentrancy protection. Deploy with two ERC20 token addresses.

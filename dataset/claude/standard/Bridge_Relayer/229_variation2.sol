@@ -1,0 +1,296 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract BridgeRelayer {
+    struct Message {
+        uint256 id;
+        address sender;
+        uint256 destinationChainId;
+        bytes payload;
+        uint256 fee;
+        uint256 timestamp;
+        MessageStatus status;
+        address assignedRelayer;
+        uint256 value;
+    }
+
+    struct RelayerBid {
+        address relayer;
+        uint256 bidAmount;
+        uint256 timestamp;
+    }
+
+    enum MessageStatus {
+        Pending,
+        Bidding,
+        Assigned,
+        Completed,
+        Cancelled
+    }
+
+    uint256 public nextMessageId;
+    uint256 public biddingDuration = 1 hours;
+    uint256 public highValueThreshold = 1 ether;
+    uint256 public minRelayerStake = 0.5 ether;
+
+    address public owner;
+
+    mapping(uint256 => Message) public messages;
+    mapping(uint256 => RelayerBid[]) public messageBids;
+    mapping(uint256 => RelayerBid) public winningBids;
+    mapping(address => uint256) public relayerStakes;
+    mapping(address => bool) public registeredRelayers;
+    mapping(address => uint256) public relayerCompletedCount;
+
+    uint256[] public pendingQueue;
+    uint256[] public biddingQueue;
+
+    event MessageSubmitted(uint256 indexed messageId, address indexed sender, uint256 fee, uint256 value);
+    event BiddingOpened(uint256 indexed messageId);
+    event BidPlaced(uint256 indexed messageId, address indexed relayer, uint256 bidAmount);
+    event RelayerAssigned(uint256 indexed messageId, address indexed relayer);
+    event MessageCompleted(uint256 indexed messageId, address indexed relayer);
+    event MessageCancelled(uint256 indexed messageId);
+    event RelayerRegistered(address indexed relayer, uint256 stake);
+    event RelayerWithdrawn(address indexed relayer, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier onlyRegisteredRelayer() {
+        require(registeredRelayers[msg.sender], "Not registered relayer");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function registerRelayer() external payable {
+        require(msg.value >= minRelayerStake, "Insufficient stake");
+        require(!registeredRelayers[msg.sender], "Already registered");
+
+        registeredRelayers[msg.sender] = true;
+        relayerStakes[msg.sender] = msg.value;
+
+        emit RelayerRegistered(msg.sender, msg.value);
+    }
+
+    function unregisterRelayer() external onlyRegisteredRelayer {
+        uint256 stake = relayerStakes[msg.sender];
+        relayerStakes[msg.sender] = 0;
+        registeredRelayers[msg.sender] = false;
+
+        (bool success, ) = msg.sender.call{value: stake}("");
+        require(success, "Transfer failed");
+
+        emit RelayerWithdrawn(msg.sender, stake);
+    }
+
+    function submitMessage(
+        uint256 destinationChainId,
+        bytes calldata payload
+    ) external payable {
+        require(msg.value > 0, "Fee required");
+
+        uint256 messageId = nextMessageId++;
+        uint256 fee = msg.value;
+        uint256 transferValue = 0;
+
+        if (payload.length >= 32) {
+            transferValue = abi.decode(payload, (uint256));
+        }
+
+        messages[messageId] = Message({
+            id: messageId,
+            sender: msg.sender,
+            destinationChainId: destinationChainId,
+            payload: payload,
+            fee: fee,
+            timestamp: block.timestamp,
+            status: MessageStatus.Pending,
+            assignedRelayer: address(0),
+            value: transferValue
+        });
+
+        if (fee >= highValueThreshold) {
+            messages[messageId].status = MessageStatus.Bidding;
+            biddingQueue.push(messageId);
+            emit BiddingOpened(messageId);
+        } else {
+            pendingQueue.push(messageId);
+        }
+
+        emit MessageSubmitted(messageId, msg.sender, fee, transferValue);
+    }
+
+    function bidOnMessage(uint256 messageId, uint256 bidAmount) external onlyRegisteredRelayer {
+        Message storage msg_ = messages[messageId];
+        require(msg_.status == MessageStatus.Bidding, "Not in bidding");
+        require(block.timestamp <= msg_.timestamp + biddingDuration, "Bidding ended");
+        require(bidAmount <= msg_.fee, "Bid exceeds fee");
+
+        messageBids[messageId].push(RelayerBid({
+            relayer: msg.sender,
+            bidAmount: bidAmount,
+            timestamp: block.timestamp
+        }));
+
+        emit BidPlaced(messageId, msg.sender, bidAmount);
+    }
+
+    function finalizeBidding(uint256 messageId) external {
+        Message storage msg_ = messages[messageId];
+        require(msg_.status == MessageStatus.Bidding, "Not in bidding");
+        require(block.timestamp > msg_.timestamp + biddingDuration, "Bidding not ended");
+
+        RelayerBid[] storage bids = messageBids[messageId];
+        require(bids.length > 0, "No bids");
+
+        uint256 lowestBid = type(uint256).max;
+        address winner = address(0);
+
+        for (uint256 i = 0; i < bids.length; i++) {
+            if (bids[i].bidAmount < lowestBid) {
+                lowestBid = bids[i].bidAmount;
+                winner = bids[i].relayer;
+            }
+        }
+
+        winningBids[messageId] = RelayerBid({
+            relayer: winner,
+            bidAmount: lowestBid,
+            timestamp: block.timestamp
+        });
+
+        msg_.status = MessageStatus.Assigned;
+        msg_.assignedRelayer = winner;
+
+        _removeFromBiddingQueue(messageId);
+
+        emit RelayerAssigned(messageId, winner);
+    }
+
+    function claimPendingMessage(uint256 messageId) external onlyRegisteredRelayer {
+        Message storage msg_ = messages[messageId];
+        require(msg_.status == MessageStatus.Pending, "Not pending");
+
+        msg_.status = MessageStatus.Assigned;
+        msg_.assignedRelayer = msg.sender;
+
+        _removeFromPendingQueue(messageId);
+
+        emit RelayerAssigned(messageId, msg.sender);
+    }
+
+    function completeMessage(uint256 messageId, bytes calldata proof) external {
+        Message storage msg_ = messages[messageId];
+        require(msg_.status == MessageStatus.Assigned, "Not assigned");
+        require(msg_.assignedRelayer == msg.sender, "Not assigned relayer");
+        require(proof.length > 0, "Proof required");
+
+        msg_.status = MessageStatus.Completed;
+        relayerCompletedCount[msg.sender]++;
+
+        uint256 payout;
+        if (winningBids[messageId].relayer != address(0)) {
+            payout = winningBids[messageId].bidAmount;
+            uint256 refund = msg_.fee - payout;
+            if (refund > 0) {
+                (bool refundSuccess, ) = msg_.sender.call{value: refund}("");
+                require(refundSuccess, "Refund failed");
+            }
+        } else {
+            payout = msg_.fee;
+        }
+
+        (bool success, ) = msg.sender.call{value: payout}("");
+        require(success, "Payout failed");
+
+        emit MessageCompleted(messageId, msg.sender);
+    }
+
+    function cancelMessage(uint256 messageId) external {
+        Message storage msg_ = messages[messageId];
+        require(msg_.sender == msg.sender, "Not message sender");
+        require(
+            msg_.status == MessageStatus.Pending ||
+            (msg_.status == MessageStatus.Bidding && messageBids[messageId].length == 0),
+            "Cannot cancel"
+        );
+
+        msg_.status = MessageStatus.Cancelled;
+
+        if (msg_.fee > 0) {
+            (bool success, ) = msg.sender.call{value: msg_.fee}("");
+            require(success, "Refund failed");
+        }
+
+        emit MessageCancelled(messageId);
+    }
+
+    function getPendingByFee() external view returns (uint256[] memory) {
+        uint256[] memory sorted = new uint256[](pendingQueue.length);
+        for (uint256 i = 0; i < pendingQueue.length; i++) {
+            sorted[i] = pendingQueue[i];
+        }
+
+        for (uint256 i = 0; i < sorted.length; i++) {
+            for (uint256 j = i + 1; j < sorted.length; j++) {
+                if (messages[sorted[j]].fee > messages[sorted[i]].fee) {
+                    uint256 temp = sorted[i];
+                    sorted[i] = sorted[j];
+                    sorted[j] = temp;
+                }
+            }
+        }
+
+        return sorted;
+    }
+
+    function getBidsForMessage(uint256 messageId) external view returns (RelayerBid[] memory) {
+        return messageBids[messageId];
+    }
+
+    function getBiddingQueueLength() external view returns (uint256) {
+        return biddingQueue.length;
+    }
+
+    function getPendingQueueLength() external view returns (uint256) {
+        return pendingQueue.length;
+    }
+
+    function setBiddingDuration(uint256 duration) external onlyOwner {
+        biddingDuration = duration;
+    }
+
+    function setHighValueThreshold(uint256 threshold) external onlyOwner {
+        highValueThreshold = threshold;
+    }
+
+    function setMinRelayerStake(uint256 stake) external onlyOwner {
+        minRelayerStake = stake;
+    }
+
+    function _removeFromPendingQueue(uint256 messageId) internal {
+        for (uint256 i = 0; i < pendingQueue.length; i++) {
+            if (pendingQueue[i] == messageId) {
+                pendingQueue[i] = pendingQueue[pendingQueue.length - 1];
+                pendingQueue.pop();
+                break;
+            }
+        }
+    }
+
+    function _removeFromBiddingQueue(uint256 messageId) internal {
+        for (uint256 i = 0; i < biddingQueue.length; i++) {
+            if (biddingQueue[i] == messageId) {
+                biddingQueue[i] = biddingQueue[biddingQueue.length - 1];
+                biddingQueue.pop();
+                break;
+            }
+        }
+    }
+}

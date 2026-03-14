@@ -1,0 +1,84 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract StakingPool {
+    struct Stake {
+        uint256 amount;
+        uint256 startTime;
+        uint256 duration;
+        bool isActive;
+    }
+
+    mapping(address => Stake) public stakes;
+    mapping(uint256 => uint256) public rewardRates;
+    uint256 public totalStaked;
+
+    event Staked(address indexed user, uint256 amount, uint256 duration);
+    event Withdrawn(address indexed user, uint256 amount);
+    event RewardPaid(address indexed user, uint256 reward);
+
+    constructor() {
+        rewardRates[30 days] = 5; // 5% for 30 days
+        rewardRates[90 days] = 8; // 8% for 90 days
+        rewardRates[180 days] = 10; // 10% for 180 days
+    }
+
+    function stake(uint256 amount, uint256 duration) public {
+        require(amount > 0, "Amount must be greater than zero");
+        require(rewardRates[duration] > 0, "Invalid duration");
+
+        if (stakes[msg.sender].isActive) {
+            uint256 reward = calculateReward(msg.sender);
+            if (reward > 0) {
+                payable(msg.sender).transfer(reward);
+                emit RewardPaid(msg.sender, reward);
+            }
+        }
+
+        stakes[msg.sender] = Stake({
+            amount: amount,
+            startTime: block.timestamp,
+            duration: duration,
+            isActive: true
+        });
+
+        totalStaked += amount;
+        emit Staked(msg.sender, amount, duration);
+    }
+
+    function withdraw() public {
+        Stake storage stake = stakes[msg.sender];
+        require(stake.isActive, "No active stake");
+        require(block.timestamp >= stake.startTime + stake.duration, "Withdrawal too early");
+
+        uint256 reward = calculateReward(msg.sender);
+        if (reward > 0) {
+            payable(msg.sender).transfer(reward);
+            emit RewardPaid(msg.sender, reward);
+        }
+
+        uint256 penalty = stake.amount * 15 / 1000; // 1.5% penalty for early withdrawal
+        uint256 amount = stake.amount - penalty;
+        payable(msg.sender).transfer(amount);
+
+        stake.isActive = false;
+        totalStaked -= stake.amount;
+        emit Withdrawn(msg.sender, amount);
+    }
+
+    function calculateReward(address user) internal view returns (uint256) {
+        Stake memory stake = stakes[user];
+        if (!stake.isActive) {
+            return 0;
+        }
+
+        uint256 timeElapsed = block.timestamp - stake.startTime;
+        if (timeElapsed < stake.duration) {
+            return 0;
+        }
+
+        uint256 rewardRate = rewardRates[stake.duration];
+        uint256 reward = stake.amount * rewardRate / 100;
+        return reward;
+    }
+}

@@ -1,0 +1,118 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract SimpleAMM {
+    IERC20 public tokenA;
+    IERC20 public tokenB;
+
+    // Stores reserves of tokenA and tokenB
+    uint256 public reserveA;
+    uint256 public reserveB;
+
+    // Price impact is implicitly handled by the constant product formula
+    // k = reserveA * reserveB
+
+    event Swap(address indexed sender, address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut);
+    event AddLiquidity(address indexed provider, uint256 amountA, uint256 amountB);
+    event RemoveLiquidity(address indexed provider, uint256 amountA, uint256 amountB);
+
+    constructor(address _tokenA, address _tokenB) {
+        tokenA = IERC20(_tokenA);
+        tokenB = IERC20(_tokenB);
+    }
+
+    // Function to add liquidity to the pool
+    function addLiquidity(uint256 _amountA, uint256 _amountB) public {
+        require(_amountA > 0 && _amountB > 0, "Amounts must be greater than 0");
+
+        // Transfer tokens from the user to the contract
+        require(tokenA.transferFrom(msg.sender, address(this), _amountA), "Failed to transfer tokenA");
+        require(tokenB.transferFrom(msg.sender, address(this), _amountB), "Failed to transfer tokenB");
+
+        // Update reserves
+        reserveA += _amountA;
+        reserveB += _amountB;
+
+        emit AddLiquidity(msg.sender, _amountA, _amountB);
+    }
+
+    // Function to remove liquidity from the pool
+    function removeLiquidity(uint256 _amountA, uint256 _amountB) public {
+        require(_amountA > 0 && _amountB > 0, "Amounts must be greater than 0");
+        require(_amountA <= reserveA, "Insufficient tokenA in reserve");
+        require(_amountB <= reserveB, "Insufficient tokenB in reserve");
+
+        // Check if the ratio of removed liquidity matches the current pool ratio
+        // This is a simplified approach, real AMMs often use LP tokens for proportional withdrawal
+        uint256 currentRatio = (reserveA * 1e18) / reserveB; // Using 1e18 for precision
+        uint256 requestedRatio = (_amountA * 1e18) / _amountB;
+
+        require(currentRatio == requestedRatio, "Liquidity removal ratio mismatch");
+
+        // Update reserves
+        reserveA -= _amountA;
+        reserveB -= _amountB;
+
+        // Transfer tokens back to the user
+        require(tokenA.transfer(msg.sender, _amountA), "Failed to transfer tokenA");
+        require(tokenB.transfer(msg.sender, _amountB), "Failed to transfer tokenB");
+
+        emit RemoveLiquidity(msg.sender, _amountA, _amountB);
+    }
+
+    // Function to swap tokenA for tokenB
+    function swapAToB(uint256 _amountIn) public {
+        require(_amountIn > 0, "Amount in must be greater than 0");
+        require(_amountIn <= reserveA, "Insufficient tokenA in reserve for swap");
+
+        // Calculate amount out using the constant product formula: k = reserveA * reserveB
+        // New amount out = (reserveB * amountIn) / (reserveA + amountIn)
+        uint256 amountOut = (_amountIn * reserveB) / (reserveA + _amountIn);
+        require(amountOut > 0, "Swap resulted in zero amount out");
+
+        // Update reserves
+        reserveA += _amountIn;
+        reserveB -= amountOut;
+
+        // Transfer tokens
+        require(tokenA.transferFrom(msg.sender, address(this), _amountIn), "Failed to transfer tokenA");
+        require(tokenB.transfer(msg.sender, amountOut), "Failed to transfer tokenB");
+
+        emit Swap(msg.sender, address(tokenA), address(tokenB), _amountIn, amountOut);
+    }
+
+    // Function to swap tokenB for tokenA
+    function swapBToA(uint256 _amountIn) public {
+        require(_amountIn > 0, "Amount in must be greater than 0");
+        require(_amountIn <= reserveB, "Insufficient tokenB in reserve for swap");
+
+        // Calculate amount out using the constant product formula: k = reserveA * reserveB
+        // New amount out = (reserveA * amountIn) / (reserveB + amountIn)
+        uint256 amountOut = (_amountIn * reserveA) / (reserveB + _amountIn);
+        require(amountOut > 0, "Swap resulted in zero amount out");
+
+        // Update reserves
+        reserveB += _amountIn;
+        reserveA -= amountOut;
+
+        // Transfer tokens
+        require(tokenB.transferFrom(msg.sender, address(this), _amountIn), "Failed to transfer tokenB");
+        require(tokenA.transfer(msg.sender, amountOut), "Failed to transfer tokenA");
+
+        emit Swap(msg.sender, address(tokenB), address(tokenA), _amountIn, amountOut);
+    }
+
+    // Get the current price of tokenA in terms of tokenB
+    function getPriceAInB() public view returns (uint256) {
+        require(reserveB > 0, "No tokenB in reserve");
+        return (reserveA * 1e18) / reserveB; // Using 1e18 for precision
+    }
+
+    // Get the current price of tokenB in terms of tokenA
+    function getPriceBInA() public view returns (uint256) {
+        require(reserveA > 0, "No tokenA in reserve");
+        return (reserveB * 1e18) / reserveA; // Using 1e18 for precision
+    }
+}

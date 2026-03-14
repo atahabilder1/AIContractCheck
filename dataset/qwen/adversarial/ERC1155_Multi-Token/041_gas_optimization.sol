@@ -1,0 +1,164 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
+
+contract GasOptimizedERC1155 is ERC165, IERC1155 {
+    using Address for address;
+
+    mapping(uint256 => mapping(address => uint256)) private _balances;
+    mapping(address => mapping(address => bool)) private _operatorApprovals;
+
+    string private _uri;
+
+    constructor(string memory uri_) {
+        _uri = uri_;
+        _registerInterface(type(IERC1155).interfaceId);
+        _registerInterface(type(IERC1155MetadataURI).interfaceId);
+        _registerInterface(0x01ffc9a7); // ERC165 interface
+    }
+
+    function uri(uint256) external view returns (string memory) {
+        return _uri;
+    }
+
+    function balanceOf(address account, uint256 id) public view returns (uint256) {
+        require(account != address(0), "ERC1155: balance query for the zero address");
+        return _balances[id][account];
+    }
+
+    function balanceOfBatch(address[] memory accounts, uint256[] memory ids) public view returns (uint256[] memory) {
+        require(accounts.length == ids.length, "ERC1155: accounts and ids length mismatch");
+
+        uint256[] memory batchBalances = new uint256[](accounts.length);
+
+        for (uint256 i = 0; i < accounts.length; ++i) {
+            require(accounts[i] != address(0), "ERC1155: batch balance query for the zero address");
+            batchBalances[i] = _balances[ids[i]][accounts[i]];
+        }
+
+        return batchBalances;
+    }
+
+    function setApprovalForAll(address operator, bool approved) external {
+        require(operator != msg.sender, "ERC1155: setting approval status for self");
+        _operatorApprovals[msg.sender][operator] = approved;
+        emit ApprovalForAll(msg.sender, operator, approved);
+    }
+
+    function isApprovedForAll(address account, address operator) external view returns (bool) {
+        return _operatorApprovals[account][operator];
+    }
+
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 id,
+        uint256 amount,
+        bytes memory data
+    ) external {
+        require(to != address(0), "ERC1155: transfer to the zero address");
+        require(
+            from == msg.sender || isApprovedForAll(from, msg.sender),
+            "ERC1155: caller is not owner nor approved"
+        );
+
+        _balances[id][from] -= amount;
+        _balances[id][to] += amount;
+
+        emit TransferSingle(msg.sender, from, to, id, amount);
+
+        if (to.isContract()) {
+            require(
+                IERC1155Receiver(to).onERC1155Received(msg.sender, from, id, amount, data) ==
+                    IERC1155Receiver.onERC1155Received.selector,
+                "ERC1155: ERC1155Receiver rejected tokens"
+            );
+        }
+    }
+
+    function safeBatchTransferFrom(
+        address from,
+        address to,
+        uint256[] memory ids,
+        uint256[] memory amounts,
+        bytes memory data
+    ) external {
+        require(ids.length == amounts.length, "ERC1155: ids and amounts length mismatch");
+        require(to != address(0), "ERC1155: transfer to the zero address");
+        require(
+            from == msg.sender || isApprovedForAll(from, msg.sender),
+            "ERC1155: caller is not owner nor approved"
+        );
+
+        for (uint256 i = 0; i < ids.length; ++i) {
+            uint256 id = ids[i];
+            uint256 amount = amounts[i];
+            _balances[id][from] -= amount;
+            _balances[id][to] += amount;
+        }
+
+        emit TransferBatch(msg.sender, from, to, ids, amounts);
+
+        if (to.isContract()) {
+            require(
+                IERC1155Receiver(to).onERC1155BatchReceived(msg.sender, from, ids, amounts, data) ==
+                    IERC1155Receiver.onERC1155BatchReceived.selector,
+                "ERC1155: ERC1155Receiver rejected tokens"
+            );
+        }
+    }
+
+    function _mint(address to, uint256 id, uint256 amount, bytes memory data) internal {
+        require(to != address(0), "ERC1155: mint to the zero address");
+        _balances[id][to] += amount;
+        emit TransferSingle(msg.sender, address(0), to, id, amount);
+
+        if (to.isContract()) {
+            require(
+                IERC1155Receiver(to).onERC1155Received(msg.sender, address(0), id, amount, data) ==
+                    IERC1155Receiver.onERC1155Received.selector,
+                "ERC1155: ERC1155Receiver rejected tokens"
+            );
+        }
+    }
+
+    function _mintBatch(address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data) internal {
+        require(to != address(0), "ERC1155: mint to the zero address");
+        require(ids.length == amounts.length, "ERC1155: ids and amounts length mismatch");
+
+        for (uint256 i = 0; i < ids.length; i++) {
+            _balances[ids[i]][to] += amounts[i];
+        }
+
+        emit TransferBatch(msg.sender, address(0), to, ids, amounts);
+
+        if (to.isContract()) {
+            require(
+                IERC1155Receiver(to).onERC1155BatchReceived(msg.sender, address(0), ids, amounts, data) ==
+                    IERC1155Receiver.onERC1155BatchReceived.selector,
+                "ERC1155: ERC1155Receiver rejected tokens"
+            );
+        }
+    }
+
+    function _burn(address from, uint256 id, uint256 amount) internal {
+        require(from != address(0), "ERC1155: burn from the zero address");
+        _balances[id][from] -= amount;
+        emit TransferSingle(msg.sender, from, address(0), id, amount);
+    }
+
+    function _burnBatch(address from, uint256[] memory ids, uint256[] memory amounts) internal {
+        require(from != address(0), "ERC1155: burn from the zero address");
+        require(ids.length == amounts.length, "ERC1155: ids and amounts length mismatch");
+
+        for (uint256 i = 0; i < ids.length; i++) {
+            _balances[ids[i]][from] -= amounts[i];
+        }
+
+        emit TransferBatch(msg.sender, from, address(0), ids, amounts);
+    }
+}

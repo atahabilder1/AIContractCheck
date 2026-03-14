@@ -1,0 +1,77 @@
+
+SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+contract DeFiDEX {
+
+    mapping(address => mapping(address => uint256)) public balances;
+    mapping(address => mapping(address => uint256)) public reserves;
+    mapping(address => mapping(address => uint256)) public supply;
+
+    event Deposit(address indexed from, address indexed to, uint256 amount);
+    event Withdrawal(address indexed from, address indexed to, uint256 amount);
+    event Swap(address indexed from, address indexed to, uint256 amount);
+
+    function deposit(address tokenA, address tokenB, uint256 amount) public {
+        require(amount > 0, "Invalid amount");
+
+        balances[tokenA][tokenB] += amount;
+        reserves[tokenA][tokenB] += amount;
+
+        emit Deposit(msg.sender, tokenA, amount);
+        emit Deposit(msg.sender, tokenB, amount);
+    }
+
+    function withdraw(address tokenA, address tokenB, uint256 amount) public {
+        require(amount > 0, "Invalid amount");
+
+        balances[tokenA][tokenB] -= amount;
+        reserves[tokenA][tokenB] -= amount;
+
+        emit Withdrawal(msg.sender, tokenA, amount);
+        emit Withdrawal(msg.sender, tokenB, amount);
+    }
+
+    function swap(address tokenA, address tokenB, uint256 amount) public {
+        require(amount > 0, "Invalid amount");
+
+        uint256 balanceA = balances[tokenA][tokenB];
+        uint256 balanceB = balances[tokenB][tokenA];
+
+        uint256 reserveA = reserves[tokenA][tokenB];
+        uint256 reserveB = reserves[tokenB][tokenA];
+
+        uint256 supplyA = supply[tokenA][tokenB];
+        uint256 supplyB = supply[tokenB][tokenA];
+
+        uint256 amountA = (amount * balanceA) / reserveA;
+        uint256 amountB = (amount * balanceB) / reserveB;
+
+        if (amountA > 0 && amountB > 0) {
+            balances[tokenA][tokenB] -= amountA;
+            balances[tokenB][tokenA] -= amountB;
+
+            reserves[tokenA][tokenB] -= amountA;
+            reserves[tokenB][tokenA] -= amountB;
+
+            supply[tokenA][tokenB] += amountA;
+            supply[tokenB][tokenA] += amountB;
+
+            emit Swap(msg.sender, tokenA, amountA);
+            emit Swap(msg.sender, tokenB, amountB);
+        }
+    }
+
+    function getBalance(address tokenA, address tokenB) public view returns (uint256) {
+        return balances[tokenA][tokenB];
+    }
+
+    function getReserve(address tokenA, address tokenB) public view returns (uint256) {
+        return reserves[tokenA][tokenB];
+    }
+
+    function getSupply(address tokenA, address tokenB) public view returns (uint256) {
+        return supply[tokenA][tokenB];
+    }
+}

@@ -1,0 +1,257 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrowdfundingICO {
+    address public owner;
+    string public projectName;
+    uint256 public goalAmount;
+    uint256 public deadline;
+    uint256 public totalRaised;
+    uint256 public tokenPrice;
+    uint256 public totalTokensSold;
+    bool public finalized;
+    bool public goalReached;
+
+    string public tokenName;
+    string public tokenSymbol;
+    uint8 public tokenDecimals = 18;
+    uint256 public tokenTotalSupply;
+
+    mapping(address => uint256) public contributions;
+    mapping(address => uint256) public tokenBalances;
+    mapping(address => mapping(address => uint256)) public tokenAllowances;
+
+    address[] public contributors;
+    mapping(address => bool) public isContributor;
+
+    uint256 public minContribution;
+    uint256 public maxContribution;
+    uint256 public hardCap;
+
+    enum State { Active, Successful, Failed, Finalized }
+
+    event Contributed(address indexed contributor, uint256 amount, uint256 tokensReceived);
+    event GoalReached(uint256 totalAmount);
+    event FundsWithdrawn(address indexed owner, uint256 amount);
+    event Refunded(address indexed contributor, uint256 amount);
+    event Finalized(bool success);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier campaignActive() {
+        require(block.timestamp < deadline, "Campaign ended");
+        require(!finalized, "Already finalized");
+        require(totalRaised < hardCap, "Hard cap reached");
+        _;
+    }
+
+    constructor(
+        string memory _projectName,
+        string memory _tokenName,
+        string memory _tokenSymbol,
+        uint256 _goalAmount,
+        uint256 _hardCap,
+        uint256 _durationDays,
+        uint256 _tokenPrice,
+        uint256 _totalTokenSupply,
+        uint256 _minContribution,
+        uint256 _maxContribution
+    ) {
+        require(_goalAmount > 0, "Goal must be > 0");
+        require(_hardCap >= _goalAmount, "Hard cap < goal");
+        require(_durationDays > 0, "Duration must be > 0");
+        require(_tokenPrice > 0, "Token price must be > 0");
+        require(_totalTokenSupply > 0, "Supply must be > 0");
+
+        owner = msg.sender;
+        projectName = _projectName;
+        tokenName = _tokenName;
+        tokenSymbol = _tokenSymbol;
+        goalAmount = _goalAmount;
+        hardCap = _hardCap;
+        deadline = block.timestamp + (_durationDays * 1 days);
+        tokenPrice = _tokenPrice;
+        tokenTotalSupply = _totalTokenSupply * (10 ** tokenDecimals);
+        minContribution = _minContribution;
+        maxContribution = _maxContribution;
+
+        tokenBalances[address(this)] = tokenTotalSupply;
+        emit Transfer(address(0), address(this), tokenTotalSupply);
+    }
+
+    function contribute() external payable campaignActive {
+        require(msg.value >= minContribution, "Below min contribution");
+        require(
+            maxContribution == 0 || contributions[msg.sender] + msg.value <= maxContribution,
+            "Exceeds max contribution"
+        );
+
+        uint256 contribution = msg.value;
+        uint256 remaining = hardCap - totalRaised;
+        uint256 refund = 0;
+
+        if (contribution > remaining) {
+            refund = contribution - remaining;
+            contribution = remaining;
+        }
+
+        uint256 tokensToMint = (contribution * (10 ** tokenDecimals)) / tokenPrice;
+        require(tokensToMint > 0, "Contribution too small for tokens");
+        require(tokenBalances[address(this)] >= tokensToMint, "Not enough tokens");
+
+        if (!isContributor[msg.sender]) {
+            contributors.push(msg.sender);
+            isContributor[msg.sender] = true;
+        }
+
+        contributions[msg.sender] += contribution;
+        totalRaised += contribution;
+        totalTokensSold += tokensToMint;
+
+        tokenBalances[address(this)] -= tokensToMint;
+        tokenBalances[msg.sender] += tokensToMint;
+        emit Transfer(address(this), msg.sender, tokensToMint);
+
+        if (totalRaised >= goalAmount && !goalReached) {
+            goalReached = true;
+            emit GoalReached(totalRaised);
+        }
+
+        if (refund > 0) {
+            (bool sent, ) = payable(msg.sender).call{value: refund}("");
+            require(sent, "Refund failed");
+        }
+
+        emit Contributed(msg.sender, contribution, tokensToMint);
+    }
+
+    function finalize() external onlyOwner {
+        require(!finalized, "Already finalized");
+        require(
+            block.timestamp >= deadline || totalRaised >= hardCap,
+            "Campaign still active"
+        );
+
+        finalized = true;
+
+        if (totalRaised >= goalAmount) {
+            goalReached = true;
+            uint256 balance = address(this).balance;
+            (bool sent, ) = payable(owner).call{value: balance}("");
+            require(sent, "Withdrawal failed");
+            emit FundsWithdrawn(owner, balance);
+
+            uint256 unsoldTokens = tokenBalances[address(this)];
+            if (unsoldTokens > 0) {
+                tokenBalances[address(this)] = 0;
+                tokenTotalSupply -= unsoldTokens;
+                emit Transfer(address(this), address(0), unsoldTokens);
+            }
+        }
+
+        emit Finalized(goalReached);
+    }
+
+    function claimRefund() external {
+        require(finalized, "Not finalized");
+        require(!goalReached, "Goal was reached");
+        require(contributions[msg.sender] > 0, "No contribution");
+
+        uint256 amount = contributions[msg.sender];
+        uint256 tokens = tokenBalances[msg.sender];
+
+        contributions[msg.sender] = 0;
+        tokenBalances[msg.sender] = 0;
+        tokenBalances[address(this)] += tokens;
+        totalTokensSold -= tokens;
+
+        emit Transfer(msg.sender, address(this), tokens);
+
+        (bool sent, ) = payable(msg.sender).call{value: amount}("");
+        require(sent, "Refund failed");
+
+        emit Refunded(msg.sender, amount);
+    }
+
+    function getState() external view returns (State) {
+        if (finalized) {
+            return State.Finalized;
+        }
+        if (block.timestamp >= deadline || totalRaised >= hardCap) {
+            if (totalRaised >= goalAmount) {
+                return State.Successful;
+            } else {
+                return State.Failed;
+            }
+        }
+        return State.Active;
+    }
+
+    function getContributorCount() external view returns (uint256) {
+        return contributors.length;
+    }
+
+    function getTimeRemaining() external view returns (uint256) {
+        if (block.timestamp >= deadline) return 0;
+        return deadline - block.timestamp;
+    }
+
+    function getProgress() external view returns (uint256) {
+        if (goalAmount == 0) return 100;
+        return (totalRaised * 100) / goalAmount;
+    }
+
+    // ERC20-like token functions
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        require(finalized && goalReached, "Tokens locked until successful finalization");
+        require(to != address(0), "Transfer to zero address");
+        require(tokenBalances[msg.sender] >= amount, "Insufficient balance");
+
+        tokenBalances[msg.sender] -= amount;
+        tokenBalances[to] += amount;
+        emit Transfer(msg.sender, to, amount);
+        return true;
+    }
+
+    function approve(address spender, uint256 amount) external returns (bool) {
+        require(spender != address(0), "Approve to zero address");
+        tokenAllowances[msg.sender][spender] = amount;
+        emit Approval(msg.sender, spender, amount);
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+        require(finalized && goalReached, "Tokens locked until successful finalization");
+        require(from != address(0), "Transfer from zero address");
+        require(to != address(0), "Transfer to zero address");
+        require(tokenBalances[from] >= amount, "Insufficient balance");
+        require(tokenAllowances[from][msg.sender] >= amount, "Insufficient allowance");
+
+        tokenBalances[from] -= amount;
+        tokenBalances[to] += amount;
+        tokenAllowances[from][msg.sender] -= amount;
+
+        emit Transfer(from, to, amount);
+        return true;
+    }
+
+    function balanceOf(address account) external view returns (uint256) {
+        return tokenBalances[account];
+    }
+
+    function allowance(address _owner, address spender) external view returns (uint256) {
+        return tokenAllowances[_owner][spender];
+    }
+
+    receive() external payable {
+        revert("Use contribute()");
+    }
+}
+```

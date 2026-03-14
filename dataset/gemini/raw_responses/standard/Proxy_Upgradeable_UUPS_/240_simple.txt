@@ -1,0 +1,23 @@
+```sol
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract MyContract is UUPSUpgradeable, Ownable {
+    string public greeting;
+
+    function initialize(string memory _greeting) public initializer {
+        greeting = _greeting;
+    }
+
+    function setGreeting(string memory _greeting) public {
+        greeting = _greeting;
+    }
+
+    function upgradeTo(address newImplementation) public onlyOwner {
+        upgradeToAndCall(newImplementation, "");
+    }
+}
+```

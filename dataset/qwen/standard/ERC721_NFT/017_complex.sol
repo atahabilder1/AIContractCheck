@@ -1,0 +1,104 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "@openzeppelin/contracts/interfaces/IERC2981.sol";
+
+contract LazyMintNFT is ERC721Enumerable, Ownable, IERC2981 {
+    using MerkleProof for bytes32[];
+
+    bytes32 public merkleRoot;
+    uint256 public maxSupply;
+    uint256 public mintPrice;
+    bool public isMintingActive;
+    string private baseTokenURI;
+    address public royaltyRecipient;
+    uint96 public royaltyPercentage;
+
+    mapping(uint256 => bool) private _minted;
+
+    event Minted(address indexed minter, uint256 indexed tokenId);
+    event MerkleRootUpdated(bytes32 indexed newMerkleRoot);
+
+    constructor(
+        string memory name_,
+        string memory symbol_,
+        uint256 maxSupply_,
+        uint256 mintPrice_,
+        bytes32 merkleRoot_,
+        string memory baseTokenURI_,
+        address royaltyRecipient_,
+        uint96 royaltyPercentage_
+    ) ERC721(name_, symbol_) {
+        maxSupply = maxSupply_;
+        mintPrice = mintPrice_;
+        merkleRoot = merkleRoot_;
+        baseTokenURI = baseTokenURI_;
+        royaltyRecipient = royaltyRecipient_;
+        royaltyPercentage = royaltyPercentage_;
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721Enumerable, IERC165) returns (bool) {
+        return interfaceId == type(IERC2981).interfaceId || super.supportsInterface(interfaceId);
+    }
+
+    function royaltyInfo(uint256 _tokenId, uint256 _salePrice) external view override returns (address, uint256) {
+        require(_exists(_tokenId), "ERC721Metadata: URI query for nonexistent token");
+        return (royaltyRecipient, (_salePrice * royaltyPercentage) / 1000);
+    }
+
+    function setMerkleRoot(bytes32 _merkleRoot) external onlyOwner {
+        merkleRoot = _merkleRoot;
+        emit MerkleRootUpdated(_merkleRoot);
+    }
+
+    function toggleMinting() external onlyOwner {
+        isMintingActive = !isMintingActive;
+    }
+
+    function mint(uint256 tokenId, bytes32[] calldata proof) external payable {
+        require(isMintingActive, "Minting is not active");
+        require(totalSupply() < maxSupply, "Max supply reached");
+        require(!_minted[tokenId], "Token already minted");
+        require(msg.value >= mintPrice, "Insufficient funds");
+        require(verifyMerkleProof(proof), "Invalid Merkle proof");
+
+        _minted[tokenId] = true;
+        _safeMint(msg.sender, tokenId);
+        emit Minted(msg.sender, tokenId);
+    }
+
+    function batchMint(uint256[] calldata tokenIds, bytes32[] calldata proof) external payable {
+        require(isMintingActive, "Minting is not active");
+        require(totalSupply() + tokenIds.length <= maxSupply, "Max supply reached");
+        require(msg.value >= mintPrice * tokenIds.length, "Insufficient funds");
+        require(verifyMerkleProof(proof), "Invalid Merkle proof");
+
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            require(!_minted[tokenIds[i]], "Token already minted");
+            _minted[tokenIds[i]] = true;
+            _safeMint(msg.sender, tokenIds[i]);
+            emit Minted(msg.sender, tokenIds[i]);
+        }
+    }
+
+    function verifyMerkleProof(bytes32[] calldata proof) public view returns (bool) {
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+        return MerkleProof.verify(proof, merkleRoot, leaf);
+    }
+
+    function _baseURI() internal view override returns (string memory) {
+        return baseTokenURI;
+    }
+
+    function setBaseURI(string memory newBaseURI) external onlyOwner {
+        baseTokenURI = newBaseURI;
+    }
+
+    function withdraw() external onlyOwner {
+        payable(owner()).transfer(address(this).balance);
+    }
+}

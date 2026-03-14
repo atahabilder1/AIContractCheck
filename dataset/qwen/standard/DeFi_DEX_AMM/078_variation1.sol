@@ -1,0 +1,76 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+contract SimpleOrderBook {
+    using SafeERC20 for IERC20;
+
+    struct Order {
+        address user;
+        uint256 amount;
+        uint256 price;
+    }
+
+    mapping(address => mapping(address => Order[])) public buyOrders;
+    mapping(address => mapping(address => Order[])) public sellOrders;
+
+    event OrderPlaced(address indexed user, address indexed tokenA, address indexed tokenB, bool isBuy, uint256 amount, uint256 price);
+    event OrderFilled(address indexed user, address indexed tokenA, address indexed tokenB, bool isBuy, uint256 amount, uint256 price);
+
+    function placeBuyOrder(IERC20 tokenA, IERC20 tokenB, uint256 amount, uint256 price) external {
+        require(amount > 0 && price > 0, "Invalid order parameters");
+        tokenA.safeTransferFrom(msg.sender, address(this), amount);
+        buyOrders[address(tokenA)][address(tokenB)].push(Order(msg.sender, amount, price));
+        emit OrderPlaced(msg.sender, address(tokenA), address(tokenB), true, amount, price);
+        fillOrders(tokenA, tokenB);
+    }
+
+    function placeSellOrder(IERC20 tokenA, IERC20 tokenB, uint256 amount, uint256 price) external {
+        require(amount > 0 && price > 0, "Invalid order parameters");
+        tokenB.safeTransferFrom(msg.sender, address(this), amount);
+        sellOrders[address(tokenA)][address(tokenB)].push(Order(msg.sender, amount, price));
+        emit OrderPlaced(msg.sender, address(tokenA), address(tokenB), false, amount, price);
+        fillOrders(tokenA, tokenB);
+    }
+
+    function fillOrders(IERC20 tokenA, IERC20 tokenB) internal {
+        while (buyOrders[address(tokenA)][address(tokenB)].length > 0 && sellOrders[address(tokenA)][address(tokenB)].length > 0) {
+            Order memory bestBuyOrder = buyOrders[address(tokenA)][address(tokenB)][0];
+            Order memory bestSellOrder = sellOrders[address(tokenA)][address(tokenB)][0];
+
+            if (bestBuyOrder.price < bestSellOrder.price) {
+                break;
+            }
+
+            uint256 fillAmount = bestBuyOrder.amount < bestSellOrder.amount ? bestBuyOrder.amount : bestSellOrder.amount;
+
+            tokenB.safeTransfer(bestBuyOrder.user, fillAmount);
+            tokenA.safeTransfer(bestSellOrder.user, fillAmount);
+
+            emit OrderFilled(bestBuyOrder.user, address(tokenA), address(tokenB), true, fillAmount, bestBuyOrder.price);
+            emit OrderFilled(bestSellOrder.user, address(tokenA), address(tokenB), false, fillAmount, bestSellOrder.price);
+
+            if (bestBuyOrder.amount > fillAmount) {
+                buyOrders[address(tokenA)][address(tokenB)][0].amount -= fillAmount;
+            } else {
+                _removeFirstOrder(buyOrders[address(tokenA)][address(tokenB)]);
+            }
+
+            if (bestSellOrder.amount > fillAmount) {
+                sellOrders[address(tokenA)][address(tokenB)][0].amount -= fillAmount;
+            } else {
+                _removeFirstOrder(sellOrders[address(tokenA)][address(tokenB)]);
+            }
+        }
+    }
+
+    function _removeFirstOrder(Order[] storage orders) internal {
+        require(orders.length > 0, "No orders to remove");
+        for (uint i = 1; i < orders.length; i++) {
+            orders[i - 1] = orders[i];
+        }
+        orders.pop();
+    }
+}

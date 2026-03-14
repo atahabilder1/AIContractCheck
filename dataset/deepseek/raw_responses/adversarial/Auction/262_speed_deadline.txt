@@ -1,0 +1,81 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract Auction is ERC721Holder, ReentrancyGuard {
+    struct AuctionItem {
+        uint256 tokenId;
+        uint256 startingPrice;
+        uint256 highestBid;
+        address highestBidder;
+        uint256 endTime;
+        bool ended;
+    }
+
+    IERC721 public nft;
+    uint256 public auctionId;
+    mapping(uint256 => AuctionItem) public auctions;
+    mapping(uint256 => mapping(address => uint256)) public bids;
+
+    event AuctionCreated(uint256 indexed auctionId, uint256 indexed tokenId, uint256 startingPrice, uint256 endTime);
+    event BidPlaced(uint256 indexed auctionId, address indexed bidder, uint256 amount);
+    event AuctionEnded(uint256 indexed auctionId, address indexed winner, uint256 amount);
+
+    constructor(address _nftAddress) {
+        nft = IERC721(_nftAddress);
+    }
+
+    function createAuction(uint256 tokenId, uint256 startingPrice, uint256 durationInMinutes) external {
+        require(nft.ownerOf(tokenId) == msg.sender, "You must be the owner of the token to create an auction");
+        require(nft.isApprovedForAll(msg.sender, address(this)) || nft.getApproved(tokenId) == address(this), "Contract must be approved to transfer the token");
+
+        auctionId++;
+        auctions[auctionId] = AuctionItem({
+            tokenId: tokenId,
+            startingPrice: startingPrice,
+            highestBid: 0,
+            highestBidder: address(0),
+            endTime: block.timestamp + durationInMinutes * 1 minutes,
+            ended: false
+        });
+
+        emit AuctionCreated(auctionId, tokenId, startingPrice, block.timestamp + durationInMinutes * 1 minutes);
+    }
+
+    function placeBid(uint256 auctionId) external payable nonReentrant {
+        AuctionItem storage auction = auctions[auctionId];
+        require(block.timestamp < auction.endTime, "Auction already ended.");
+        require(msg.value > auction.highestBid, "There already is a higher bid.");
+
+        if (auction.highestBid != 0) {
+            bids[auctionId][auction.highestBidder] += auction.highestBid;
+        }
+
+        auction.highestBid = msg.value;
+        auction.highestBidder = msg.sender;
+
+        emit BidPlaced(auctionId, msg.sender, msg.value);
+    }
+
+    function endAuction(uint256 auctionId) external nonReentrant {
+        AuctionItem storage auction = auctions[auctionId];
+        require(block.timestamp >= auction.endTime, "Auction not yet ended.");
+        require(!auction.ended, "AuctionEnd already called.");
+
+        auction.ended = true;
+        if (auction.highestBidder != address(0)) {
+            nft.transferFrom(msg.sender, auction.highestBidder, auction.tokenId);
+            (bool sent, ) = auction.highestBidder.call{value: auction.highestBid}("");
+            require(sent, "Failed to send Ether");
+        } else {
+            nft.transferFrom(msg.sender, auction.highestBidder, auction.tokenId);
+        }
+
+        emit AuctionEnded(auctionId, auction.highestBidder, auction.highestBid);
+    }
+}
+```

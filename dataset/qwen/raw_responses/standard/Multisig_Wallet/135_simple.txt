@@ -1,0 +1,103 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultiSigWallet {
+    address[3] public owners;
+    uint public required = 2;
+    mapping(bytes32 => uint) public approvals;
+    mapping(bytes32 => bool) public executed;
+
+    event Deposit(address indexed sender, uint amount);
+    event SubmitTransaction(bytes32 indexed txHash, address indexed destination, uint value, bytes data);
+    event ConfirmTransaction(bytes32 indexed txHash, address indexed owner);
+    event ExecuteTransaction(bytes32 indexed txHash);
+    event RevokeConfirmation(bytes32 indexed txHash, address indexed owner);
+
+    modifier onlyOwner() {
+        require(isOwner(msg.sender), "Not an owner");
+        _;
+    }
+
+    modifier txExists(bytes32 _txHash) {
+        require(approvals[_txHash] > 0, "Transaction does not exist");
+        _;
+    }
+
+    modifier notExecuted(bytes32 _txHash) {
+        require(!executed[_txHash], "Transaction has already been executed");
+        _;
+    }
+
+    modifier notConfirmed(bytes32 _txHash) {
+        require(!isConfirmed(_txHash, msg.sender), "Transaction is already confirmed");
+        _;
+    }
+
+    constructor(address[3] memory _owners) {
+        require(_owners[0] != address(0) && _owners[1] != address(0) && _owners[2] != address(0), "Invalid owners");
+        owners = _owners;
+    }
+
+    receive() external payable {
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function submitTransaction(address _destination, uint _value, bytes memory _data) external onlyOwner {
+        bytes32 txHash = getTxHash(_destination, _value, _data);
+        require(approvals[txHash] == 0, "Transaction already submitted");
+        approvals[txHash] = 1;
+        emit SubmitTransaction(txHash, _destination, _value, _data);
+    }
+
+    function confirmTransaction(bytes32 _txHash) external onlyOwner txExists(_txHash) notExecuted(_txHash) notConfirmed(_txHash) {
+        approvals[_txHash]++;
+        emit ConfirmTransaction(_txHash, msg.sender);
+        if (approvals[_txHash] >= required) {
+            executeTransaction(_txHash);
+        }
+    }
+
+    function executeTransaction(bytes32 _txHash) public onlyOwner txExists(_txHash) notExecuted(_txHash) {
+        require(isConfirmed(_txHash, msg.sender), "Transaction not confirmed by enough owners");
+        (address destination, uint value, bytes memory data) = parseTxHash(_txHash);
+        (bool success, ) = destination.call{value: value}(data);
+        require(success, "Transaction failed");
+        executed[_txHash] = true;
+        emit ExecuteTransaction(_txHash);
+    }
+
+    function revokeConfirmation(bytes32 _txHash) external onlyOwner txExists(_txHash) notExecuted(_txHash) {
+        require(isConfirmed(_txHash, msg.sender), "Transaction not confirmed by this owner");
+        approvals[_txHash]--;
+        emit RevokeConfirmation(_txHash, msg.sender);
+    }
+
+    function getTxHash(address _destination, uint _value, bytes memory _data) public pure returns (bytes32) {
+        return keccak256(abi.encode(_destination, _value, _data));
+    }
+
+    function parseTxHash(bytes32 _txHash) public pure returns (address destination, uint value, bytes memory data) {
+        (destination, value, data) = abi.decode(abi.encodePacked(_txHash), (address, uint, bytes));
+    }
+
+    function isConfirmed(bytes32 _txHash, address _owner) public view returns (bool) {
+        uint count = 0;
+        for (uint i = 0; i < owners.length; i++) {
+            if (owners[i] == _owner) {
+                return approvals[_txHash] > i;
+            }
+        }
+        return false;
+    }
+
+    function isOwner(address _address) public view returns (bool) {
+        for (uint i = 0; i < owners.length; i++) {
+            if (owners[i] == _address) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+```

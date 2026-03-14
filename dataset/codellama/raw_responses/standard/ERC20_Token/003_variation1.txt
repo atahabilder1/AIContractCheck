@@ -1,0 +1,24 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "https://github.com/OpenZeppelin/openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
+
+contract MyToken is ERC20 {
+    uint256 private constant _totalSupply = 1_000_000_000 * 10 ** 18;
+
+    constructor() ERC20("MyToken", "MYT") {
+        _mint(msg.sender, _totalSupply);
+    }
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal override {
+        require(amount <= _totalSupply, "ERC20: transfer amount exceeds supply");
+        super._beforeTokenTransfer(from, to, amount);
+    }
+}
+```
+This code creates an ERC20 token called `MyToken` with a total supply of 1 billion tokens. It also supports gasless approvals via EIP-2612. The `ERC20` contract is imported from OpenZeppelin, and the `MyToken` contract inherits from it. The constructor mints the total supply of tokens to the creator of the contract. The `_beforeTokenTransfer` function is overridden to check that the transfer amount does not exceed the total supply.

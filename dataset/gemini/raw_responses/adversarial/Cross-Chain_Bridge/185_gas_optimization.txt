@@ -1,0 +1,69 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address public owner;
+    mapping(bytes32 => bool) public processedMessages;
+    uint256 public messageFee; // Fee in native currency to be paid by the sender
+
+    event MessageSent(bytes32 indexed messageId, address indexed sender, address recipient, bytes payload, uint256 timestamp);
+    event MessageReceived(bytes32 indexed messageId, address indexed sender, address recipient, bytes payload, uint256 timestamp);
+
+    constructor(uint256 _messageFee) {
+        owner = msg.sender;
+        messageFee = _messageFee;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    function setMessageFee(uint256 _messageFee) public onlyOwner {
+        messageFee = _messageFee;
+    }
+
+    // Function to send a message to another chain.
+    // The sender pays the messageFee.
+    // This contract does not handle the actual cross-chain transfer,
+    // it only logs the message and marks it as sent on this chain.
+    // A relayer service is expected to pick up this event and relay it.
+    function sendMessage(address _recipient, bytes calldata _payload) external payable {
+        require(msg.value >= messageFee, "Insufficient fee");
+
+        bytes32 messageId = keccak256(abi.encodePacked(msg.sender, _recipient, _payload, block.timestamp));
+        require(!processedMessages[messageId], "Message already processed");
+
+        processedMessages[messageId] = true;
+        emit MessageSent(messageId, msg.sender, _recipient, _payload, block.timestamp);
+    }
+
+    // Function to be called by a relayer on the destination chain
+    // to confirm a message has been received.
+    // This function is intended to be called by a trusted relayer or another bridge contract.
+    // The messageId should be the same one generated on the source chain.
+    function receiveMessage(bytes32 _messageId, address _sender, address _recipient, bytes calldata _payload, uint256 _timestamp) external {
+        // In a real-world scenario, you'd have a mechanism to verify the authenticity
+        // of the message coming from the other chain (e.g., through a validator set,
+        // a multi-sig, or a specific trusted relayer address).
+        // For simplicity and gas optimization, we are omitting that here and
+        // assuming the caller is authorized.
+        // A common pattern is to check if `processedMessages[_messageId]` is true on the source chain
+        // before relaying, and then mark it as processed on the destination chain.
+
+        require(!processedMessages[_messageId], "Message already processed on this chain");
+
+        processedMessages[_messageId] = true;
+        emit MessageReceived(_messageId, _sender, _recipient, _payload, _timestamp);
+
+        // In a more complex bridge, you might trigger contract calls on the destination chain here.
+        // Example (commented out for gas optimization and simplicity):
+        // (bool success, ) = _recipient.call(abi.encodeWithSelector(bytes4(keccak256("execute(bytes)")), _payload));
+        // require(success, "Execution failed");
+    }
+
+    // Fallback function to receive Ether, though not strictly necessary for the bridge logic itself.
+    receive() external payable {}
+}
+```

@@ -1,0 +1,57 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Auction {
+    address public admin;
+    uint256 public highestBid;
+    address public highestBidder;
+    bool public paused;
+
+    event HighestBidIncreased(address bidder, uint256 amount);
+    event AuctionPaused();
+    event AuctionResumed();
+    event FundsWithdrawn(uint256 amount);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not an admin");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "Auction paused");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+        paused = false;
+    }
+
+    function bid() external payable whenNotPaused {
+        require(msg.value > highestBid, "Bid not high enough");
+        if (highestBid != 0) {
+            payable(highestBidder).transfer(highestBid);
+        }
+        highestBid = msg.value;
+        highestBidder = msg.sender;
+        emit HighestBidIncreased(msg.sender, msg.value);
+    }
+
+    function pauseAuction() external onlyAdmin {
+        require(!paused, "Auction already paused");
+        paused = true;
+        emit AuctionPaused();
+    }
+
+    function resumeAuction() external onlyAdmin {
+        require(paused, "Auction not paused");
+        paused = false;
+        emit AuctionResumed();
+    }
+
+    function withdrawFunds(uint256 amount) external onlyAdmin {
+        require(address(this).balance >= amount, "Insufficient funds");
+        payable(admin).transfer(amount);
+        emit FundsWithdrawn(amount);
+    }
+}

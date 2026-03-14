@@ -1,0 +1,87 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Burnable.sol";
+import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
+
+contract MyERC1155 is ERC1155, ERC1155Burnable, ERC1155Supply, Ownable {
+    using Strings for uint256;
+
+    string public name;
+    string public symbol;
+    mapping(uint256 => string) private _tokenURIs;
+
+    constructor(string memory _name, string memory _symbol) ERC1155("") {
+        name = _name;
+        symbol = _symbol;
+    }
+
+    function setURI(string memory newuri) public onlyOwner {
+        _setURI(newuri);
+    }
+
+    function mint(address account, uint256 id, uint256 amount, bytes memory data)
+        public
+        onlyOwner
+    {
+        _mint(account, id, amount, data);
+    }
+
+    function mintBatch(address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data)
+        public
+        onlyOwner
+    {
+        _mintBatch(to, ids, amounts, data);
+    }
+
+    function burn(address account, uint256 id, uint256 value) public {
+        require(
+            _balances[id][account] >= value,
+            "ERC1155: burn amount exceeds balance"
+        );
+        _burn(account, id, value);
+    }
+
+    function burnBatch(address account, uint256[] memory ids, uint256[] memory values) public {
+        for (uint256 i = 0; i < ids.length; i++) {
+            require(
+                _balances[ids[i]][account] >= values[i],
+                "ERC1155: burn amount exceeds balance"
+            );
+        }
+        _burnBatch(account, ids, values);
+    }
+
+    function uri(uint256 tokenId) public view override returns (string memory) {
+        return _tokenURIs[tokenId];
+    }
+
+    function setTokenURI(uint256 tokenId, string memory tokenURI) public onlyOwner {
+        _tokenURIs[tokenId] = tokenURI;
+    }
+
+    function _beforeTokenTransfer(address operator, address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data)
+        internal
+        override(ERC1155, ERC1155Supply)
+    {
+        super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
+    }
+
+    // Marketplace integration example
+    mapping(uint256 => uint256) public tokenPrices;
+
+    function setTokenPrice(uint256 tokenId, uint256 price) public onlyOwner {
+        tokenPrices[tokenId] = price;
+    }
+
+    function purchaseToken(uint256 tokenId) public payable {
+        require(tokenPrices[tokenId] > 0, "Token price is not set");
+        require(msg.value >= tokenPrices[tokenId], "Insufficient funds sent");
+        _mint(msg.sender, tokenId, 1, "");
+    }
+}
+```

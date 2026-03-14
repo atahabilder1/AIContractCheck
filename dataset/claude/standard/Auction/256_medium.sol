@@ -1,0 +1,225 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract DualAuction {
+    enum AuctionType { English, Dutch }
+    enum AuctionState { Created, Active, Ended, Cancelled }
+
+    struct Auction {
+        address payable seller;
+        AuctionType auctionType;
+        AuctionState state;
+        string itemDescription;
+        uint256 startTime;
+        uint256 endTime;
+        uint256 reservePrice;
+        uint256 minBidIncrement;
+        // English auction
+        address payable highestBidder;
+        uint256 highestBid;
+        // Dutch auction
+        uint256 startingPrice;
+        uint256 floorPrice;
+        address payable buyer;
+        uint256 finalPrice;
+    }
+
+    uint256 public nextAuctionId;
+    mapping(uint256 => Auction) public auctions;
+    mapping(uint256 => mapping(address => uint256)) public pendingReturns;
+
+    event AuctionCreated(uint256 indexed auctionId, AuctionType auctionType, address seller);
+    event BidPlaced(uint256 indexed auctionId, address bidder, uint256 amount);
+    event AuctionEnded(uint256 indexed auctionId, address winner, uint256 amount);
+    event AuctionCancelled(uint256 indexed auctionId);
+    event RefundClaimed(uint256 indexed auctionId, address bidder, uint256 amount);
+
+    modifier onlySeller(uint256 auctionId) {
+        require(msg.sender == auctions[auctionId].seller, "Not seller");
+        _;
+    }
+
+    modifier inState(uint256 auctionId, AuctionState state) {
+        require(auctions[auctionId].state == state, "Invalid state");
+        _;
+    }
+
+    function createEnglishAuction(
+        string calldata itemDescription,
+        uint256 duration,
+        uint256 reservePrice,
+        uint256 minBidIncrement
+    ) external returns (uint256 auctionId) {
+        require(duration > 0, "Duration must be > 0");
+        require(minBidIncrement > 0, "Increment must be > 0");
+
+        auctionId = nextAuctionId++;
+        Auction storage a = auctions[auctionId];
+        a.seller = payable(msg.sender);
+        a.auctionType = AuctionType.English;
+        a.state = AuctionState.Active;
+        a.itemDescription = itemDescription;
+        a.startTime = block.timestamp;
+        a.endTime = block.timestamp + duration;
+        a.reservePrice = reservePrice;
+        a.minBidIncrement = minBidIncrement;
+
+        emit AuctionCreated(auctionId, AuctionType.English, msg.sender);
+    }
+
+    function createDutchAuction(
+        string calldata itemDescription,
+        uint256 duration,
+        uint256 startingPrice,
+        uint256 floorPrice,
+        uint256 reservePrice
+    ) external returns (uint256 auctionId) {
+        require(duration > 0, "Duration must be > 0");
+        require(startingPrice > floorPrice, "Start must exceed floor");
+        require(reservePrice <= floorPrice, "Reserve must be <= floor");
+
+        auctionId = nextAuctionId++;
+        Auction storage a = auctions[auctionId];
+        a.seller = payable(msg.sender);
+        a.auctionType = AuctionType.Dutch;
+        a.state = AuctionState.Active;
+        a.itemDescription = itemDescription;
+        a.startTime = block.timestamp;
+        a.endTime = block.timestamp + duration;
+        a.reservePrice = reservePrice;
+        a.startingPrice = startingPrice;
+        a.floorPrice = floorPrice;
+
+        emit AuctionCreated(auctionId, AuctionType.Dutch, msg.sender);
+    }
+
+    function getDutchPrice(uint256 auctionId) public view returns (uint256) {
+        Auction storage a = auctions[auctionId];
+        require(a.auctionType == AuctionType.Dutch, "Not Dutch auction");
+
+        if (block.timestamp >= a.endTime) {
+            return a.floorPrice;
+        }
+
+        uint256 elapsed = block.timestamp - a.startTime;
+        uint256 duration = a.endTime - a.startTime;
+        uint256 priceDrop = ((a.startingPrice - a.floorPrice) * elapsed) / duration;
+        return a.startingPrice - priceDrop;
+    }
+
+    function bidEnglish(uint256 auctionId) external payable inState(auctionId, AuctionState.Active) {
+        Auction storage a = auctions[auctionId];
+        require(a.auctionType == AuctionType.English, "Not English auction");
+        require(block.timestamp < a.endTime, "Auction ended");
+        require(msg.sender != a.seller, "Seller cannot bid");
+
+        uint256 requiredBid = a.highestBid == 0
+            ? a.reservePrice
+            : a.highestBid + a.minBidIncrement;
+        require(msg.value >= requiredBid, "Bid too low");
+
+        if (a.highestBidder != address(0)) {
+            pendingReturns[auctionId][a.highestBidder] += a.highestBid;
+        }
+
+        a.highestBidder = payable(msg.sender);
+        a.highestBid = msg.value;
+
+        emit BidPlaced(auctionId, msg.sender, msg.value);
+    }
+
+    function buyDutch(uint256 auctionId) external payable inState(auctionId, AuctionState.Active) {
+        Auction storage a = auctions[auctionId];
+        require(a.auctionType == AuctionType.Dutch, "Not Dutch auction");
+        require(block.timestamp <= a.endTime, "Auction ended");
+        require(msg.sender != a.seller, "Seller cannot buy");
+
+        uint256 currentPrice = getDutchPrice(auctionId);
+        require(msg.value >= currentPrice, "Insufficient payment");
+
+        a.state = AuctionState.Ended;
+        a.buyer = payable(msg.sender);
+        a.finalPrice = currentPrice;
+
+        a.seller.transfer(currentPrice);
+
+        uint256 refund = msg.value - currentPrice;
+        if (refund > 0) {
+            payable(msg.sender).transfer(refund);
+        }
+
+        emit AuctionEnded(auctionId, msg.sender, currentPrice);
+    }
+
+    function endEnglishAuction(uint256 auctionId) external inState(auctionId, AuctionState.Active) {
+        Auction storage a = auctions[auctionId];
+        require(a.auctionType == AuctionType.English, "Not English auction");
+        require(block.timestamp >= a.endTime, "Auction not yet ended");
+
+        a.state = AuctionState.Ended;
+
+        if (a.highestBidder != address(0) && a.highestBid >= a.reservePrice) {
+            a.seller.transfer(a.highestBid);
+            emit AuctionEnded(auctionId, a.highestBidder, a.highestBid);
+        } else {
+            if (a.highestBidder != address(0)) {
+                pendingReturns[auctionId][a.highestBidder] += a.highestBid;
+            }
+            emit AuctionEnded(auctionId, address(0), 0);
+        }
+    }
+
+    function cancelAuction(uint256 auctionId)
+        external
+        onlySeller(auctionId)
+        inState(auctionId, AuctionState.Active)
+    {
+        Auction storage a = auctions[auctionId];
+
+        if (a.auctionType == AuctionType.English && a.highestBidder != address(0)) {
+            pendingReturns[auctionId][a.highestBidder] += a.highestBid;
+        }
+
+        a.state = AuctionState.Cancelled;
+        emit AuctionCancelled(auctionId);
+    }
+
+    function claimRefund(uint256 auctionId) external {
+        uint256 amount = pendingReturns[auctionId][msg.sender];
+        require(amount > 0, "No refund available");
+
+        pendingReturns[auctionId][msg.sender] = 0;
+        payable(msg.sender).transfer(amount);
+
+        emit RefundClaimed(auctionId, msg.sender, amount);
+    }
+
+    function getAuction(uint256 auctionId)
+        external
+        view
+        returns (
+            address seller,
+            AuctionType auctionType,
+            AuctionState state,
+            string memory itemDescription,
+            uint256 startTime,
+            uint256 endTime,
+            uint256 reservePrice,
+            uint256 highestBid,
+            address highestBidder
+        )
+    {
+        Auction storage a = auctions[auctionId];
+        return (
+            a.seller,
+            a.auctionType,
+            a.state,
+            a.itemDescription,
+            a.startTime,
+            a.endTime,
+            a.reservePrice,
+            a.auctionType == AuctionType.English ? a.highestBid : getDutchPrice(auctionId),
+            a.auctionType == AuctionType.English ? a.highestBidder : a.buyer
+        );
+    }
+}

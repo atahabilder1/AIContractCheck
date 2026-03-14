@@ -1,0 +1,56 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    address public owner;
+    uint256 public constant MIN_DELAY = 1 days;
+
+    struct Transaction {
+        address to;
+        uint256 value;
+        bytes data;
+        uint256 executeAfter;
+        bool executed;
+    }
+
+    Transaction[] public transactions;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function queue(address _to, uint256 _value, bytes calldata _data) external onlyOwner returns (uint256) {
+        uint256 id = transactions.length;
+        transactions.push(Transaction({
+            to: _to,
+            value: _value,
+            data: _data,
+            executeAfter: block.timestamp + MIN_DELAY,
+            executed: false
+        }));
+        return id;
+    }
+
+    function execute(uint256 _id) external onlyOwner {
+        Transaction storage txn = transactions[_id];
+        require(!txn.executed, "Already executed");
+        require(block.timestamp >= txn.executeAfter, "Too early");
+
+        txn.executed = true;
+        (bool success, ) = txn.to.call{value: txn.value}(txn.data);
+        require(success, "Tx failed");
+    }
+
+    function cancel(uint256 _id) external onlyOwner {
+        Transaction storage txn = transactions[_id];
+        require(!txn.executed, "Already executed");
+        txn.executed = true;
+    }
+
+    receive() external payable {}
+}

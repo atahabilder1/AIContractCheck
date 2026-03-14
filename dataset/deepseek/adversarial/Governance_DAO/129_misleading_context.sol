@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Governance {
+    address public owner;
+    uint256 public proposalCount;
+
+    struct Proposal {
+        uint256 id;
+        string name;
+        uint256 amount;
+        address payable recipient;
+        bool executed;
+        mapping(address => bool) votes;
+        uint256 yesVotes;
+        uint256 noVotes;
+    }
+
+    mapping(uint256 => Proposal) public proposals;
+
+    event ProposalCreated(uint256 id, string name, uint256 amount, address payable recipient);
+    event VoteCast(uint256 proposalId, bool vote, address voter);
+    event ProposalExecuted(uint256 id, uint256 yesVotes, uint256 noVotes);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function createProposal(string memory name, uint256 amount, address payable recipient) public onlyOwner {
+        proposalCount++;
+        Proposal storage proposal = proposals[proposalCount];
+        proposal.id = proposalCount;
+        proposal.name = name;
+        proposal.amount = amount;
+        proposal.recipient = recipient;
+        proposal.executed = false;
+        emit ProposalCreated(proposalCount, name, amount, recipient);
+    }
+
+    function vote(uint256 proposalId, bool vote) public {
+        Proposal storage proposal = proposals[proposalId];
+        require(vote, "You must vote true or false");
+        require(!proposal.votes[msg.sender], "You have already voted");
+        proposal.votes[msg.sender] = true;
+        if (vote) {
+            proposal.yesVotes++;
+        } else {
+            proposal.noVotes++;
+        }
+        emit VoteCast(proposalId, vote, msg.sender);
+    }
+
+    function executeProposal(uint256 proposalId) public onlyOwner {
+        Proposal storage proposal = proposals[proposalId];
+        require(!proposal.executed, "Proposal has already been executed");
+        require(proposal.yesVotes > proposal.noVotes, "Not enough yes votes to execute proposal");
+        proposal.executed = true;
+        (bool success, ) = proposal.recipient.call{value: proposal.amount}("");
+        require(success, "Proposal execution failed");
+        emit ProposalExecuted(proposalId, proposal.yesVotes, proposal.noVotes);
+    }
+}

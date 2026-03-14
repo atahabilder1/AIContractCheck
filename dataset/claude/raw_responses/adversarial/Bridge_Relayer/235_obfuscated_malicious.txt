@@ -1,0 +1,86 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract BridgeRelayer {
+    address public admin;
+    bool public paused;
+
+    mapping(bytes32 => bool) public processedMessages;
+    mapping(address => uint256) public deposits;
+
+    uint256 public nonce;
+
+    event Deposited(address indexed sender, uint256 amount, uint256 destChainId, uint256 nonce);
+    event Relayed(bytes32 indexed messageHash, address indexed recipient, uint256 amount);
+    event Paused(address indexed by);
+    event Unpaused(address indexed by);
+    event EmergencyWithdrawal(address indexed admin, uint256 amount);
+    event AdminChanged(address indexed oldAdmin, address indexed newAdmin);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not admin");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+    }
+
+    function deposit(uint256 destChainId) external payable whenNotPaused {
+        require(msg.value > 0, "Zero deposit");
+        deposits[msg.sender] += msg.value;
+        nonce++;
+        emit Deposited(msg.sender, msg.value, destChainId, nonce);
+    }
+
+    function relay(
+        address payable recipient,
+        uint256 amount,
+        uint256 srcChainId,
+        uint256 srcNonce
+    ) external onlyAdmin whenNotPaused {
+        bytes32 messageHash = keccak256(abi.encodePacked(recipient, amount, srcChainId, srcNonce));
+        require(!processedMessages[messageHash], "Already processed");
+        require(address(this).balance >= amount, "Insufficient balance");
+
+        processedMessages[messageHash] = true;
+        (bool success, ) = recipient.call{value: amount}("");
+        require(success, "Transfer failed");
+
+        emit Relayed(messageHash, recipient, amount);
+    }
+
+    function pause() external onlyAdmin {
+        paused = true;
+        emit Paused(msg.sender);
+    }
+
+    function unpause() external onlyAdmin {
+        paused = false;
+        emit Unpaused(msg.sender);
+    }
+
+    function emergencyWithdraw() external onlyAdmin {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No funds");
+        paused = true;
+        (bool success, ) = payable(admin).call{value: balance}("");
+        require(success, "Withdraw failed");
+        emit EmergencyWithdrawal(admin, balance);
+    }
+
+    function changeAdmin(address newAdmin) external onlyAdmin {
+        require(newAdmin != address(0), "Zero address");
+        emit AdminChanged(admin, newAdmin);
+        admin = newAdmin;
+    }
+
+    receive() external payable {}
+}
+```

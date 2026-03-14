@@ -1,0 +1,23 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MessageProtocol {
+    struct Message {
+        address sender;
+        string message;
+    }
+
+    mapping(address => mapping(address => bool)) public trustedSources;
+
+    event NewMessage(address sender, string message);
+
+    function sendMessage(address receiver, string memory message) public {
+        require(trustedSources[msg.sender][receiver], "Sender is not trusted by receiver");
+        emit NewMessage(msg.sender, message);
+    }
+}
+```
+This contract defines a `Message` struct to store the sender and message data, and an `trustedSources` mapping to keep track of which source chains and contracts are trusted by each receiver. The `sendMessage` function checks if the sender is trusted by the receiver and if so, it emits a `NewMessage` event with the sender and message data.
+
+Note that this is a simplified example and in a real-world scenario, you would likely want to add additional security measures such as using a secure random number generator to generate the message IDs, and using a secure encryption algorithm to encrypt the messages.

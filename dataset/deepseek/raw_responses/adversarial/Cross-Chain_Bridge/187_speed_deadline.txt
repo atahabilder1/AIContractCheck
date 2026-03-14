@@ -1,0 +1,37 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract CrossChainBridge is Ownable {
+    using SafeERC20 for IERC20;
+
+    address public otherChainTokenAddress;
+    mapping(address => uint256) public depositedAmounts;
+
+    event TokensDeposited(address indexed user, uint256 amount);
+    event TokensWithdrawn(address indexed user, uint256 amount);
+
+    function depositTokens(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        IERC20(otherChainTokenAddress).safeTransferFrom(msg.sender, address(this), amount);
+        depositedAmounts[msg.sender] += amount;
+        emit TokensDeposited(msg.sender, amount);
+    }
+
+    function withdrawTokens(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        require(depositedAmounts[msg.sender] >= amount, "Insufficient balance");
+        depositedAmounts[msg.sender] -= amount;
+        IERC20(otherChainTokenAddress).safeTransfer(msg.sender, amount);
+        emit TokensWithdrawn(msg.sender, amount);
+    }
+
+    function setOtherChainTokenAddress(address _tokenAddress) external onlyOwner {
+        otherChainTokenAddress = _tokenAddress;
+    }
+}
+```

@@ -1,0 +1,42 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract EnglishAuction {
+    address payable public seller;
+    string public item;
+    uint public endTime;
+    bool public ended;
+    uint public highestBid;
+    address public highestBidder;
+    mapping(address => uint) public bids;
+
+    event BidPlaced(address bidder, uint amount);
+    event AuctionEnded(address winner, uint amount);
+
+    constructor(string memory _item, uint _duration) {
+        seller = payable(msg.sender);
+        item = _item;
+        endTime = block.timestamp + _duration;
+    }
+
+    function bid() public payable {
+        require(block.timestamp < endTime, "Auction has ended.");
+        require(msg.value > highestBid, "There already is a higher bid.");
+
+        if (highestBid != 0) {
+            bids[highestBidder] += highestBid;
+        }
+
+        highestBid = msg.value;
+        highestBidder = msg.sender;
+        emit BidPlaced(msg.sender, msg.value);
+    }
+
+    function endAuction() public {
+        require(block.timestamp >= endTime, "Auction not yet ended.");
+        require(!ended, "Auction has already ended.");
+        ended = true;
+        seller.transfer(highestBid);
+        emit AuctionEnded(highestBidder, highestBid);
+    }
+}

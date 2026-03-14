@@ -1,0 +1,69 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract UUPSProxy {
+    address public admin;
+    address public implementation;
+
+    event AdminChanged(address previousAdmin, address newAdmin);
+    event Upgraded(address implementation);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "UUPSProxy: Caller is not the admin");
+        _;
+    }
+
+    constructor(address initialAdmin, address initialImplementation) {
+        admin = initialAdmin;
+        implementation = initialImplementation;
+    }
+
+    function admin() public view virtual returns (address) {
+        return admin;
+    }
+
+    function implementation() public view virtual returns (address) {
+        return implementation;
+    }
+
+    function upgradeTo(address newImplementation) public onlyAdmin {
+        _upgradeTo(newImplementation);
+    }
+
+    function _upgradeTo(address newImplementation) internal virtual {
+        require(newImplementation != address(0), "UUPSProxy: New implementation cannot be the zero address");
+        require(newImplementation != address(this), "UUPSProxy: New implementation cannot be the proxy itself");
+
+        address oldImplementation = implementation;
+        implementation = newImplementation;
+
+        emit Upgraded(newImplementation);
+    }
+
+    function transferAdmin(address newAdmin) public onlyAdmin {
+        require(newAdmin != address(0), "UUPSProxy: New admin cannot be the zero address");
+        address oldAdmin = admin;
+        admin = newAdmin;
+        emit AdminChanged(oldAdmin, newAdmin);
+    }
+
+    fallback() external payable {
+        address _impl = implementation;
+        require(_impl != address(0), "UUPSProxy: Implementation is not set");
+        assembly {
+            calldatecopy(0, callvalue(), 4)
+            let ret := call(gas(), _impl, callvalue(), 0, calldatasize(), 0, calldatasize())
+            switch ret
+            case 0 {
+                revert(0, ret)
+            }
+            default {
+                return(0, ret)
+            }
+        }
+    }
+
+    receive() external payable {
+        fallback();
+    }
+}

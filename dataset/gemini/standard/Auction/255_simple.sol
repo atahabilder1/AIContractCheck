@@ -1,0 +1,90 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract EnglishAuction {
+    address payable public seller;
+    uint256 public endTime;
+    uint256 public highestBid;
+    address payable public highestBidder;
+    bool public auctionEnded;
+
+    event BidPlaced(address bidder, uint256 amount);
+    event AuctionWon(address winner, uint256 amount);
+    event AuctionEnded();
+
+    modifier onlySeller() {
+        require(msg.sender == seller, "Only the seller can perform this action.");
+        _;
+    }
+
+    modifier notEnded() {
+        require(!auctionEnded, "Auction has already ended.");
+        _;
+    }
+
+    constructor(uint256 _durationInSeconds) {
+        seller = payable(msg.sender);
+        endTime = block.timestamp + _durationInSeconds;
+        highestBid = 0;
+        highestBidder = payable(address(0));
+        auctionEnded = false;
+    }
+
+    function placeBid() public payable notEnded {
+        require(block.timestamp < endTime, "Auction has already ended.");
+        require(msg.value > highestBid, "Bid must be higher than the current highest bid.");
+
+        if (highestBidder != payable(address(0))) {
+            // Refund previous highest bidder
+            (bool success, ) = highestBidder.call{value: highestBid}("");
+            require(success, "Refund failed.");
+        }
+
+        highestBid = msg.value;
+        highestBidder = payable(msg.sender);
+
+        emit BidPlaced(msg.sender, msg.value);
+    }
+
+    function endAuction() public onlySeller notEnded {
+        require(block.timestamp >= endTime, "Auction has not ended yet.");
+
+        auctionEnded = true;
+
+        if (highestBidder != payable(address(0))) {
+            // Transfer funds to the seller
+            (bool success, ) = seller.call{value: highestBid}("");
+            require(success, "Fund transfer to seller failed.");
+
+            emit AuctionWon(highestBidder, highestBid);
+        }
+
+        emit AuctionEnded();
+    }
+
+    // Fallback function to receive Ether, can be used to place bids if no specific function is called
+    receive() external payable notEnded {
+        placeBid();
+    }
+
+    // Function to withdraw funds if the auction ends without a winner (e.g., no bids)
+    function withdrawFunds() public onlySeller {
+        require(auctionEnded, "Auction has not ended.");
+        require(highestBidder == payable(address(0)), "Funds have already been distributed.");
+        // This case should ideally not happen if endAuction is called correctly,
+        // but as a safeguard, if no bids were placed, seller can withdraw their initial funds if any.
+        // In a real-world scenario, you might want to handle this differently.
+        // For simplicity, we assume no funds are sent initially to the contract.
+    }
+
+    // Function to get current auction status
+    function getAuctionStatus() public view returns (
+        address payable _seller,
+        uint256 _endTime,
+        uint256 _highestBid,
+        address payable _highestBidder,
+        bool _auctionEnded
+    ) {
+        return (seller, endTime, highestBid, highestBidder, auctionEnded);
+    }
+}

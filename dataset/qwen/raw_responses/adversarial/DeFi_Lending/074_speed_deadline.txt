@@ -1,0 +1,36 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleLending {
+    mapping(address => uint256) public deposits;
+    mapping(address => uint256) public loans;
+    uint256 public interestRate = 10; // 10% interest per period
+
+    function deposit(uint256 amount) public payable {
+        require(amount == msg.value, "Amount mismatch");
+        deposits[msg.sender] += amount;
+    }
+
+    function borrow(uint256 amount) public {
+        require(deposits[msg.sender] >= amount, "Insufficient deposit");
+        loans[msg.sender] += amount;
+        deposits[msg.sender] -= amount;
+        payable(msg.sender).transfer(amount);
+    }
+
+    function repay(uint256 amount) public payable {
+        require(loans[msg.sender] >= amount, "Repayment exceeds loan");
+        require(amount == msg.value, "Amount mismatch");
+        loans[msg.sender] -= amount;
+        deposits[msg.sender] += amount;
+    }
+
+    function withdraw(uint256 amount) public {
+        require(deposits[msg.sender] >= amount, "Insufficient deposit");
+        require(loans[msg.sender] == 0, "Outstanding loan");
+        deposits[msg.sender] -= amount;
+        payable(msg.sender).transfer(amount);
+    }
+}
+```

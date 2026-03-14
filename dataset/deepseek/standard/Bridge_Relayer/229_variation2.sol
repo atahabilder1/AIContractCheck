@@ -1,0 +1,78 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+
+contract BridgeRelayer is Ownable {
+    using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableSet for EnumerableSet.UintSet;
+
+    struct Bid {
+        uint256 amount;
+        address relayer;
+    }
+
+    EnumerableSet.AddressSet private relayers;
+    mapping(address => uint256) private relayerBids;
+    EnumerableSet.UintSet private bidIds;
+
+    event BidPlaced(address indexed relayer, uint256 amount);
+    event BidAccepted(uint256 indexed bidId, address indexed relayer, uint256 amount);
+
+    function placeBid(uint256 amount) external {
+        require(amount > 0, "Bid amount must be greater than zero");
+        relayerBids[msg.sender] = amount;
+        relayers.add(msg.sender);
+        bidIds.add(amount);
+        emit BidPlaced(msg.sender, amount);
+    }
+
+    function acceptBid(uint256 bidId) external onlyOwner {
+        require(bidIds.contains(bidId), "Bid does not exist");
+        address relayer = getRelayerByBidId(bidId);
+        require(relayer != address(0), "Relayer not found");
+        uint256 amount = getBidAmountByBidId(bidId);
+        require(amount > 0, "Bid amount must be greater than zero");
+
+        relayers.remove(relayer);
+        bidIds.remove(bidId);
+        relayerBids[relayer] = 0;
+
+        emit BidAccepted(bidId, relayer, amount);
+    }
+
+    function getRelayerByBidId(uint256 bidId) public view returns (address) {
+        for (uint256 i = 0; i < relayers.length(); i++) {
+            address relayer = relayers.at(i);
+            if (relayerBids[relayer] == bidId) {
+                return relayer;
+            }
+        }
+        return address(0);
+    }
+
+    function getBidAmountByBidId(uint256 bidId) public view returns (uint256) {
+        for (uint256 i = 0; i < relayers.length(); i++) {
+            address relayer = relayers.at(i);
+            if (relayerBids[relayer] == bidId) {
+                return relayerBids[relayer];
+            }
+        }
+        return 0;
+    }
+
+    function getTopBids(uint256 count) external view returns (Bid[] memory) {
+        Bid[] memory bids = new Bid[](count);
+        uint256 index = 0;
+        for (uint256 i = 0; i < relayers.length() && index < count; i++) {
+            address relayer = relayers.at(i);
+            uint256 amount = relayerBids[relayer];
+            if (amount > 0) {
+                bids[index] = Bid({amount: amount, relayer: relayer});
+                index++;
+            }
+        }
+        return bids;
+    }
+}

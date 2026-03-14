@@ -1,0 +1,173 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address) external view returns (uint256);
+    function transfer(address, uint256) external returns (bool);
+    function allowance(address, address) external view returns (uint256);
+    function approve(address, uint256) external returns (bool);
+    function transferFrom(address, address, uint256) external returns (bool);
+}
+
+interface IStrategy {
+    function want() external view returns (address);
+    function deposit(uint256) external;
+    function withdraw(uint256) external;
+    function balanceOf() external view returns (uint256);
+    function harvest() external;
+}
+
+contract YieldAggregator {
+    struct UserInfo {
+        uint128 shares;
+        uint128 depositBlock;
+    }
+
+    address public immutable asset;
+    address public owner;
+    address public strategy;
+
+    uint256 public totalShares;
+    uint256 public withdrawalFee; // basis points, max 50 (0.5%)
+    uint256 public harvestBounty; // basis points for caller incentive
+
+    mapping(address => UserInfo) public users;
+
+    event Deposit(address indexed user, uint256 amount, uint256 shares);
+    event Withdraw(address indexed user, uint256 amount, uint256 shares);
+    event StrategyUpdated(address indexed strategy);
+    event Harvest(address indexed caller, uint256 bounty);
+
+    error Unauthorized();
+    error ZeroAmount();
+    error InsufficientShares();
+    error InvalidFee();
+    error SameBlock();
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert Unauthorized();
+        _;
+    }
+
+    constructor(address _asset, uint256 _withdrawalFee, uint256 _harvestBounty) {
+        asset = _asset;
+        owner = msg.sender;
+        withdrawalFee = _withdrawalFee;
+        harvestBounty = _harvestBounty;
+    }
+
+    function deposit(uint256 _amount) external {
+        if (_amount == 0) revert ZeroAmount();
+
+        uint256 pool = totalBalance();
+        IERC20(asset).transferFrom(msg.sender, address(this), _amount);
+
+        uint256 shares;
+        unchecked {
+            shares = totalShares == 0 ? _amount : (_amount * totalShares) / pool;
+        }
+
+        UserInfo storage u = users[msg.sender];
+        u.shares = uint128(uint256(u.shares) + shares);
+        u.depositBlock = uint128(block.number);
+
+        unchecked {
+            totalShares += shares;
+        }
+
+        _earn();
+        emit Deposit(msg.sender, _amount, shares);
+    }
+
+    function withdraw(uint256 _shares) external {
+        UserInfo storage u = users[msg.sender];
+        if (_shares == 0) revert ZeroAmount();
+        if (_shares > u.shares) revert InsufficientShares();
+        if (u.depositBlock == block.number) revert SameBlock();
+
+        uint256 amount = (_shares * totalBalance()) / totalShares;
+
+        unchecked {
+            u.shares = uint128(uint256(u.shares) - _shares);
+            totalShares -= _shares;
+        }
+
+        uint256 bal = IERC20(asset).balanceOf(address(this));
+        if (bal < amount) {
+            IStrategy(strategy).withdraw(amount - bal);
+            bal = IERC20(asset).balanceOf(address(this));
+            if (bal < amount) amount = bal;
+        }
+
+        if (withdrawalFee > 0) {
+            uint256 fee;
+            unchecked {
+                fee = (amount * withdrawalFee) / 10000;
+                amount -= fee;
+            }
+        }
+
+        IERC20(asset).transfer(msg.sender, amount);
+        emit Withdraw(msg.sender, amount, _shares);
+    }
+
+    function harvest() external {
+        IStrategy(strategy).harvest();
+
+        uint256 bounty;
+        if (harvestBounty > 0) {
+            uint256 bal = IERC20(asset).balanceOf(address(this));
+            unchecked {
+                bounty = (bal * harvestBounty) / 10000;
+            }
+            if (bounty > 0) {
+                IERC20(asset).transfer(msg.sender, bounty);
+            }
+        }
+
+        _earn();
+        emit Harvest(msg.sender, bounty);
+    }
+
+    function setStrategy(address _strategy) external onlyOwner {
+        if (strategy != address(0)) {
+            IStrategy(strategy).withdraw(IStrategy(strategy).balanceOf());
+        }
+        strategy = _strategy;
+        _earn();
+        emit StrategyUpdated(_strategy);
+    }
+
+    function setWithdrawalFee(uint256 _fee) external onlyOwner {
+        if (_fee > 50) revert InvalidFee();
+        withdrawalFee = _fee;
+    }
+
+    function setHarvestBounty(uint256 _bounty) external onlyOwner {
+        if (_bounty > 500) revert InvalidFee();
+        harvestBounty = _bounty;
+    }
+
+    function transferOwnership(address _owner) external onlyOwner {
+        owner = _owner;
+    }
+
+    function totalBalance() public view returns (uint256) {
+        uint256 strat = strategy != address(0) ? IStrategy(strategy).balanceOf() : 0;
+        return IERC20(asset).balanceOf(address(this)) + strat;
+    }
+
+    function pricePerShare() external view returns (uint256) {
+        return totalShares == 0 ? 1e18 : (totalBalance() * 1e18) / totalShares;
+    }
+
+    function _earn() internal {
+        address s = strategy;
+        if (s == address(0)) return;
+        uint256 bal = IERC20(asset).balanceOf(address(this));
+        if (bal == 0) return;
+        IERC20(asset).approve(s, bal);
+        IStrategy(s).deposit(bal);
+    }
+}

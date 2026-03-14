@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainMessaging {
+    event MessageSent(address indexed sender, uint256 indexed chainId, bytes message);
+    event MessageReceived(address indexed sender, uint256 indexed chainId, bytes message);
+
+    function sendMessage(uint256 chainId, bytes memory message) public {
+        emit MessageSent(msg.sender, chainId, message);
+    }
+
+    function receiveMessage(uint256 chainId, bytes memory message) public {
+        emit MessageReceived(msg.sender, chainId, message);
+    }
+}

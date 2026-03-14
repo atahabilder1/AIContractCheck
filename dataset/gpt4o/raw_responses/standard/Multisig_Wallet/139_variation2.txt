@@ -1,0 +1,109 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SocialRecoveryWallet {
+    address public owner;
+    address[] public guardians;
+    mapping(address => bool) public isGuardian;
+    uint256 public recoveryThreshold;
+    mapping(address => bool) public recoveryApprovals;
+    uint256 public approvalCount;
+    address public newOwner;
+
+    event OwnerChanged(address indexed oldOwner, address indexed newOwner);
+    event GuardianAdded(address indexed guardian);
+    event GuardianRemoved(address indexed guardian);
+    event RecoveryRequested(address indexed newOwner);
+    event RecoveryApproved(address indexed guardian, address indexed newOwner);
+    event RecoveryRevoked(address indexed guardian, address indexed newOwner);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    modifier onlyGuardian() {
+        require(isGuardian[msg.sender], "Not a guardian");
+        _;
+    }
+
+    constructor(address[] memory _guardians, uint256 _recoveryThreshold) {
+        require(_guardians.length >= _recoveryThreshold, "Guardians less than threshold");
+        owner = msg.sender;
+        guardians = _guardians;
+        recoveryThreshold = _recoveryThreshold;
+        for (uint256 i = 0; i < _guardians.length; i++) {
+            isGuardian[_guardians[i]] = true;
+        }
+    }
+
+    function addGuardian(address _guardian) external onlyOwner {
+        require(!isGuardian[_guardian], "Already a guardian");
+        guardians.push(_guardian);
+        isGuardian[_guardian] = true;
+        emit GuardianAdded(_guardian);
+    }
+
+    function removeGuardian(address _guardian) external onlyOwner {
+        require(isGuardian[_guardian], "Not a guardian");
+        isGuardian[_guardian] = false;
+        for (uint256 i = 0; i < guardians.length; i++) {
+            if (guardians[i] == _guardian) {
+                guardians[i] = guardians[guardians.length - 1];
+                guardians.pop();
+                break;
+            }
+        }
+        emit GuardianRemoved(_guardian);
+    }
+
+    function requestRecovery(address _newOwner) external onlyGuardian {
+        require(_newOwner != address(0), "Invalid new owner");
+        newOwner = _newOwner;
+        for (uint256 i = 0; i < guardians.length; i++) {
+            recoveryApprovals[guardians[i]] = false;
+        }
+        approvalCount = 0;
+        emit RecoveryRequested(_newOwner);
+    }
+
+    function approveRecovery() external onlyGuardian {
+        require(newOwner != address(0), "No recovery requested");
+        require(!recoveryApprovals[msg.sender], "Already approved");
+        recoveryApprovals[msg.sender] = true;
+        approvalCount++;
+        emit RecoveryApproved(msg.sender, newOwner);
+
+        if (approvalCount >= recoveryThreshold) {
+            address oldOwner = owner;
+            owner = newOwner;
+            newOwner = address(0);
+            emit OwnerChanged(oldOwner, owner);
+        }
+    }
+
+    function revokeRecovery() external onlyGuardian {
+        require(recoveryApprovals[msg.sender], "Not approved");
+        recoveryApprovals[msg.sender] = false;
+        approvalCount--;
+        emit RecoveryRevoked(msg.sender, newOwner);
+    }
+
+    function resetRecovery() external onlyOwner {
+        newOwner = address(0);
+        approvalCount = 0;
+        for (uint256 i = 0; i < guardians.length; i++) {
+            recoveryApprovals[guardians[i]] = false;
+        }
+    }
+
+    receive() external payable {}
+
+    function transfer(address payable _to, uint256 _amount) external onlyOwner {
+        require(_to != address(0), "Invalid address");
+        require(address(this).balance >= _amount, "Insufficient balance");
+        _to.transfer(_amount);
+    }
+}
+```

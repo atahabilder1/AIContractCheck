@@ -1,0 +1,68 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract FlashLoanProvider {
+    address public owner;
+    uint256 public feePercent;
+    mapping(address => uint256) private balances;
+
+    event FlashLoan(address borrower, uint256 amount, uint256 fee);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    constructor(uint256 _feePercent) {
+        owner = msg.sender;
+        feePercent = _feePercent;
+    }
+
+    function deposit() external payable {
+        require(msg.value > 0, "Must deposit non-zero amount");
+        balances[msg.sender] += msg.value;
+    }
+
+    function withdraw(uint256 amount) external {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        balances[msg.sender] -= amount;
+        payable(msg.sender).transfer(amount);
+    }
+
+    function availableLiquidity() public view returns (uint256) {
+        return address(this).balance;
+    }
+
+    function executeFlashLoan(uint256 amount, bytes calldata data) external {
+        uint256 initialBalance = address(this).balance;
+        require(amount > 0 && amount <= initialBalance, "Invalid loan amount");
+
+        uint256 fee = (amount * feePercent) / 100;
+        uint256 totalRepayment = amount + fee;
+
+        (bool success, ) = msg.sender.call{value: amount}(data);
+        require(success, "Flash loan execution failed");
+
+        require(address(this).balance >= initialBalance + fee, "Flash loan not repaid");
+
+        emit FlashLoan(msg.sender, amount, fee);
+    }
+
+    function setFeePercent(uint256 _feePercent) external onlyOwner {
+        feePercent = _feePercent;
+    }
+
+    function withdrawFees() external onlyOwner {
+        uint256 contractBalance = address(this).balance;
+        uint256 totalDeposits = 0;
+
+        for (uint256 i = 0; i < balances[msg.sender]; i++) {
+            totalDeposits += balances[msg.sender];
+        }
+
+        uint256 fees = contractBalance - totalDeposits;
+        require(fees > 0, "No fees to withdraw");
+
+        payable(owner).transfer(fees);
+    }
+}

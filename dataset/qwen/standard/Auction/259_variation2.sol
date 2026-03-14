@@ -1,0 +1,104 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract VickreyAuction {
+    address public seller;
+    uint public startTime;
+    uint public biddingEndTime;
+    uint public revealEndTime;
+    bool public ended;
+
+    struct Bid {
+        bytes32 blindedBid;
+        uint deposit;
+    }
+
+    mapping(address => Bid) public bids;
+    address public highestBidder;
+    uint public highestBid;
+    address public secondHighestBidder;
+    uint public secondHighestBid;
+
+    event AuctionEnded(address winner, uint amount);
+    event HighestBidIncreased(address bidder, uint amount);
+    event AuctionBegun(uint startTime, uint biddingEndTime, uint revealEndTime);
+    event BidRevealed(address bidder, uint value, bool valid);
+
+    modifier onlyBefore(uint time) {
+        require(block.timestamp < time);
+        _;
+    }
+
+    modifier onlyAfter(uint time) {
+        require(block.timestamp >= time);
+        _;
+    }
+
+    constructor(uint _biddingTime, uint _revealTime) {
+        seller = msg.sender;
+        startTime = block.timestamp;
+        biddingEndTime = block.timestamp + _biddingTime;
+        revealEndTime = biddingEndTime + _revealTime;
+        emit AuctionBegun(startTime, biddingEndTime, revealEndTime);
+    }
+
+    function bid(bytes32 _blindedBid) external payable onlyBefore(biddingEndTime) {
+        require(msg.value > 0);
+        bids[msg.sender] = Bid({
+            blindedBid: _blindedBid,
+            deposit: msg.value
+        });
+    }
+
+    function reveal(
+        uint _value,
+        bool _fake,
+        bytes32 _secret
+    ) external onlyAfter(biddingEndTime) onlyBefore(revealEndTime) {
+        uint refund;
+        Bid storage bidToCheck = bids[msg.sender];
+        require(bidToCheck.blindedBid == keccak256(abi.encodePacked(_value, _fake, _secret)));
+        refund = bidToCheck.deposit;
+
+        if (!_fake && bidToCheck.deposit >= _value) {
+            if (placeBid(msg.sender, _value))
+                refund -= _value;
+        }
+
+        payable(msg.sender).transfer(refund);
+        emit BidRevealed(msg.sender, _value, !_fake);
+    }
+
+    function placeBid(address bidder, uint value) internal returns (bool success) {
+        if (value > highestBid) {
+            if (secondHighestBidder != address(0)) {
+                secondHighestBidder.transfer(secondHighestBid);
+            }
+            secondHighestBidder = highestBidder;
+            secondHighestBid = highestBid;
+
+            highestBidder = bidder;
+            highestBid = value;
+
+            emit HighestBidIncreased(bidder, value);
+            return true;
+        } else if (value > secondHighestBid) {
+            if (secondHighestBidder != address(0)) {
+                secondHighestBidder.transfer(secondHighestBid);
+            }
+            secondHighestBidder = bidder;
+            secondHighestBid = value;
+
+            emit HighestBidIncreased(bidder, value);
+            return true;
+        }
+        return false;
+    }
+
+    function auctionEnd() external onlyAfter(revealEndTime) {
+        require(!ended);
+        ended = true;
+        emit AuctionEnded(highestBidder, secondHighestBid);
+        payable(seller).transfer(secondHighestBid);
+    }
+}

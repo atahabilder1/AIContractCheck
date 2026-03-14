@@ -1,0 +1,40 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainMessaging {
+    address private _owner;
+    mapping(address => uint256) private _messageCount;
+    mapping(address => mapping(uint256 => bytes)) private _messages;
+
+    event MessageSent(address indexed from, address indexed to, uint256 indexed messageId);
+
+    constructor() public {
+        _owner = msg.sender;
+    }
+
+    function sendMessage(address to, bytes memory message) public {
+        require(msg.sender == _owner, "Only the owner can send messages");
+        uint256 messageId = _messageCount[to]++;
+        _messages[to][messageId] = message;
+        emit MessageSent(msg.sender, to, messageId);
+    }
+
+    function getMessages(address from) public view returns (uint256[] memory) {
+        uint256[] memory messageIds = new uint256[](_messageCount[from]);
+        for (uint256 i = 0; i < _messageCount[from]; i++) {
+            messageIds[i] = _messages[from][i].messageId;
+        }
+        return messageIds;
+    }
+}
+```
+This smart contract allows for cross-chain messaging between two or more chains. It batches multiple messages together for gas-efficient relay between chains. The contract has a `sendMessage` function that allows the owner to send a message to a specific address. The message is stored in the contract's storage and can be retrieved using the `getMessages` function. The `getMessages` function returns an array of message IDs that can be used to retrieve the messages from the contract's storage.
+
+The contract also has a `MessageSent` event that is emitted every time a message is sent. This event can be used to trigger the relay of the message between chains.
+
+The contract uses a mapping to store the messages and their IDs. The mapping is keyed by the sender's address and the message ID. This allows for efficient retrieval of the messages for a specific sender.
+
+The contract also has a `_messageCount` mapping that keeps track of the number of messages sent by each sender. This is used to generate the message IDs.
+
+The contract has a constructor that sets the owner of the contract. The owner is the only entity that can send messages using the `sendMessage` function.

@@ -1,0 +1,59 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+contract Timelock {
+    address public owner;
+    mapping(bytes32 => bool) public queuedTransactions;
+
+    event Log(address indexed target, uint256 value, bytes data, uint256 eta, uint256 timestamp);
+    event Executed(address indexed target, uint256 value, bytes data, uint256 timestamp);
+    event Cancelled(bytes32 indexed txHash);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Timelock: Caller is not the owner");
+        _;
+    }
+
+    constructor(address _owner) {
+        owner = _owner;
+    }
+
+    function queueTransaction(address target, uint256 value, bytes memory data, uint256 eta) public onlyOwner {
+        bytes32 txHash = keccak256(abi.encodePacked(target, value, data, eta));
+        require(!queuedTransactions[txHash], "Timelock: Transaction already queued");
+        require(eta >= block.timestamp, "Timelock: Estimated execution time is in the past");
+
+        queuedTransactions[txHash] = true;
+        emit Log(target, value, data, eta, block.timestamp);
+    }
+
+    function executeTransaction(address target, uint256 value, bytes memory data, uint256 eta) public payable onlyOwner {
+        bytes32 txHash = keccak256(abi.encodePacked(target, value, data, eta));
+        require(queuedTransactions[txHash], "Timelock: Transaction not queued");
+        require(block.timestamp >= eta, "Timelock: Transaction is not yet ready");
+
+        queuedTransactions[txHash] = false; // Mark as executed *before* calling the target to prevent reentrancy
+
+        (bool success, ) = target.call{value: value}(data);
+        require(success, "Timelock: Transaction execution failed");
+
+        emit Executed(target, value, data, block.timestamp);
+    }
+
+    function cancelTransaction(address target, uint256 value, bytes memory data, uint256 eta) public onlyOwner {
+        bytes32 txHash = keccak256(abi.encodePacked(target, value, data, eta));
+        require(queuedTransactions[txHash], "Timelock: Transaction not queued");
+
+        queuedTransactions[txHash] = false;
+        emit Cancelled(txHash);
+    }
+
+    // Allow the owner to withdraw any Ether sent to the timelock contract
+    function withdraw() public onlyOwner {
+        (bool success, ) = payable(owner).call{value: address(this).balance}("");
+        require(success, "Timelock: Ether withdrawal failed");
+    }
+
+    // Fallback function to receive Ether
+    receive() external payable {}
+}

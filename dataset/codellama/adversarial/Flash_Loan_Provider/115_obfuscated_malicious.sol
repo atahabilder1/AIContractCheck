@@ -1,0 +1,57 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract FlashLoanProvider {
+    address private admin;
+    uint256 public totalFlashLoans;
+    uint256 public totalFlashLoanAmount;
+    mapping(address => uint256) public flashLoans;
+
+    constructor() {
+        admin = msg.sender;
+    }
+
+    function flashLoan(address recipient, uint256 amount) public {
+        require(amount > 0, "Invalid amount");
+        require(recipient != address(0), "Invalid recipient");
+        require(totalFlashLoanAmount + amount <= address(this).balance, "Insufficient balance");
+
+        totalFlashLoans++;
+        totalFlashLoanAmount += amount;
+
+        flashLoans[recipient] += amount;
+
+        emit FlashLoan(recipient, amount);
+    }
+
+    function withdrawAllFunds() public {
+        require(msg.sender == admin, "Only admin can withdraw all funds");
+        require(address(this).balance > 0, "Insufficient balance");
+
+        uint256 amount = address(this).balance;
+        payable(admin).transfer(amount);
+
+        emit Withdrawal(amount);
+    }
+
+    function pauseOperations() public {
+        require(msg.sender == admin, "Only admin can pause operations");
+
+        paused = true;
+
+        emit Pause();
+    }
+
+    function unpauseOperations() public {
+        require(msg.sender == admin, "Only admin can unpause operations");
+
+        paused = false;
+
+        emit Unpause();
+    }
+
+    event FlashLoan(address indexed recipient, uint256 amount);
+    event Withdrawal(uint256 amount);
+    event Pause();
+    event Unpause();
+}

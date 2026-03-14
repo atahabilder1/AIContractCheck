@@ -1,0 +1,37 @@
+pragma solidity ^0.8.0;
+
+contract CrossChainMessaging {
+    address private _owner;
+    mapping(address => mapping(bytes32 => bool)) private _messages;
+    mapping(address => bytes32) private _messageHashes;
+    mapping(bytes32 => mapping(address => bool)) private _messageSent;
+    mapping(bytes32 => address[]) private _messageRecipients;
+
+    event MessageSent(address indexed sender, address indexed recipient, bytes32 messageHash);
+
+    constructor() public {
+        _owner = msg.sender;
+    }
+
+    function sendMessage(address recipient, bytes32 messageHash) external {
+        require(msg.sender == _owner, "Only the owner can send messages");
+        require(recipient != address(0), "Invalid recipient address");
+        require(!_messages[recipient][messageHash], "Message already sent");
+
+        _messages[recipient][messageHash] = true;
+        _messageHashes[recipient] = messageHash;
+        _messageSent[messageHash][msg.sender] = true;
+        _messageRecipients[messageHash].push(recipient);
+
+        emit MessageSent(msg.sender, recipient, messageHash);
+    }
+
+    function getMessages(address recipient) external view returns (bytes32[] memory) {
+        return _messageRecipients[recipient];
+    }
+
+    function getMessageHashes(address recipient) external view returns (bytes32[] memory) {
+        return _messageHashes[recipient];
+    }
+}
+```

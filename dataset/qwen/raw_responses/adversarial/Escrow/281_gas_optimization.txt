@@ -1,0 +1,36 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract GasOptimizedEscrow {
+    address payable public buyer;
+    address payable public seller;
+    address public arbiter;
+    bool public isApproved;
+    bool public isReleased;
+
+    constructor(address payable _buyer, address payable _seller, address _arbiter) {
+        buyer = _buyer;
+        seller = _seller;
+        arbiter = _arbiter;
+    }
+
+    receive() external payable {}
+
+    function approve() external {
+        require(msg.sender == arbiter, "Only arbiter can approve");
+        isApproved = true;
+    }
+
+    function release() external {
+        require(isApproved && !isReleased, "Not ready for release");
+        isReleased = true;
+        seller.transfer(address(this).balance);
+    }
+
+    function refund() external {
+        require(msg.sender == buyer && !isApproved && !isReleased, "Not ready for refund");
+        buyer.transfer(address(this).balance);
+    }
+}
+```

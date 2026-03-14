@@ -1,0 +1,129 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract BridgeRelayer {
+    address public immutable owner;
+    uint256 public immutable requiredConfirmations;
+
+    mapping(address => bool) public relayers;
+    uint256 public relayerCount;
+
+    mapping(bytes32 => uint256) private _confirmationCount;
+    mapping(bytes32 => mapping(address => bool)) private _hasConfirmed;
+    mapping(bytes32 => bool) public executed;
+
+    event RelayerAdded(address indexed relayer);
+    event RelayerRemoved(address indexed relayer);
+    event DepositRelayed(bytes32 indexed txHash, address indexed recipient, uint256 amount, uint256 sourceChain);
+    event Confirmed(bytes32 indexed txHash, address indexed relayer);
+    event Executed(bytes32 indexed txHash, address indexed recipient, uint256 amount);
+
+    error NotOwner();
+    error NotRelayer();
+    error AlreadyConfirmed();
+    error AlreadyExecuted();
+    error InsufficientConfirmations();
+    error TransferFailed();
+    error ZeroAddress();
+    error AlreadyRelayer();
+    error NotExistingRelayer();
+    error InsufficientBalance();
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert NotOwner();
+        _;
+    }
+
+    modifier onlyRelayer() {
+        if (!relayers[msg.sender]) revert NotRelayer();
+        _;
+    }
+
+    constructor(address[] memory _relayers, uint256 _requiredConfirmations) {
+        owner = msg.sender;
+        requiredConfirmations = _requiredConfirmations;
+        uint256 len = _relayers.length;
+        for (uint256 i; i < len;) {
+            relayers[_relayers[i]] = true;
+            unchecked { ++i; }
+        }
+        relayerCount = len;
+    }
+
+    receive() external payable {}
+
+    function addRelayer(address relayer) external onlyOwner {
+        if (relayer == address(0)) revert ZeroAddress();
+        if (relayers[relayer]) revert AlreadyRelayer();
+        relayers[relayer] = true;
+        unchecked { ++relayerCount; }
+        emit RelayerAdded(relayer);
+    }
+
+    function removeRelayer(address relayer) external onlyOwner {
+        if (!relayers[relayer]) revert NotExistingRelayer();
+        relayers[relayer] = false;
+        unchecked { --relayerCount; }
+        emit RelayerRemoved(relayer);
+    }
+
+    function computeTxHash(
+        address recipient,
+        uint256 amount,
+        uint256 sourceChain,
+        uint256 nonce
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(recipient, amount, sourceChain, nonce));
+    }
+
+    function confirm(
+        address recipient,
+        uint256 amount,
+        uint256 sourceChain,
+        uint256 nonce
+    ) external onlyRelayer {
+        bytes32 txHash = computeTxHash(recipient, amount, sourceChain, nonce);
+        if (executed[txHash]) revert AlreadyExecuted();
+        if (_hasConfirmed[txHash][msg.sender]) revert AlreadyConfirmed();
+
+        _hasConfirmed[txHash][msg.sender] = true;
+        uint256 count;
+        unchecked {
+            count = ++_confirmationCount[txHash];
+        }
+
+        emit Confirmed(txHash, msg.sender);
+
+        if (count >= requiredConfirmations) {
+            _execute(txHash, recipient, amount);
+        }
+    }
+
+    function execute(
+        address recipient,
+        uint256 amount,
+        uint256 sourceChain,
+        uint256 nonce
+    ) external {
+        bytes32 txHash = computeTxHash(recipient, amount, sourceChain, nonce);
+        if (executed[txHash]) revert AlreadyExecuted();
+        if (_confirmationCount[txHash] < requiredConfirmations) revert InsufficientConfirmations();
+        _execute(txHash, recipient, amount);
+    }
+
+    function _execute(bytes32 txHash, address recipient, uint256 amount) private {
+        if (address(this).balance < amount) revert InsufficientBalance();
+        executed[txHash] = true;
+        (bool ok,) = recipient.call{value: amount}("");
+        if (!ok) revert TransferFailed();
+        emit Executed(txHash, recipient, amount);
+    }
+
+    function confirmationCount(bytes32 txHash) external view returns (uint256) {
+        return _confirmationCount[txHash];
+    }
+
+    function hasConfirmed(bytes32 txHash, address relayer) external view returns (bool) {
+        return _hasConfirmed[txHash][relayer];
+    }
+}

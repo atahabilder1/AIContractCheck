@@ -1,0 +1,50 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    address public owner;
+    mapping(address => bool) public relayers;
+
+    event RelayerAdded(address indexed relayer);
+    event RelayerRemoved(address indexed relayer);
+    event BridgeTransaction(
+        address indexed from,
+        address indexed to,
+        uint256 amount,
+        bytes32 indexed transactionId
+    );
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    modifier onlyRelayer() {
+        require(relayers[msg.sender], "Not a registered relayer");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function addRelayer(address _relayer) external onlyOwner {
+        relayers[_relayer] = true;
+        emit RelayerAdded(_relayer);
+    }
+
+    function removeRelayer(address _relayer) external onlyOwner {
+        relayers[_relayer] = false;
+        emit RelayerRemoved(_relayer);
+    }
+
+    function relayTransaction(
+        address _from,
+        address _to,
+        uint256 _amount,
+        bytes32 _transactionId
+    ) external onlyRelayer {
+        emit BridgeTransaction(_from, _to, _amount, _transactionId);
+        // In a real bridge, here would go the logic to transfer the assets across chains
+    }
+}

@@ -1,0 +1,17 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    mapping(address => uint256) public releaseTimes;
+
+    function setReleaseTime(address beneficiary, uint256 releaseTime) public {
+        releaseTimes[beneficiary] = releaseTime;
+    }
+
+    function release(address beneficiary) public {
+        require(block.timestamp >= releaseTimes[beneficiary], "Timelock: not yet");
+        // In a real contract, you'd transfer funds here.
+        // For simplicity, we're just demonstrating the time lock mechanism.
+        // Example: payable(beneficiary).transfer(amount);
+    }
+}

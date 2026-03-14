@@ -1,0 +1,64 @@
+```solicitor
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address payable public seller;
+    address payable public buyer;
+    address payable public arbiter;
+
+    enum State {
+        Created,
+        Funded,
+        Disbursed,
+        Refunded
+    }
+
+    State public state;
+    uint256 public amount;
+
+    modifier onlySeller() {
+        require(msg.sender == seller, "Only seller can call this function.");
+        _;
+    }
+
+    modifier onlyBuyer() {
+        require(msg.sender == buyer, "Only buyer can call this function.");
+        _;
+    }
+
+    modifier onlyArbiter() {
+        require(msg.sender == arbiter, "Only arbiter can call this function.");
+        _;
+    }
+
+    modifier inState(State _state) {
+        require(state == _state, "Invalid state.");
+        _;
+    }
+
+    constructor(address payable _seller, address payable _buyer, address payable _arbiter) {
+        seller = _seller;
+        buyer = _buyer;
+        arbiter = _arbiter;
+        state = State.Created;
+    }
+
+    function fund() public payable inState(State.Created) {
+        require(msg.sender == buyer, "Only buyer can fund the escrow.");
+        require(msg.value > 0, "Amount must be greater than zero.");
+        amount = msg.value;
+        state = State.Funded;
+    }
+
+    function disburse() public onlySeller inState(State.Funded) {
+        seller.transfer(amount);
+        state = State.Disbursed;
+    }
+
+    function refund() public onlyArbiter inState(State.Funded) {
+        buyer.transfer(amount);
+        state = State.Refunded;
+    }
+}
+```

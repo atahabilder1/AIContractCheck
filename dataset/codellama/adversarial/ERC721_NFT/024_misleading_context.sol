@@ -1,0 +1,84 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract NFT is ERC721 {
+    address public owner;
+    mapping (uint256 => address) public tokenApprovals;
+    mapping (address => mapping (address => bool)) public operatorApprovals;
+
+    event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
+    event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
+    event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
+
+    constructor() public {
+        owner = msg.sender;
+    }
+
+    function mint(address to, uint256 tokenId) public onlyOwner {
+        require(to != address(0), "Invalid to address");
+        require(tokenId == uint256(uint128(tokenId)), "Invalid token ID");
+        _mint(to, tokenId);
+    }
+
+    function safeTransferFrom(address from, address to, uint256 tokenId) public {
+        require(to != address(0), "Invalid to address");
+        require(tokenId == uint256(uint128(tokenId)), "Invalid token ID");
+        require(from == ownerOf(tokenId), "Invalid owner");
+        require(to != from, "Invalid to address");
+        _safeTransferFrom(from, to, tokenId);
+    }
+
+    function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory _data) public {
+        require(to != address(0), "Invalid to address");
+        require(tokenId == uint256(uint128(tokenId)), "Invalid token ID");
+        require(from == ownerOf(tokenId), "Invalid owner");
+        require(to != from, "Invalid to address");
+        _safeTransferFrom(from, to, tokenId, _data);
+    }
+
+    function transferFrom(address from, address to, uint256 tokenId) public {
+        require(to != address(0), "Invalid to address");
+        require(tokenId == uint256(uint128(tokenId)), "Invalid token ID");
+        require(from == ownerOf(tokenId), "Invalid owner");
+        require(to != from, "Invalid to address");
+        _transferFrom(from, to, tokenId);
+    }
+
+    function approve(address to, uint256 tokenId) public {
+        require(to != address(0), "Invalid to address");
+        require(tokenId == uint256(uint128(tokenId)), "Invalid token ID");
+        require(ownerOf(tokenId) == msg.sender, "Invalid owner");
+        tokenApprovals[tokenId] = to;
+        emit Approval(msg.sender, to, tokenId);
+    }
+
+    function setApprovalForAll(address operator, bool approved) public {
+        require(operator != address(0), "Invalid operator address");
+        operatorApprovals[msg.sender][operator] = approved;
+        emit ApprovalForAll(msg.sender, operator, approved);
+    }
+
+    function isApprovedForAll(address owner, address operator) public view returns (bool) {
+        return operatorApprovals[owner][operator];
+    }
+
+    function getApproved(uint256 tokenId) public view returns (address) {
+        return tokenApprovals[tokenId];
+    }
+
+    function totalSupply() public view returns (uint256) {
+        return _totalSupply;
+    }
+
+    function balanceOf(address owner) public view returns (uint256) {
+        return _balances[owner];
+    }
+
+    function ownerOf(uint256 tokenId) public view returns (address) {
+        return _owners[tokenId];
+    }
+
+    function tokenURI(uint256 tokenId) public view returns (string memory) {
+        return _tokenURIs[tokenId];
+    }
+}

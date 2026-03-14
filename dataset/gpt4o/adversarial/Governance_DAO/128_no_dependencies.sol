@@ -1,0 +1,81 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleDAO {
+    struct Proposal {
+        string description;
+        uint256 voteCount;
+        bool executed;
+        uint256 deadline;
+        mapping(address => bool) voters;
+    }
+
+    address public chairperson;
+    mapping(address => bool) public members;
+    Proposal[] public proposals;
+    uint256 public proposalDuration;
+    uint256 public memberCount;
+
+    modifier onlyChairperson() {
+        require(msg.sender == chairperson, "Not authorized");
+        _;
+    }
+
+    modifier onlyMembers() {
+        require(members[msg.sender], "Not a member");
+        _;
+    }
+
+    constructor(uint256 _proposalDuration) {
+        chairperson = msg.sender;
+        proposalDuration = _proposalDuration;
+    }
+
+    function addMember(address _member) public onlyChairperson {
+        require(!members[_member], "Already a member");
+        members[_member] = true;
+        memberCount++;
+    }
+
+    function removeMember(address _member) public onlyChairperson {
+        require(members[_member], "Not a member");
+        members[_member] = false;
+        memberCount--;
+    }
+
+    function createProposal(string memory _description) public onlyMembers {
+        Proposal storage newProposal = proposals.push();
+        newProposal.description = _description;
+        newProposal.voteCount = 0;
+        newProposal.executed = false;
+        newProposal.deadline = block.timestamp + proposalDuration;
+    }
+
+    function voteOnProposal(uint256 _proposalIndex) public onlyMembers {
+        Proposal storage proposal = proposals[_proposalIndex];
+        require(block.timestamp < proposal.deadline, "Voting period ended");
+        require(!proposal.voters[msg.sender], "Already voted");
+
+        proposal.voters[msg.sender] = true;
+        proposal.voteCount++;
+    }
+
+    function executeProposal(uint256 _proposalIndex) public {
+        Proposal storage proposal = proposals[_proposalIndex];
+        require(block.timestamp >= proposal.deadline, "Voting period not ended");
+        require(!proposal.executed, "Proposal already executed");
+        require(proposal.voteCount > memberCount / 2, "Not enough votes");
+
+        proposal.executed = true;
+        // Add proposal execution logic here
+    }
+
+    function getProposalCount() public view returns (uint256) {
+        return proposals.length;
+    }
+
+    function getProposal(uint256 _proposalIndex) public view returns (string memory, uint256, bool, uint256) {
+        Proposal storage proposal = proposals[_proposalIndex];
+        return (proposal.description, proposal.voteCount, proposal.executed, proposal.deadline);
+    }
+}

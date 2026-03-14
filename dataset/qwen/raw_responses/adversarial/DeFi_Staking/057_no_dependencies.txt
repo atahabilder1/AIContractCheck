@@ -1,0 +1,67 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiStaking {
+    address public owner;
+    mapping(address => uint256) public stakedAmounts;
+    uint256 public totalStaked;
+    uint256 public rewardRatePerSecond; // Example: 1 token per second per staked token
+    mapping(address => uint256) public lastClaimedTime;
+
+    event Staked(address indexed user, uint256 amount);
+    event Unstaked(address indexed user, uint256 amount);
+    event RewardClaimed(address indexed user, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    constructor(uint256 _rewardRatePerSecond) {
+        owner = msg.sender;
+        rewardRatePerSecond = _rewardRatePerSecond;
+    }
+
+    function stake(uint256 amount) external {
+        require(amount > 0, "Stake amount must be greater than 0");
+        stakedAmounts[msg.sender] += amount;
+        totalStaked += amount;
+        lastClaimedTime[msg.sender] = block.timestamp;
+        emit Staked(msg.sender, amount);
+    }
+
+    function unstake(uint256 amount) external {
+        require(amount > 0, "Unstake amount must be greater than 0");
+        require(stakedAmounts[msg.sender] >= amount, "Insufficient staked amount");
+        stakedAmounts[msg.sender] -= amount;
+        totalStaked -= amount;
+        uint256 rewards = calculateRewards(msg.sender);
+        if (rewards > 0) {
+            claimRewards();
+        }
+        emit Unstaked(msg.sender, amount);
+    }
+
+    function claimRewards() public {
+        uint256 rewards = calculateRewards(msg.sender);
+        require(rewards > 0, "No rewards to claim");
+        lastClaimedTime[msg.sender] = block.timestamp;
+        payable(msg.sender).transfer(rewards);
+        emit RewardClaimed(msg.sender, rewards);
+    }
+
+    function calculateRewards(address user) public view returns (uint256) {
+        uint256 timeElapsed = block.timestamp - lastClaimedTime[user];
+        return timeElapsed * stakedAmounts[user] * rewardRatePerSecond;
+    }
+
+    function setRewardRatePerSecond(uint256 _rewardRatePerSecond) external onlyOwner {
+        rewardRatePerSecond = _rewardRatePerSecond;
+    }
+
+    function withdrawEth(uint256 amount) external onlyOwner {
+        payable(owner).transfer(amount);
+    }
+}
+```

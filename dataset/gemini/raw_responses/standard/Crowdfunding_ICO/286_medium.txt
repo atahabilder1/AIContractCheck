@@ -1,0 +1,176 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Crowdfunding {
+
+    struct Campaign {
+        address payable owner;
+        string title;
+        string description;
+        uint256 targetAmount;
+        uint256 deadline;
+        uint256 currentAmount;
+        uint256 stretchGoalAmount;
+        string stretchGoalDescription;
+        bool stretchGoalReached;
+        mapping(address => uint256) contributors;
+        uint256 contributorCount;
+        bool campaignEnded;
+    }
+
+    Campaign[] public campaigns;
+    mapping(uint256 => address[]) public campaignContributors;
+    address public manager;
+
+    event CampaignCreated(uint256 indexed campaignId, address owner, string title, uint256 targetAmount, uint256 deadline);
+    event ContributionMade(uint256 indexed campaignId, address contributor, uint256 amount);
+    event CampaignEnded(uint256 indexed campaignId, bool success);
+    event FundsWithdrawn(uint256 indexed campaignId, address recipient, uint256 amount);
+    event StretchGoalReached(uint256 indexed campaignId, uint256 stretchGoalAmount);
+
+    modifier onlyManager() {
+        require(msg.sender == manager, "Only the manager can perform this action");
+        _;
+    }
+
+    constructor() {
+        manager = msg.sender;
+    }
+
+    function createCampaign(
+        string memory _title,
+        string memory _description,
+        uint256 _targetAmount,
+        uint256 _durationInDays,
+        uint256 _stretchGoalAmount,
+        string memory _stretchGoalDescription
+    ) public {
+        require(_targetAmount > 0, "Target amount must be greater than zero");
+        require(_durationInDays > 0, "Duration must be greater than zero");
+
+        uint256 deadline = block.timestamp + (_durationInDays * 1 days);
+
+        campaigns.push(Campaign({
+            owner: payable(msg.sender),
+            title: _title,
+            description: _description,
+            targetAmount: _targetAmount,
+            deadline: deadline,
+            currentAmount: 0,
+            stretchGoalAmount: _stretchGoalAmount,
+            stretchGoalDescription: _stretchGoalDescription,
+            stretchGoalReached: false,
+            contributorCount: 0,
+            campaignEnded: false
+        }));
+
+        emit CampaignCreated(campaigns.length - 1, msg.sender, _title, _targetAmount, deadline);
+    }
+
+    function contribute(uint256 _campaignId) public payable {
+        require(_campaignId < campaigns.length, "Invalid campaign ID");
+        Campaign storage campaign = campaigns[_campaignId];
+        require(block.timestamp < campaign.deadline, "Campaign has ended");
+        require(msg.value > 0, "Contribution must be greater than zero");
+
+        if (campaign.contributors[msg.sender] == 0) {
+            campaign.contributorCount++;
+            campaignContributors[_campaignId].push(msg.sender);
+        }
+        campaign.contributors[msg.sender] += msg.value;
+        campaign.currentAmount += msg.value;
+
+        emit ContributionMade(_campaignId, msg.sender, msg.value);
+
+        // Check for stretch goal
+        if (!campaign.stretchGoalReached && campaign.currentAmount >= campaign.stretchGoalAmount && campaign.stretchGoalAmount > 0) {
+            campaign.stretchGoalReached = true;
+            emit StretchGoalReached(_campaignId, campaign.stretchGoalAmount);
+        }
+    }
+
+    function endCampaign(uint256 _campaignId) public {
+        require(_campaignId < campaigns.length, "Invalid campaign ID");
+        Campaign storage campaign = campaigns[_campaignId];
+        require(block.timestamp >= campaign.deadline, "Campaign has not ended yet");
+        require(!campaign.campaignEnded, "Campaign has already ended");
+
+        campaign.campaignEnded = true;
+
+        if (campaign.currentAmount >= campaign.targetAmount) {
+            emit CampaignEnded(_campaignId, true);
+        } else {
+            emit CampaignEnded(_campaignId, false);
+        }
+    }
+
+    function withdrawFunds(uint256 _campaignId) public {
+        require(_campaignId < campaigns.length, "Invalid campaign ID");
+        Campaign storage campaign = campaigns[_campaignId];
+        require(campaign.campaignEnded, "Campaign has not ended");
+        require(msg.sender == campaign.owner, "Only the owner can withdraw funds");
+
+        if (campaign.currentAmount >= campaign.targetAmount) {
+            // Successful campaign, owner can withdraw all funds
+            uint256 amountToWithdraw = address(this).balance; // This contract's balance for this campaign
+            require(amountToWithdraw > 0, "No funds to withdraw");
+            campaign.owner.transfer(amountToWithdraw);
+            emit FundsWithdrawn(_campaignId, campaign.owner, amountToWithdraw);
+        } else {
+            // Unsuccessful campaign, contributors can get refunds
+            // This implementation assumes refunds are handled by the owner
+            // For a fully automated refund, a separate function would be needed
+            // For this example, we'll allow the owner to withdraw to facilitate refunds
+            uint256 amountToWithdraw = address(this).balance;
+            require(amountToWithdraw > 0, "No funds to withdraw");
+            campaign.owner.transfer(amountToWithdraw);
+            emit FundsWithdrawn(_campaignId, campaign.owner, amountToWithdraw);
+        }
+    }
+
+    function getCampaign(uint256 _campaignId) public view returns (
+        address owner,
+        string memory title,
+        string memory description,
+        uint256 targetAmount,
+        uint256 deadline,
+        uint256 currentAmount,
+        uint256 stretchGoalAmount,
+        string memory stretchGoalDescription,
+        bool stretchGoalReached,
+        uint256 contributorCount,
+        bool campaignEnded
+    ) {
+        require(_campaignId < campaigns.length, "Invalid campaign ID");
+        Campaign storage campaign = campaigns[_campaignId];
+        return (
+            campaign.owner,
+            campaign.title,
+            campaign.description,
+            campaign.targetAmount,
+            campaign.deadline,
+            campaign.currentAmount,
+            campaign.stretchGoalAmount,
+            campaign.stretchGoalDescription,
+            campaign.stretchGoalReached,
+            campaign.contributorCount,
+            campaign.campaignEnded
+        );
+    }
+
+    function getCampaignContributors(uint256 _campaignId) public view returns (address[] memory) {
+        require(_campaignId < campaigns.length, "Invalid campaign ID");
+        return campaignContributors[_campaignId];
+    }
+
+    function getContributionAmount(uint256 _campaignId, address _contributor) public view returns (uint256) {
+        require(_campaignId < campaigns.length, "Invalid campaign ID");
+        return campaigns[_campaignId].contributors[_contributor];
+    }
+
+    // Fallback function to receive Ether
+    receive() external payable {}
+    fallback() external payable {}
+}
+```

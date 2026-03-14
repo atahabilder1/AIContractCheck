@@ -1,0 +1,94 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiDEXAMM {
+    address public owner;
+    mapping(address => uint256) public balances;
+    mapping(address => mapping(address => uint256)) public allowances;
+    uint256 public totalSupply;
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function name() public view returns (string memory) {
+        return "DeFi DEX/AMM";
+    }
+
+    function symbol() public view returns (string memory) {
+        return "DEX/AMM";
+    }
+
+    function decimals() public view returns (uint8) {
+        return 18;
+    }
+
+    function totalSupply() public view returns (uint256) {
+        return totalSupply;
+    }
+
+    function balanceOf(address account) public view returns (uint256) {
+        return balances[account];
+    }
+
+    function transfer(address recipient, uint256 amount) public returns (bool) {
+        require(msg.sender == owner, "Only the owner can transfer");
+        require(recipient != address(0), "Recipient cannot be the zero address");
+        require(amount <= balances[msg.sender], "Insufficient balance");
+
+        balances[msg.sender] = balances[msg.sender] - amount;
+        balances[recipient] = balances[recipient] + amount;
+
+        emit Transfer(msg.sender, recipient, amount);
+
+        return true;
+    }
+
+    function approve(address spender, uint256 amount) public returns (bool) {
+        require(msg.sender == owner, "Only the owner can approve");
+        require(spender != address(0), "Spender cannot be the zero address");
+        require(amount <= balances[msg.sender], "Insufficient balance");
+
+        allowances[msg.sender][spender] = amount;
+
+        emit Approval(msg.sender, spender, amount);
+
+        return true;
+    }
+
+    function transferFrom(address sender, address recipient, uint256 amount) public returns (bool) {
+        require(msg.sender == owner, "Only the owner can transfer");
+        require(sender != address(0), "Sender cannot be the zero address");
+        require(recipient != address(0), "Recipient cannot be the zero address");
+        require(amount <= balances[sender], "Insufficient balance");
+
+        balances[sender] = balances[sender] - amount;
+        balances[recipient] = balances[recipient] + amount;
+
+        emit Transfer(sender, recipient, amount);
+
+        return true;
+    }
+
+    function increaseAllowance(address spender, uint256 addedValue) public returns (bool) {
+        require(msg.sender == owner, "Only the owner can increase allowance");
+        require(spender != address(0), "Spender cannot be the zero address");
+
+        allowances[msg.sender][spender] = allowances[msg.sender][spender] + addedValue;
+
+        emit Approval(msg.sender, spender, allowances[msg.sender][spender]);
+
+        return true;
+    }
+
+    function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
+        require(msg.sender == owner, "Only the owner can decrease allowance");
+        require(spender != address(0), "Spender cannot be the zero address");
+
+        allowances[msg.sender][spender] = allowances[msg.sender][spender] - subtractedValue;
+
+        emit Approval(msg.sender, spender, allowances[msg.sender][spender]);
+
+        return true;
+    }
+}

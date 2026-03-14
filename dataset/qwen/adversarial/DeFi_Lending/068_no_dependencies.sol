@@ -1,0 +1,73 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiLending {
+    struct Loan {
+        address borrower;
+        uint256 amount;
+        uint256 interestRate; // in basis points (1 basis point = 0.01%)
+        uint256 startDate;
+        uint256 duration; // in seconds
+        bool repaid;
+    }
+
+    address public owner;
+    uint256 public totalLiquidity;
+    mapping(uint256 => Loan) public loans;
+    uint256 public loanCount;
+
+    event LiquidityAdded(uint256 amount);
+    event LoanCreated(uint256 loanId, address borrower, uint256 amount, uint256 interestRate, uint256 duration);
+    event LoanRepaid(uint256 loanId, address borrower, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function addLiquidity() external payable {
+        require(msg.value > 0, "Amount must be greater than 0");
+        totalLiquidity += msg.value;
+        emit LiquidityAdded(msg.value);
+    }
+
+    function createLoan(uint256 _amount, uint256 _interestRate, uint256 _duration) external {
+        require(_amount > 0, "Loan amount must be greater than 0");
+        require(totalLiquidity >= _amount, "Insufficient liquidity");
+        require(_duration > 0, "Duration must be greater than 0");
+
+        loans[loanCount] = Loan({
+            borrower: msg.sender,
+            amount: _amount,
+            interestRate: _interestRate,
+            startDate: block.timestamp,
+            duration: _duration,
+            repaid: false
+        });
+
+        totalLiquidity -= _amount;
+        payable(msg.sender).transfer(_amount);
+
+        emit LoanCreated(loanCount, msg.sender, _amount, _interestRate, _duration);
+        loanCount++;
+    }
+
+    function repayLoan(uint256 _loanId) external payable {
+        Loan storage loan = loans[_loanId];
+        require(!loan.repaid, "Loan already repaid");
+        require(msg.sender == loan.borrower, "Not the borrower");
+
+        uint256 interest = (loan.amount * loan.interestRate * loan.duration) / (10000 * 365 days);
+        uint256 totalRepayment = loan.amount + interest;
+        require(msg.value == totalRepayment, "Incorrect repayment amount");
+
+        loan.repaid = true;
+        totalLiquidity += totalRepayment;
+
+        emit LoanRepaid(_loanId, msg.sender, totalRepayment);
+    }
+}

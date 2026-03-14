@@ -1,0 +1,159 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract DeFiStaking {
+    struct StakeInfo {
+        uint256 amount;
+        uint256 rewardDebt;
+        uint256 lastStakedTime;
+    }
+
+    address public owner;
+    uint256 public rewardRatePerSecond;
+    uint256 public accRewardPerShare;
+    uint256 public lastRewardTime;
+    uint256 public totalStaked;
+    uint256 public lockDuration;
+
+    mapping(address => StakeInfo) public stakes;
+
+    event Staked(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
+    event RewardClaimed(address indexed user, uint256 reward);
+    event RewardRateUpdated(uint256 newRate);
+    event RewardsFunded(uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    constructor(uint256 _rewardRatePerSecond, uint256 _lockDuration) {
+        owner = msg.sender;
+        rewardRatePerSecond = _rewardRatePerSecond;
+        lockDuration = _lockDuration;
+        lastRewardTime = block.timestamp;
+    }
+
+    function fundRewards() external payable onlyOwner {
+        emit RewardsFunded(msg.value);
+    }
+
+    function updatePool() internal {
+        if (totalStaked == 0) {
+            lastRewardTime = block.timestamp;
+            return;
+        }
+        uint256 elapsed = block.timestamp - lastRewardTime;
+        uint256 reward = elapsed * rewardRatePerSecond;
+        accRewardPerShare += (reward * 1e18) / totalStaked;
+        lastRewardTime = block.timestamp;
+    }
+
+    function pendingReward(address _user) public view returns (uint256) {
+        StakeInfo storage user = stakes[_user];
+        uint256 _accRewardPerShare = accRewardPerShare;
+        if (totalStaked > 0 && block.timestamp > lastRewardTime) {
+            uint256 elapsed = block.timestamp - lastRewardTime;
+            uint256 reward = elapsed * rewardRatePerSecond;
+            _accRewardPerShare += (reward * 1e18) / totalStaked;
+        }
+        return (user.amount * _accRewardPerShare) / 1e18 - user.rewardDebt;
+    }
+
+    function stake() external payable {
+        require(msg.value > 0, "Cannot stake 0");
+        updatePool();
+
+        StakeInfo storage user = stakes[msg.sender];
+
+        if (user.amount > 0) {
+            uint256 pending = (user.amount * accRewardPerShare) / 1e18 - user.rewardDebt;
+            if (pending > 0) {
+                _safeTransfer(msg.sender, pending);
+                emit RewardClaimed(msg.sender, pending);
+            }
+        }
+
+        user.amount += msg.value;
+        user.rewardDebt = (user.amount * accRewardPerShare) / 1e18;
+        user.lastStakedTime = block.timestamp;
+        totalStaked += msg.value;
+
+        emit Staked(msg.sender, msg.value);
+    }
+
+    function withdraw(uint256 _amount) external {
+        StakeInfo storage user = stakes[msg.sender];
+        require(user.amount >= _amount, "Insufficient staked amount");
+        require(_amount > 0, "Cannot withdraw 0");
+        require(
+            block.timestamp >= user.lastStakedTime + lockDuration,
+            "Still locked"
+        );
+
+        updatePool();
+
+        uint256 pending = (user.amount * accRewardPerShare) / 1e18 - user.rewardDebt;
+        if (pending > 0) {
+            _safeTransfer(msg.sender, pending);
+            emit RewardClaimed(msg.sender, pending);
+        }
+
+        user.amount -= _amount;
+        user.rewardDebt = (user.amount * accRewardPerShare) / 1e18;
+        totalStaked -= _amount;
+
+        _safeTransfer(msg.sender, _amount);
+        emit Withdrawn(msg.sender, _amount);
+    }
+
+    function claimReward() external {
+        updatePool();
+
+        StakeInfo storage user = stakes[msg.sender];
+        require(user.amount > 0, "No stake found");
+
+        uint256 pending = (user.amount * accRewardPerShare) / 1e18 - user.rewardDebt;
+        require(pending > 0, "No reward available");
+
+        user.rewardDebt = (user.amount * accRewardPerShare) / 1e18;
+        _safeTransfer(msg.sender, pending);
+
+        emit RewardClaimed(msg.sender, pending);
+    }
+
+    function setRewardRate(uint256 _newRate) external onlyOwner {
+        updatePool();
+        rewardRatePerSecond = _newRate;
+        emit RewardRateUpdated(_newRate);
+    }
+
+    function setLockDuration(uint256 _lockDuration) external onlyOwner {
+        lockDuration = _lockDuration;
+    }
+
+    function emergencyWithdraw() external {
+        StakeInfo storage user = stakes[msg.sender];
+        uint256 amount = user.amount;
+        require(amount > 0, "No stake found");
+
+        totalStaked -= amount;
+        user.amount = 0;
+        user.rewardDebt = 0;
+
+        _safeTransfer(msg.sender, amount);
+        emit Withdrawn(msg.sender, amount);
+    }
+
+    function _safeTransfer(address _to, uint256 _amount) internal {
+        uint256 bal = address(this).balance;
+        uint256 transferAmount = _amount > bal ? bal : _amount;
+        (bool success, ) = _to.call{value: transferAmount}("");
+        require(success, "Transfer failed");
+    }
+
+    receive() external payable {}
+}
+```

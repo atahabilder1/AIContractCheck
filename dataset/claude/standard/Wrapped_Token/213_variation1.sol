@@ -1,0 +1,77 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+interface IRebasingToken is IERC20 {
+    function sharesOf(address account) external view returns (uint256);
+    function getSharesByPooledAssets(uint256 assets) external view returns (uint256);
+    function getPooledAssetsByShares(uint256 shares) external view returns (uint256);
+    function transferShares(address to, uint256 shares) external returns (uint256);
+}
+
+contract WrappedRebasingToken is ERC20, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
+    IRebasingToken public immutable underlying;
+
+    event Wrap(address indexed sender, uint256 assets, uint256 shares);
+    event Unwrap(address indexed sender, uint256 shares, uint256 assets);
+
+    constructor(
+        address _underlying,
+        string memory _name,
+        string memory _symbol
+    ) ERC20(_name, _symbol) {
+        underlying = IRebasingToken(_underlying);
+    }
+
+    /// @notice Wrap rebasing tokens by depositing assets. Mints wrapped tokens 1:1 with shares.
+    /// @param assets Amount of underlying rebasing tokens to deposit.
+    /// @return shares Amount of wrapped tokens minted (equal to underlying shares received).
+    function wrap(uint256 assets) external nonReentrant returns (uint256 shares) {
+        require(assets > 0, "Cannot wrap zero");
+
+        uint256 sharesBefore = underlying.sharesOf(address(this));
+        IERC20(address(underlying)).safeTransferFrom(msg.sender, address(this), assets);
+        uint256 sharesAfter = underlying.sharesOf(address(this));
+
+        shares = sharesAfter - sharesBefore;
+        require(shares > 0, "No shares received");
+
+        _mint(msg.sender, shares);
+        emit Wrap(msg.sender, assets, shares);
+    }
+
+    /// @notice Unwrap by burning wrapped tokens to reclaim underlying rebasing tokens.
+    /// @param shares Amount of wrapped tokens to burn.
+    /// @return assets Amount of underlying rebasing tokens returned.
+    function unwrap(uint256 shares) external nonReentrant returns (uint256 assets) {
+        require(shares > 0, "Cannot unwrap zero");
+        require(balanceOf(msg.sender) >= shares, "Insufficient balance");
+
+        _burn(msg.sender, shares);
+
+        assets = underlying.getPooledAssetsByShares(shares);
+        underlying.transferShares(msg.sender, shares);
+
+        emit Unwrap(msg.sender, shares, assets);
+    }
+
+    /// @notice Returns the current value of wrapped tokens in terms of underlying assets.
+    /// @param wrappedAmount Amount of wrapped tokens.
+    /// @return The equivalent underlying asset amount.
+    function wrappedToUnderlying(uint256 wrappedAmount) external view returns (uint256) {
+        return underlying.getPooledAssetsByShares(wrappedAmount);
+    }
+
+    /// @notice Returns how many wrapped tokens correspond to a given underlying asset amount.
+    /// @param underlyingAmount Amount of underlying assets.
+    /// @return The equivalent wrapped token amount (shares).
+    function underlyingToWrapped(uint256 underlyingAmount) external view returns (uint256) {
+        return underlying.getSharesByPooledAssets(underlyingAmount);
+    }
+}

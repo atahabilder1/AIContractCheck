@@ -1,0 +1,87 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MinimalMultiSig {
+    address[] public owners;
+    uint public requiredConfirmations;
+
+    struct Transaction {
+        address destination;
+        uint value;
+        bytes data;
+        bool executed;
+        mapping(address => bool) confirmations;
+        uint confirmationCount;
+    }
+
+    Transaction[] public transactions;
+
+    modifier onlyOwner() {
+        bool isOwner = false;
+        for (uint i = 0; i < owners.length; i++) {
+            if (owners[i] == msg.sender) {
+                isOwner = true;
+                break;
+            }
+        }
+        require(isOwner, "Not an owner");
+        _;
+    }
+
+    constructor(address[] memory _owners, uint _requiredConfirmations) {
+        require(_owners.length > 0, "Owners must be provided");
+        require(_requiredConfirmations > 0 && _requiredConfirmations <= _owners.length, "Invalid number of required confirmations");
+        owners = _owners;
+        requiredConfirmations = _requiredConfirmations;
+    }
+
+    function submitTransaction(address _destination, uint _value, bytes memory _data) public onlyOwner returns (uint) {
+        transactions.push(Transaction({
+            destination: _destination,
+            value: _value,
+            data: _data,
+            executed: false,
+            confirmationCount: 0
+        }));
+        return transactions.length - 1;
+    }
+
+    function confirmTransaction(uint _transactionId) public onlyOwner {
+        Transaction storage transaction = transactions[_transactionId];
+        require(!transaction.executed, "Transaction already executed");
+        require(!transaction.confirmations[msg.sender], "Transaction already confirmed by this owner");
+
+        transaction.confirmations[msg.sender] = true;
+        transaction.confirmationCount++;
+
+        if (transaction.confirmationCount >= requiredConfirmations) {
+            executeTransaction(_transactionId);
+        }
+    }
+
+    function executeTransaction(uint _transactionId) internal {
+        Transaction storage transaction = transactions[_transactionId];
+        require(!transaction.executed, "Transaction already executed");
+        require(transaction.confirmationCount >= requiredConfirmations, "Not enough confirmations");
+
+        transaction.executed = true;
+
+        (bool success, ) = transaction.destination.call{value: transaction.value}(transaction.data);
+        require(success, "Transaction execution failed");
+    }
+
+    function getTransaction(uint _transactionId) public view returns (address destination, uint value, bytes memory data, bool executed, uint confirmationCount) {
+        Transaction storage transaction = transactions[_transactionId];
+        return (transaction.destination, transaction.value, transaction.data, transaction.executed, transaction.confirmationCount);
+    }
+
+    function getOwners() public view returns (address[] memory) {
+        return owners;
+    }
+
+    function getRequiredConfirmations() public view returns (uint) {
+        return requiredConfirmations;
+    }
+
+    receive() external payable {}
+}

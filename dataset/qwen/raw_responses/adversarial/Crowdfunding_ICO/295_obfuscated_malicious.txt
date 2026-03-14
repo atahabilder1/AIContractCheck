@@ -1,0 +1,70 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Crowdfunding {
+    address public admin;
+    uint256 public fundingGoal;
+    uint256 public amountRaised;
+    bool public paused;
+    bool public fundingSuccessful;
+
+    event FundTransfer(address backer, uint256 amount, bool isContribution);
+    event Paused();
+    event Unpaused();
+    event FundsWithdrawn(uint256 amount);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin can call this function");
+        _;
+    }
+
+    modifier notPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
+    constructor(uint256 _fundingGoal) {
+        admin = msg.sender;
+        fundingGoal = _fundingGoal;
+        paused = false;
+        fundingSuccessful = false;
+    }
+
+    function contribute() external payable notPaused {
+        require(fundingSuccessful == false, "Funding has already been successful");
+        amountRaised += msg.value;
+        emit FundTransfer(msg.sender, msg.value, true);
+    }
+
+    function checkGoalReached() external notPaused {
+        if (amountRaised >= fundingGoal) {
+            fundingSuccessful = true;
+        }
+    }
+
+    function safeWithdrawal() external {
+        require(fundingSuccessful, "Funding goal not reached");
+        require(msg.sender == admin, "Only admin can withdraw funds");
+        uint256 amount = address(this).balance;
+        payable(admin).transfer(amount);
+        emit FundsWithdrawn(amount);
+    }
+
+    function emergencyWithdraw() external onlyAdmin {
+        uint256 amount = address(this).balance;
+        payable(admin).transfer(amount);
+        emit FundsWithdrawn(amount);
+    }
+
+    function pause() external onlyAdmin {
+        paused = true;
+        emit Paused();
+    }
+
+    function unpause() external onlyAdmin {
+        paused = false;
+        emit Unpaused();
+    }
+}
+```

@@ -1,0 +1,86 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract FlashLoanProvider {
+    address[] public pools;
+    mapping(address => mapping(address => uint256)) public poolBalances;
+    mapping(address => uint256) public poolFeeAccrued;
+
+    function createPool(address _token, uint256 _amount) public {
+        require(_token != address(0), "Invalid token address");
+        require(_amount > 0, "Invalid amount");
+
+        // Create a new pool
+        address newPool = new Pool(_token, _amount);
+
+        // Add the new pool to the list of pools
+        pools.push(newPool);
+
+        // Set the pool's initial balance
+        poolBalances[_token][newPool] = _amount;
+    }
+
+    function flashLoan(address _borrower, address _token, uint256 _amount) public {
+        require(_borrower != address(0), "Invalid borrower address");
+        require(_token != address(0), "Invalid token address");
+        require(_amount > 0, "Invalid amount");
+
+        // Get the pool for the token
+        address pool = getPoolForToken(_token);
+
+        // Check if the pool has enough balance to cover the loan
+        require(poolBalances[_token][pool] >= _amount, "Insufficient pool balance");
+
+        // Check if the borrower has enough allowance to cover the loan
+        require(IERC20(_token).allowance(_borrower, address(this)) >= _amount, "Insufficient borrower allowance");
+
+        // Transfer the loan amount to the borrower
+        IERC20(_token).transferFrom(pool, _borrower, _amount);
+
+        // Update the pool's balance
+        poolBalances[_token][pool] -= _amount;
+
+        // Update the pool's fee accrued
+        poolFeeAccrued[_token] += (_amount / 100);
+
+        // Call the callback function with the loan amount
+        _borrower.call.value(_amount)("");
+    }
+
+    function batchFlashLoan(address[] memory _borrowers, address[] memory _tokens, uint256[] memory _amounts) public {
+        require(_borrowers.length > 0, "Invalid borrowers array");
+        require(_tokens.length > 0, "Invalid tokens array");
+        require(_amounts.length > 0, "Invalid amounts array");
+
+        // Check if the arrays have the same length
+        require(_borrowers.length == _tokens.length, "Borrowers and tokens arrays must have the same length");
+        require(_tokens.length == _amounts.length, "Tokens and amounts arrays must have the same length");
+
+        // Loop through the arrays and perform the flash loans
+        for (uint256 i = 0; i < _borrowers.length; i++) {
+            flashLoan(_borrowers[i], _tokens[i], _amounts[i]);
+        }
+    }
+
+    function getPoolForToken(address _token) public view returns (address) {
+        // Loop through the pools and find the one with the matching token
+        for (uint256 i = 0; i < pools.length; i++) {
+            if (poolBalances[_token][pools[i]] > 0) {
+                return pools[i];
+            }
+        }
+
+        // If no pool was found, return the zero address
+        return address(0);
+    }
+}
+
+contract Pool {
+    address public token;
+    uint256 public amount;
+
+    constructor(address _token, uint256 _amount) public {
+        token = _token;
+        amount = _amount;
+    }
+}

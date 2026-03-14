@@ -1,0 +1,55 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainMessaging {
+    struct Message {
+        uint256 sourceChainId;
+        address sender;
+        bytes data;
+        uint256 timestamp;
+    }
+
+    address public relayer;
+    uint256 public messageCount;
+
+    mapping(uint256 => Message) public messages;
+    mapping(bytes32 => bool) public processedMessages;
+
+    event MessageSent(uint256 indexed targetChainId, address indexed sender, bytes data, uint256 nonce);
+    event MessageReceived(uint256 indexed sourceChainId, address indexed sender, bytes data, uint256 nonce);
+
+    modifier onlyRelayer() {
+        require(msg.sender == relayer, "Only relayer");
+        _;
+    }
+
+    constructor() {
+        relayer = msg.sender;
+    }
+
+    function sendMessage(uint256 targetChainId, bytes calldata data) external {
+        uint256 nonce = messageCount++;
+        emit MessageSent(targetChainId, msg.sender, data, nonce);
+    }
+
+    function receiveMessage(
+        uint256 sourceChainId,
+        address sender,
+        bytes calldata data,
+        uint256 nonce
+    ) external onlyRelayer {
+        bytes32 messageHash = keccak256(abi.encodePacked(sourceChainId, sender, data, nonce));
+        require(!processedMessages[messageHash], "Already processed");
+
+        processedMessages[messageHash] = true;
+        messages[nonce] = Message(sourceChainId, sender, data, block.timestamp);
+
+        emit MessageReceived(sourceChainId, sender, data, nonce);
+    }
+
+    function setRelayer(address _relayer) external onlyRelayer {
+        relayer = _relayer;
+    }
+}
+```

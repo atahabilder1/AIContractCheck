@@ -1,0 +1,111 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrowdfundingICO {
+    address public admin;
+    uint256 public goal;
+    uint256 public deadline;
+    uint256 public totalRaised;
+    bool public paused;
+    bool public finalized;
+
+    mapping(address => uint256) public contributions;
+
+    event Contributed(address indexed contributor, uint256 amount);
+    event Refunded(address indexed contributor, uint256 amount);
+    event Finalized(uint256 totalRaised);
+    event Paused(bool status);
+    event EmergencyWithdrawal(address indexed admin, uint256 amount);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not admin");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
+    constructor(uint256 _goal, uint256 _durationInDays) {
+        admin = msg.sender;
+        goal = _goal;
+        deadline = block.timestamp + (_durationInDays * 1 days);
+    }
+
+    function contribute() external payable whenNotPaused {
+        require(block.timestamp < deadline, "Campaign ended");
+        require(!finalized, "Campaign finalized");
+        require(msg.value > 0, "Must send ETH");
+
+        contributions[msg.sender] += msg.value;
+        totalRaised += msg.value;
+
+        emit Contributed(msg.sender, msg.value);
+    }
+
+    function finalize() external onlyAdmin {
+        require(block.timestamp >= deadline, "Campaign not ended");
+        require(!finalized, "Already finalized");
+
+        finalized = true;
+
+        if (totalRaised >= goal) {
+            (bool success, ) = admin.call{value: address(this).balance}("");
+            require(success, "Transfer failed");
+        }
+
+        emit Finalized(totalRaised);
+    }
+
+    function refund() external whenNotPaused {
+        require(finalized, "Not finalized");
+        require(totalRaised < goal, "Goal was met");
+        uint256 amount = contributions[msg.sender];
+        require(amount > 0, "No contribution");
+
+        contributions[msg.sender] = 0;
+
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Refund failed");
+
+        emit Refunded(msg.sender, amount);
+    }
+
+    function pause() external onlyAdmin {
+        paused = true;
+        emit Paused(true);
+    }
+
+    function unpause() external onlyAdmin {
+        paused = false;
+        emit Paused(false);
+    }
+
+    function emergencyWithdraw() external onlyAdmin {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No funds");
+
+        (bool success, ) = admin.call{value: balance}("");
+        require(success, "Withdraw failed");
+
+        emit EmergencyWithdrawal(admin, balance);
+    }
+
+    function getContribution(address _contributor) external view returns (uint256) {
+        return contributions[_contributor];
+    }
+
+    function getBalance() external view returns (uint256) {
+        return address(this).balance;
+    }
+
+    function timeRemaining() external view returns (uint256) {
+        if (block.timestamp >= deadline) return 0;
+        return deadline - block.timestamp;
+    }
+
+    receive() external payable {
+        revert("Use contribute()");
+    }
+}

@@ -1,0 +1,69 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
+
+contract SocialRecoveryWallet {
+    address public owner;
+    address[] public guardians;
+    uint public recoveryThreshold;
+    bool public isLocked;
+
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event RecoveryRequested(address indexed newOwner);
+    event LockStatusChanged(bool locked);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    modifier onlyGuardians() {
+        bool isGuardian = false;
+        for (uint i = 0; i < guardians.length; i++) {
+            if (msg.sender == guardians[i]) {
+                isGuardian = true;
+                break;
+            }
+        }
+        require(isGuardian, "Not a guardian");
+        _;
+    }
+
+    constructor(address[] memory _guardians, uint _recoveryThreshold) {
+        require(_guardians.length > 0, "At least one guardian is required");
+        require(_recoveryThreshold > 0 && _recoveryThreshold <= _guardians.length, "Invalid recovery threshold");
+        guardians = _guardians;
+        recoveryThreshold = _recoveryThreshold;
+        owner = msg.sender;
+    }
+
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "Invalid address");
+        owner = newOwner;
+        emit OwnershipTransferred(owner, newOwner);
+    }
+
+    function requestRecovery(address newOwner) external onlyGuardians {
+        require(!isLocked, "Wallet is locked");
+        require(newOwner != address(0), "Invalid address");
+        isLocked = true;
+        owner = newOwner;
+        emit RecoveryRequested(newOwner);
+        emit LockStatusChanged(isLocked);
+    }
+
+    function setLockStatus(bool locked) external onlyOwner {
+        isLocked = locked;
+        emit LockStatusChanged(isLocked);
+    }
+
+    function withdrawTokens(address tokenAddress, address recipient, uint amount) external onlyOwner {
+        IERC20 token = IERC20(tokenAddress);
+        require(token.balanceOf(address(this)) >= amount, "Insufficient balance");
+        require(token.transfer(recipient, amount), "Token transfer failed");
+    }
+}

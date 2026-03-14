@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleCrossChainMessenger {
+    address public owner;
+    mapping(uint256 => address) public trustedSourceContracts;
+
+    event MessageReceived(uint256 indexed sourceChainId, address indexed sourceContract, string message);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function setTrustedSourceContract(uint256 chainId, address sourceContract) external onlyOwner {
+        trustedSourceContracts[chainId] = sourceContract;
+    }
+
+    function receiveMessage(uint256 sourceChainId, address sourceContract, string calldata message) external {
+        require(trustedSourceContracts[sourceChainId] == sourceContract, "Untrusted source contract");
+        emit MessageReceived(sourceChainId, sourceContract, message);
+    }
+}

@@ -1,0 +1,33 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Auction {
+    address public owner;
+    uint public highestBid;
+    address public highestBidder;
+    mapping(address => uint) public bids;
+
+    constructor() public {
+        owner = msg.sender;
+    }
+
+    function bid(uint amount) public {
+        require(amount > highestBid, "Bid must be higher than the current highest bid");
+        bids[msg.sender] = amount;
+        highestBid = amount;
+        highestBidder = msg.sender;
+    }
+
+    function endAuction() public {
+        require(msg.sender == owner, "Only the owner can end the auction");
+        uint winner = highestBidder;
+        uint amount = highestBid;
+        delete bids[winner];
+        delete highestBid;
+        delete highestBidder;
+        winner.transfer(amount);
+    }
+}
+```
+Note: This is a basic auction contract and is not a complete implementation. It is missing features such as a bid duration, a way to refund bids that are not the highest, and a way to handle the case where there are no bids.

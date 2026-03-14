@@ -1,0 +1,101 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Auction {
+    address payable public owner;
+    uint256 public startTime;
+    uint256 public endTime;
+    uint256 public highestBid;
+    address public highestBidder;
+    bool public auctionEnded;
+
+    event BidPlaced(address bidder, uint256 amount);
+    event AuctionWon(address winner, uint256 amount);
+    event AuctionCancelled(address cancelledBy);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can perform this action");
+        _;
+    }
+
+    modifier onlyBeforeAuctionEnd() {
+        require(block.timestamp < endTime, "Auction has already ended");
+        _;
+    }
+
+    modifier onlyAfterAuctionStart() {
+        require(block.timestamp >= startTime, "Auction has not started yet");
+        _;
+    }
+
+    constructor(uint256 _durationInSeconds) {
+        owner = payable(msg.sender);
+        startTime = block.timestamp;
+        endTime = startTime + _durationInSeconds;
+        highestBid = 0;
+        highestBidder = address(0);
+        auctionEnded = false;
+    }
+
+    function placeBid() public payable onlyAfterAuctionStart onlyBeforeAuctionEnd {
+        require(msg.value > highestBid, "Bid must be higher than the current highest bid");
+        require(msg.value > 0, "Bid must be a positive amount");
+
+        if (highestBidder != address(0)) {
+            // Refund the previous highest bidder
+            (bool success, ) = payable(highestBidder).call{value: highestBid}("");
+            require(success, "Refund failed");
+        }
+
+        highestBid = msg.value;
+        highestBidder = msg.sender;
+
+        emit BidPlaced(msg.sender, msg.value);
+    }
+
+    function endAuction() public {
+        require(block.timestamp >= endTime, "Auction has not ended yet");
+        require(!auctionEnded, "Auction has already ended");
+
+        auctionEnded = true;
+
+        if (highestBidder != address(0)) {
+            // Transfer the highest bid to the owner
+            (bool success, ) = owner.call{value: highestBid}("");
+            require(success, "Payment transfer failed");
+            emit AuctionWon(highestBidder, highestBid);
+        } else {
+            // No bids were placed
+            emit AuctionCancelled(msg.sender);
+        }
+    }
+
+    function cancelAuction() public onlyOwner {
+        require(!auctionEnded, "Auction has already ended");
+        require(block.timestamp < endTime, "Cannot cancel after auction end time");
+
+        auctionEnded = true;
+        emit AuctionCancelled(msg.sender);
+
+        // Refund any bids placed if the auction is cancelled before it ends
+        if (highestBidder != address(0)) {
+            (bool success, ) = payable(highestBidder).call{value: highestBid}("");
+            require(success, "Refund failed");
+        }
+    }
+
+    // Fallback function to receive Ether directly
+    receive() external payable {
+        // Optionally, you can disallow direct Ether transfers or handle them
+        // For this auction contract, direct Ether transfers are not intended for bidding.
+        // Revert the transaction if Ether is sent directly without calling placeBid.
+        revert("Direct Ether transfers are not allowed. Use placeBid().");
+    }
+
+    // Fallback function for older Solidity versions or when no other function matches
+    fallback() external payable {
+        revert("Invalid function call or direct Ether transfer. Use placeBid().");
+    }
+}
+```

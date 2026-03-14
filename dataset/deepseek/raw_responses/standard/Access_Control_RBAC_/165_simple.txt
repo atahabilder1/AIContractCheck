@@ -1,0 +1,44 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract RoleBasedAccessControl {
+    address public admin;
+    address public minter;
+
+    mapping(address => bool) public hasRole;
+
+    event RoleGranted(address indexed account, string role);
+    event RoleRevoked(address indexed account, string role);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Caller is not the admin");
+        _;
+    }
+
+    modifier onlyMinter() {
+        require(msg.sender == minter, "Caller is not the minter");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+        hasRole[msg.sender] = true;
+    }
+
+    function grantRole(address account, string memory role) public onlyAdmin {
+        hasRole[account] = true;
+        emit RoleGranted(account, role);
+    }
+
+    function revokeRole(address account, string memory role) public onlyAdmin {
+        require(hasRole[account], "Account does not have the role");
+        hasRole[account] = false;
+        emit RoleRevoked(account, role);
+    }
+
+    function setMinter(address newMinter) public onlyAdmin {
+        minter = newMinter;
+    }
+}
+```

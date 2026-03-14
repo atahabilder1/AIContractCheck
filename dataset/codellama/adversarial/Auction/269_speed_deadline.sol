@@ -1,0 +1,94 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Auction {
+    // Define the auction structure
+    struct Auction {
+        address payable seller;
+        address payable highestBidder;
+        uint highestBid;
+        uint startTime;
+        uint endTime;
+        bool ended;
+    }
+
+    // Define the mapping to store the auctions
+    mapping(uint => Auction) public auctions;
+
+    // Define the event to emit when a new auction is created
+    event AuctionCreated(uint auctionId, address seller, uint startTime, uint endTime);
+
+    // Define the event to emit when a bid is placed
+    event BidPlaced(uint auctionId, address bidder, uint amount, uint timestamp);
+
+    // Define the event to emit when an auction is ended
+    event AuctionEnded(uint auctionId, address winner, uint amount, uint timestamp);
+
+    // Define the modifier to check if the auction has ended
+    modifier auctionEnded(uint auctionId) {
+        require(auctions[auctionId].ended, "Auction has not ended yet");
+        _;
+    }
+
+    // Define the modifier to check if the auction has not ended
+    modifier auctionNotEnded(uint auctionId) {
+        require(!auctions[auctionId].ended, "Auction has ended");
+        _;
+    }
+
+    // Define the constructor to create a new auction
+    constructor() public {
+        // Initialize the mapping
+        auctions = new mapping(uint => Auction)();
+    }
+
+    // Define the function to create a new auction
+    function createAuction(uint _startTime, uint _endTime) public {
+        // Create a new auction structure
+        Auction memory auction = Auction({
+            seller: msg.sender,
+            highestBidder: address(0),
+            highestBid: 0,
+            startTime: _startTime,
+            endTime: _endTime,
+            ended: false
+        });
+
+        // Add the auction to the mapping
+        auctions[auctions.length] = auction;
+
+        // Emit the event
+        emit AuctionCreated(auctions.length, msg.sender, _startTime, _endTime);
+    }
+
+    // Define the function to place a bid on an auction
+    function placeBid(uint _auctionId, uint _amount) public auctionNotEnded(_auctionId) {
+        // Get the auction from the mapping
+        Auction storage auction = auctions[_auctionId];
+
+        // Check if the bid amount is greater than the highest bid
+        require(_amount > auction.highestBid, "Bid amount must be greater than the highest bid");
+
+        // Update the highest bidder and highest bid
+        auction.highestBidder = msg.sender;
+        auction.highestBid = _amount;
+
+        // Emit the event
+        emit BidPlaced(_auctionId, msg.sender, _amount, block.timestamp);
+    }
+
+    // Define the function to end an auction
+    function endAuction(uint _auctionId) public auctionNotEnded(_auctionId) {
+        // Get the auction from the mapping
+        Auction storage auction = auctions[_auctionId];
+
+        // Check if the auction has ended
+        require(block.timestamp > auction.endTime, "Auction has not ended yet");
+
+        // Update the ended status
+        auction.ended = true;
+
+        // Emit the event
+        emit AuctionEnded(_auctionId, auction.highestBidder, auction.highestBid, block.timestamp);
+    }
+}

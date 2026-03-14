@@ -1,0 +1,65 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+contract GasOptimizedRBAC {
+    mapping(bytes32 => mapping(address => bool)) private _roles;
+    mapping(address => bool) private _isOwner; // For initial owner, can be removed if not needed
+
+    address public owner;
+
+    event RoleGranted(bytes32 indexed role, address indexed account);
+    event RoleRevoked(bytes32 indexed role, address indexed account);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "GasOptimizedRBAC: Caller is not the owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+        _isOwner[msg.sender] = true; // Optional: Grant owner role to deployer
+    }
+
+    function hasRole(bytes32 role, address account) public view returns (bool) {
+        return _roles[role][account];
+    }
+
+    function grantRole(bytes32 role, address account) public virtual onlyOwner {
+        require(!_roles[role][account], "GasOptimizedRBAC: Account already has role");
+        _roles[role][account] = true;
+        emit RoleGranted(role, account);
+    }
+
+    function revokeRole(bytes32 role, address account) public virtual onlyOwner {
+        require(_roles[role][account], "GasOptimizedRBAC: Account does not have role");
+        _roles[role][account] = false;
+        emit RoleRevoked(role, account);
+    }
+
+    function renounceOwnership() public virtual onlyOwner {
+        _transferOwnership(address(0));
+    }
+
+    function transferOwnership(address newOwner) public virtual onlyOwner {
+        require(newOwner != address(0), "GasOptimizedRBAC: New owner cannot be the zero address");
+        _transferOwnership(newOwner);
+    }
+
+    function _transferOwnership(address newOwner) internal virtual {
+        address oldOwner = owner;
+        owner = newOwner;
+        _isOwner[oldOwner] = false; // Remove old owner from _isOwner mapping
+        if (newOwner != address(0)) {
+            _isOwner[newOwner] = true; // Add new owner to _isOwner mapping
+        }
+        emit OwnershipTransferred(oldOwner, newOwner);
+    }
+
+    // Example of a role-restricted function
+    function doSomethingAdminOnly() public view {
+        bytes32 adminRole = keccak256("ADMIN_ROLE");
+        require(hasRole(adminRole, msg.sender), "GasOptimizedRBAC: Caller does not have ADMIN_ROLE");
+        // ... perform admin action ...
+    }
+}

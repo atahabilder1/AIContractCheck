@@ -1,0 +1,22 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract ConstantProductAMM {
+    uint256 constant K = 100000000;
+    uint256 public x;
+    uint256 public y;
+
+    function swap(uint256 amount0) external {
+        uint256 amount1 = K / (x + amount0);
+        x += amount0;
+        y += amount1;
+    }
+
+    function liquidity(uint256 amount0, uint256 amount1) external {
+        require(amount0 > 0 && amount1 > 0, "Invalid amounts");
+        uint256 liquidity = K / (x + amount0);
+        x += amount0;
+        y += amount1;
+        msg.sender.transfer(liquidity);
+    }
+}

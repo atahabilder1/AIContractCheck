@@ -1,0 +1,74 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IWETH {
+    function deposit() external payable;
+    function withdraw(uint wad) external;
+    function totalSupply() external view returns (uint);
+    function balanceOf(address account) external view returns (uint);
+    function transfer(address recipient, uint amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint);
+    function approve(address spender, uint amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint amount) external returns (bool);
+    event Transfer(address indexed from, address indexed to, uint value);
+    event Approval(address indexed owner, address indexed spender, uint value);
+}
+
+contract WETH is IWETH {
+    string public name = "Wrapped Ether";
+    string public symbol = "WETH";
+    uint8 public decimals = 18;
+    mapping(address => uint) private _balances;
+    mapping(address => mapping(address => uint)) private _allowances;
+    uint private _totalSupply;
+
+    function deposit() external payable override {
+        _balances[msg.sender] += msg.value;
+        _totalSupply += msg.value;
+        emit Transfer(address(0), msg.sender, msg.value);
+    }
+
+    function withdraw(uint wad) external override {
+        require(_balances[msg.sender] >= wad, "Insufficient balance");
+        _balances[msg.sender] -= wad;
+        _totalSupply -= wad;
+        payable(msg.sender).transfer(wad);
+        emit Transfer(msg.sender, address(0), wad);
+    }
+
+    function totalSupply() external view override returns (uint) {
+        return _totalSupply;
+    }
+
+    function balanceOf(address account) external view override returns (uint) {
+        return _balances[account];
+    }
+
+    function transfer(address recipient, uint amount) external override returns (bool) {
+        require(_balances[msg.sender] >= amount, "Insufficient balance");
+        _balances[msg.sender] -= amount;
+        _balances[recipient] += amount;
+        emit Transfer(msg.sender, recipient, amount);
+        return true;
+    }
+
+    function allowance(address owner, address spender) external view override returns (uint) {
+        return _allowances[owner][spender];
+    }
+
+    function approve(address spender, uint amount) external override returns (bool) {
+        _allowances[msg.sender][spender] = amount;
+        emit Approval(msg.sender, spender, amount);
+        return true;
+    }
+
+    function transferFrom(address sender, address recipient, uint amount) external override returns (bool) {
+        require(_balances[sender] >= amount, "Insufficient balance");
+        require(_allowances[sender][msg.sender] >= amount, "Allowance exceeded");
+        _balances[sender] -= amount;
+        _balances[recipient] += amount;
+        _allowances[sender][msg.sender] -= amount;
+        emit Transfer(sender, recipient, amount);
+        return true;
+    }
+}

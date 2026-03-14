@@ -1,0 +1,56 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address public owner;
+    mapping(address => uint256) public balances;
+    mapping(bytes32 => bool) public processedTransactions;
+
+    event Deposit(address indexed user, uint256 amount, uint256 timestamp);
+    event Withdrawal(address indexed user, uint256 amount, uint256 timestamp);
+    event CrossChainTransfer(address indexed user, uint256 amount, uint256 targetChainId, uint256 timestamp);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function deposit() external payable {
+        require(msg.value > 0, "Value must be greater than 0");
+        balances[msg.sender] += msg.value;
+        emit Deposit(msg.sender, msg.value, block.timestamp);
+    }
+
+    function withdraw(uint256 amount) external {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        balances[msg.sender] -= amount;
+        payable(msg.sender).transfer(amount);
+        emit Withdrawal(msg.sender, amount, block.timestamp);
+    }
+
+    function crossChainTransfer(uint256 amount, uint256 targetChainId) external {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        balances[msg.sender] -= amount;
+        bytes32 txHash = keccak256(abi.encodePacked(msg.sender, amount, targetChainId, block.timestamp));
+        processedTransactions[txHash] = true;
+        emit CrossChainTransfer(msg.sender, amount, targetChainId, block.timestamp);
+    }
+
+    function completeCrossChainTransfer(
+        address user,
+        uint256 amount,
+        uint256 sourceChainId,
+        uint256 timestamp,
+        bytes32 txHash
+    ) external onlyOwner {
+        require(!processedTransactions[txHash], "Transaction already processed");
+        processedTransactions[txHash] = true;
+        balances[user] += amount;
+    }
+}
+```

@@ -1,0 +1,121 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Snapshot.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract GovernanceToken is ERC20Votes, ERC20Snapshot, ERC20Permit, Ownable {
+    using SafeMath for uint256;
+
+    struct VestingSchedule {
+        uint256 totalAmount;
+        uint256 releasedAmount;
+        uint256 start;
+        uint256 duration;
+        bool revocable;
+    }
+    
+    mapping(address => VestingSchedule) private _vestingSchedules;
+    mapping(address => bool) private _revoked;
+
+    event TokensReleased(address beneficiary, uint256 amount);
+    event VestingRevoked(address beneficiary);
+
+    constructor(string memory name, string memory symbol)
+        ERC20(name, symbol)
+        ERC20Permit(name)
+    {}
+
+    function _beforeTokenTransfer(address from, address to, uint256 amount)
+        internal
+        override(ERC20, ERC20Snapshot)
+    {
+        super._beforeTokenTransfer(from, to, amount);
+    }
+
+    function _afterTokenTransfer(address from, address to, uint256 amount)
+        internal
+        override(ERC20, ERC20Votes)
+    {
+        super._afterTokenTransfer(from, to, amount);
+    }
+
+    function _mint(address to, uint256 amount)
+        internal
+        override(ERC20, ERC20Votes)
+    {
+        super._mint(to, amount);
+    }
+
+    function _burn(address account, uint256 amount)
+        internal
+        override(ERC20, ERC20Votes)
+    {
+        super._burn(account, amount);
+    }
+
+    function createVestingSchedule(
+        address beneficiary,
+        uint256 totalAmount,
+        uint256 start,
+        uint256 duration,
+        bool revocable
+    ) external onlyOwner {
+        require(_vestingSchedules[beneficiary].totalAmount == 0, "Vesting already exists");
+        _vestingSchedules[beneficiary] = VestingSchedule({
+            totalAmount: totalAmount,
+            releasedAmount: 0,
+            start: start,
+            duration: duration,
+            revocable: revocable
+        });
+    }
+
+    function releaseVestedTokens(address beneficiary) external {
+        VestingSchedule storage schedule = _vestingSchedules[beneficiary];
+        uint256 vestedAmount = _vestedAmount(schedule);
+        uint256 releasableAmount = vestedAmount.sub(schedule.releasedAmount);
+
+        require(releasableAmount > 0, "No tokens to release");
+
+        schedule.releasedAmount = schedule.releasedAmount.add(releasableAmount);
+        _transfer(address(this), beneficiary, releasableAmount);
+
+        emit TokensReleased(beneficiary, releasableAmount);
+    }
+
+    function revokeVesting(address beneficiary) external onlyOwner {
+        VestingSchedule storage schedule = _vestingSchedules[beneficiary];
+        require(schedule.revocable, "Vesting is not revocable");
+        require(!_revoked[beneficiary], "Vesting already revoked");
+
+        uint256 vestedAmount = _vestedAmount(schedule);
+        uint256 unreleased = vestedAmount.sub(schedule.releasedAmount);
+        uint256 refund = schedule.totalAmount.sub(schedule.releasedAmount).sub(unreleased);
+
+        _revoked[beneficiary] = true;
+        _transfer(address(this), owner(), refund);
+
+        emit VestingRevoked(beneficiary);
+    }
+
+    function _vestedAmount(VestingSchedule memory schedule) private view returns (uint256) {
+        if (block.timestamp < schedule.start) {
+            return 0;
+        } else if (block.timestamp >= schedule.start.add(schedule.duration) || _revoked[msg.sender]) {
+            return schedule.totalAmount;
+        } else {
+            return schedule.totalAmount.mul(block.timestamp.sub(schedule.start)).div(schedule.duration);
+        }
+    }
+
+    function snapshot() external onlyOwner {
+        _snapshot();
+    }
+}
+```

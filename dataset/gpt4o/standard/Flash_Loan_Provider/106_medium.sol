@@ -1,0 +1,60 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract FlashLoanProvider is ReentrancyGuard {
+    // Events
+    event FlashLoanExecuted(address borrower, address token, uint256 amount, uint256 fee);
+
+    // Fee configuration
+    uint256 public feeBasisPoints;
+    address public owner;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    constructor(uint256 _feeBasisPoints) {
+        require(_feeBasisPoints <= 10000, "Fee basis points exceed maximum");
+        feeBasisPoints = _feeBasisPoints;
+        owner = msg.sender;
+    }
+
+    function setFee(uint256 _feeBasisPoints) external onlyOwner {
+        require(_feeBasisPoints <= 10000, "Fee basis points exceed maximum");
+        feeBasisPoints = _feeBasisPoints;
+    }
+
+    function flashLoan(address token, uint256 amount, bytes calldata data) external nonReentrant {
+        IERC20 tokenContract = IERC20(token);
+        uint256 balanceBefore = tokenContract.balanceOf(address(this));
+        require(balanceBefore >= amount, "Insufficient funds");
+
+        // Calculate fee
+        uint256 fee = (amount * feeBasisPoints) / 10000;
+
+        // Transfer tokens to borrower
+        tokenContract.transfer(msg.sender, amount);
+
+        // Execute callback
+        (bool success, ) = msg.sender.call(data);
+        require(success, "Flash loan callback failed");
+
+        // Validate repayment
+        uint256 balanceAfter = tokenContract.balanceOf(address(this));
+        require(balanceAfter >= balanceBefore + fee, "Repayment not sufficient");
+
+        emit FlashLoanExecuted(msg.sender, token, amount, fee);
+    }
+
+    function deposit(address token, uint256 amount) external {
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
+    }
+
+    function withdraw(address token, uint256 amount) external onlyOwner {
+        IERC20(token).transfer(owner, amount);
+    }
+}

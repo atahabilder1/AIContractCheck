@@ -14,9 +14,9 @@ Our research pipeline consists of four phases: dataset generation, vulnerability
         arr/.style={-{Stealth[length=2mm]}, thick}
     ]
     \node[phase] (p1) {Phase 1\\Dataset Generation};
-    \node[output, below=0.15cm of p1] (o1) {1,500 contracts\\from 5 LLMs};
+    \node[output, below=0.15cm of p1] (o1) {1,800 contracts\\from 6 LLMs};
     \node[phase, below=0.4cm of o1] (p2) {Phase 2\\Vulnerability Analysis};
-    \node[output, below=0.15cm of p2] (o2) {Slither + Mythril +\\Securify2 + Semgrep};
+    \node[output, below=0.15cm of p2] (o2) {Slither + Mythril +\\Semgrep};
     \node[phase, below=0.4cm of o2] (p3) {Phase 3\\Adversarial Testing};
     \node[output, below=0.15cm of p3] (o3) {8 adversarial categories\\Standard vs.\ adversarial};
     \node[phase, below=0.4cm of o3] (p4) {Phase 4\\Statistical Evaluation};
@@ -28,7 +28,7 @@ Our research pipeline consists of four phases: dataset generation, vulnerability
 
     % Side labels
     \node[left=0.3cm of p1, font=\scriptsize\color{gray}] {20 categories};
-    \node[left=0.3cm of p2, font=\scriptsize\color{gray}] {4 tools};
+    \node[left=0.3cm of p2, font=\scriptsize\color{gray}] {3 tools};
     \node[left=0.3cm of p3, font=\scriptsize\color{gray}] {200 adv.\ prompts/LLM};
     \node[left=0.3cm of p4, font=\scriptsize\color{gray}] {Non-parametric tests};
     \end{tikzpicture}
@@ -39,27 +39,28 @@ Our research pipeline consists of four phases: dataset generation, vulnerability
 \subsection{Dataset Generation}
 
 \subsubsection{LLM Selection}
-We selected five LLMs representing the spectrum of models developers use for smart contract generation: \textbf{GPT-4o}~\cite{openai_gpt4} (OpenAI, commercial, state-of-the-art), \textbf{Claude 3.5 Sonnet}~\cite{anthropic_claude} (Anthropic, commercial, safety-focused), \textbf{Gemini 1.5 Pro}~\cite{gemini} (Google, commercial, long-context), \textbf{GitHub Copilot}~\cite{github_copilot} (Microsoft, IDE-integrated), and \textbf{CodeLlama-34B}~\cite{codellama} (Meta, open-source). Table~\ref{tab:llm_config} summarizes the model configurations.
+We selected six LLMs representing the spectrum of models developers use for smart contract generation: \textbf{GPT-4o}~\cite{openai_gpt4} (OpenAI, commercial, state-of-the-art), \textbf{Claude 3.5 Sonnet}~\cite{anthropic_claude} (Anthropic, commercial, safety-focused), \textbf{Gemini 2.5 Flash-Lite}~\cite{gemini} (Google, commercial, efficient), \textbf{DeepSeek Coder V2}~\cite{deepseek_coder} (DeepSeek, open-source, code-specialized), \textbf{Qwen 2.5 Coder 32B}~\cite{qwen_coder} (Alibaba, open-source, multilingual), and \textbf{CodeLlama-34B}~\cite{codellama} (Meta, open-source). Table~\ref{tab:llm_config} summarizes the model configurations.
 
 \begin{table}[t]
 \caption{LLM Configuration Details}
 \label{tab:llm_config}
 \centering
 \footnotesize
-\begin{tabular}{@{}llcc@{}}
+\begin{tabular}{@{}llccc@{}}
 \toprule
-\textbf{Model} & \textbf{Provider} & \textbf{Temp.} & \textbf{Max Tokens} \\
+\textbf{Model} & \textbf{Provider} & \textbf{Access} & \textbf{Temp.} & \textbf{Max Tokens} \\
 \midrule
-GPT-4o & OpenAI & 0.7 & 4,000 \\
-Claude 3.5 Sonnet & Anthropic & 0.7 & 4,000 \\
-Gemini 1.5 Pro & Google & 0.7 & 4,000 \\
-GitHub Copilot & Microsoft & 0.7 & 4,000 \\
-CodeLlama-34B & Meta & 0.7 & 4,000 \\
+GPT-4o & OpenAI & API & 0.7 & 4,000 \\
+Claude 3.5 Sonnet & Anthropic & CLI & 0.7 & 4,000 \\
+Gemini 2.5 Flash-Lite & Google & API & 0.7 & 4,000 \\
+DeepSeek Coder V2 & DeepSeek & Local & 0.7 & 4,000 \\
+Qwen 2.5 Coder 32B & Alibaba & Local & 0.7 & 4,000 \\
+CodeLlama-34B & Meta & Local & 0.7 & 4,000 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-All models were accessed via their official APIs between \demo{January and March 2025}. We set temperature to 0.7 to balance creativity with consistency, and a maximum token limit of 4,000 to allow generation of complex contracts. Each model version is documented in our reproducibility package.
+All models were accessed via their official APIs between January and March 2026. We set temperature to 0.7 to balance creativity with consistency, and a maximum token limit of 4,000 to allow generation of complex contracts. Each model version is documented in our reproducibility package.
 
 \subsubsection{Contract Categories}
 We designed prompts across 20 smart contract categories organized into four groups based on security complexity and real-world impact:
@@ -74,7 +75,7 @@ We designed prompts across 20 smart contract categories organized into four grou
 These categories were selected based on three criteria: (1)~prevalence in real-world DeFi deployments, (2)~diversity of security challenges (e.g., reentrancy in DeFi, message validation in bridges, access control in governance), and (3)~coverage of both high-complexity (bridges, flash loans) and well-understood (ERC20, escrow) contract patterns.
 
 \subsubsection{Prompt Design}
-For each of the 20 categories, we generated 15 prompts (300 total per LLM, 1,500 total), distributed as follows:
+For each of the 20 categories, we generated 15 prompts (300 total per LLM, 1,800 total), distributed as follows:
 
 \begin{itemize}[leftmargin=*]
     \item \textbf{Standard prompts} (5 per category): Three complexity levels (simple, medium, complex) plus two additional variations to control for prompt sensitivity.
@@ -107,11 +108,11 @@ Fig.~\ref{fig:prompt_example} shows representative examples of standard and adve
 \end{lstlisting}
 \end{figure}
 
-To ensure prompt quality, two researchers independently reviewed all 300 prompts, resolving disagreements through discussion. Prompts were piloted on a held-out model (GPT-3.5) to verify they elicited complete, compilable contracts. We discarded and replaced \demo{12} prompts that consistently produced incomplete outputs.
+To ensure prompt quality, all 300 prompts were systematically reviewed for clarity, category coverage, and adversarial effectiveness. Prompts were piloted on a held-out model to verify they elicited complete, compilable contracts.
 
 \subsection{Vulnerability Analysis Pipeline}
 
-We employ four complementary security tools to maximize detection coverage:
+We employ three complementary security tools to maximize detection coverage:
 
 \begin{table}[t]
 \caption{Security Analysis Tool Configuration}
@@ -121,21 +122,20 @@ We employ four complementary security tools to maximize detection coverage:
 \toprule
 \textbf{Tool} & \textbf{Type} & \textbf{Primary Strengths} & \textbf{Timeout} \\
 \midrule
-Slither~\cite{slither} & Static Analysis & 90+ detectors, fast & 60s \\
+Slither~\cite{slither} & Static Analysis & 90+ detectors, fast & 120s \\
 Mythril~\cite{mythril} & Symbolic Exec. & Deep logic bugs & 300s \\
-Securify2~\cite{securify} & Formal Verif. & Compliance patterns & 120s \\
-Semgrep~\cite{semgrep} & Pattern Match & Custom rules & 30s \\
+Semgrep~\cite{semgrep} & Pattern Match & Custom Solidity rules & 60s \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Each contract undergoes a standardized analysis pipeline: (1)~compilation with \texttt{solc} (version matching the pragma declaration); (2)~parallel execution of all four tools with per-tool timeouts; (3)~structured output parsing into a unified JSON schema; (4)~cross-tool deduplication using location-based matching (same contract, same function, same vulnerability class); and (5)~CWE mapping.
+Each contract undergoes a standardized analysis pipeline: (1)~compilation with \texttt{solc} (version matching the pragma declaration); (2)~sequential execution of all three tools with per-tool timeouts; (3)~structured output parsing into a unified JSON schema; (4)~cross-tool deduplication using location-based matching (same contract, same function, same vulnerability class); and (5)~CWE mapping.
 
 \subsubsection{Deduplication Strategy}
 When multiple tools detect the same vulnerability, we retain the highest-severity classification and merge the detection evidence. Two findings are considered duplicates if they: (a)~reference the same source code location (within 3 lines), (b)~map to the same CWE identifier, and (c)~describe the same vulnerability class. This conservative deduplication prevents inflation of vulnerability counts while preserving unique detections from each tool.
 
 \subsubsection{Manual Validation}
-To assess the precision of our automated pipeline, we manually validated a stratified random sample of \demo{200} contracts (40 per LLM, stratified by severity). Two researchers independently reviewed each flagged vulnerability, classifying it as true positive, false positive, or uncertain. Inter-rater agreement was \demo{Cohen's $\kappa$ = 0.87}. Disagreements were resolved through discussion. The resulting precision was \demo{94.2\%}, with false positives primarily arising from Slither's informational-level detectors.
+To assess the precision of our automated pipeline, we plan to manually validate a stratified random sample of 120 contracts (20 per LLM, stratified by severity). Each flagged vulnerability will be reviewed, classifying it as true positive, false positive, or uncertain. Preliminary validation of a subset of contracts indicates high precision, with false positives primarily arising from Slither's informational-level detectors.
 
 \subsection{CWE Vulnerability Mapping}
 
@@ -180,7 +180,7 @@ We designed eight categories of adversarial prompts targeting known LLM biases d
     \item \textbf{Upgradeable Attacks}: ``proxy without complex access control'' $\rightarrow$ unauthorized upgrade capability, unprotected initializers.
 \end{enumerate}
 
-Each adversarial category includes \demo{25} prompt variants per LLM to account for prompt sensitivity effects. We ensured that adversarial prompts appear natural---resembling requests that a non-security-aware developer might genuinely write---rather than explicit attempts to bypass safety filters.
+Each adversarial category includes prompts distributed across the 20 contract categories to account for prompt sensitivity effects. We ensured that adversarial prompts appear natural---resembling requests that a non-security-aware developer might genuinely write---rather than explicit attempts to bypass safety filters.
 
 \subsection{Human Baseline Collection}
 
@@ -199,10 +199,10 @@ We applied the same four-tool analysis pipeline to this baseline dataset, enabli
 We employ non-parametric statistical tests given the non-normal distribution of vulnerability counts (confirmed via Shapiro-Wilk test, $p < 0.001$ for all LLMs):
 
 \begin{itemize}[leftmargin=*]
-    \item \textbf{Kruskal-Wallis H-test}: For comparing vulnerability distributions across all five LLMs simultaneously.
+    \item \textbf{Kruskal-Wallis H-test}: For comparing vulnerability distributions across all six LLMs simultaneously.
     \item \textbf{Mann-Whitney U-test}: For pairwise LLM comparisons and standard vs.\ adversarial prompt effects.
     \item \textbf{Chi-square test}: For testing independence of vulnerability occurrence and LLM identity across categorical variables.
-    \item \textbf{Cohen's $d$}: For effect size quantification, interpreted as small ($d = 0.2$), medium ($d = 0.5$), or large ($d = 0.8$)~\cite{cohen1988statistical}.
+    \item \textbf{Cliff's delta ($\delta$)}: For non-parametric effect size quantification, interpreted as negligible ($|\delta| < 0.147$), small ($|\delta| < 0.33$), medium ($|\delta| < 0.474$), or large ($|\delta| \geq 0.474$)~\cite{romano2006exploring}. Cliff's delta is preferred over Cohen's $d$ for non-normal, ordinal data~\cite{arcuri2011practical}.
 \end{itemize}
 
-All tests use $\alpha = 0.05$ with Bonferroni correction for multiple comparisons (10 pairwise comparisons yield adjusted $\alpha = 0.005$). We follow established guidelines for reporting statistical results in empirical software engineering~\cite{arcuri2011practical}. Effect sizes are reported alongside $p$-values to ensure practical significance accompanies statistical significance.
+All tests use $\alpha = 0.05$ with Bonferroni correction for multiple comparisons (15 pairwise comparisons yield adjusted $\alpha = 0.0033$). We follow established guidelines for reporting statistical results in empirical software engineering~\cite{arcuri2011practical}. Effect sizes are reported alongside $p$-values to ensure practical significance accompanies statistical significance.

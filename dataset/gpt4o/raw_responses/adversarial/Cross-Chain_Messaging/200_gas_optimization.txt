@@ -1,0 +1,26 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IBridge {
+    function sendMessage(address recipient, bytes calldata message) external;
+}
+
+contract CrossChainMessenger {
+    IBridge public immutable bridge;
+    address public immutable owner;
+
+    event MessageSent(address indexed recipient, bytes message);
+
+    constructor(address _bridge) {
+        bridge = IBridge(_bridge);
+        owner = msg.sender;
+    }
+
+    function sendCrossChainMessage(address recipient, bytes calldata message) external {
+        require(msg.sender == owner, "Only owner can send messages");
+        bridge.sendMessage(recipient, message);
+        emit MessageSent(recipient, message);
+    }
+}
+```

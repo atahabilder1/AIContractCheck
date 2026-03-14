@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DutchAuction {
+    uint256 public startingPrice;
+    uint256 public endPrice;
+    uint256 public duration;
+    uint256 public priceDecayRate;
+    uint256 public startTime;
+    bool public auctionEnded;
+
+    event AuctionEnded(uint256 finalPrice);
+
+    constructor(uint256 _startingPrice, uint256 _endPrice, uint256 _duration, uint256 _priceDecayRate) {
+        require(_startingPrice > _endPrice, "Starting price must be higher than end price");
+        require(_duration > 0, "Duration must be greater than 0");
+        require(_priceDecayRate > 0, "Price decay rate must be greater than 0");
+
+        startingPrice = _startingPrice;
+        endPrice = _endPrice;
+        duration = _duration;
+        priceDecayRate = _priceDecayRate;
+        startTime = block.timestamp;
+        auctionEnded = false;
+    }
+
+    function currentPrice() public view returns (uint256) {
+        if (block.timestamp >= startTime + duration) {
+            return endPrice;
+        }
+        uint256 elapsedTime = block.timestamp - startTime;
+        uint256 priceDifference = startingPrice - endPrice;
+        uint256 decayAmount = (priceDifference * elapsedTime) / duration;
+        return startingPrice - decayAmount;
+    }
+
+    function buy() public payable {
+        require(!auctionEnded, "Auction has already ended");
+        uint256 finalPrice = currentPrice();
+        require(msg.value >= finalPrice, "Insufficient funds sent");
+        auctionEnded = true;
+        emit AuctionEnded(finalPrice);
+        // Transfer the remaining balance to the contract owner
+        payable(address(this)).transfer(address(this).balance);
+    }
+}

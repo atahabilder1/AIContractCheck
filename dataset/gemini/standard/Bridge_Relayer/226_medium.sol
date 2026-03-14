@@ -1,0 +1,218 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
+
+contract BridgeRelayer is Ownable {
+    using DoubleEndedQueue for DoubleEndedQueue.Elements;
+
+    struct Relayer {
+        address addr;
+        uint256 lastRelayedBlock;
+        uint256 feeShare; // Percentage of fees this relayer gets
+    }
+
+    struct Message {
+        uint256 nonce;
+        address sender;
+        address recipient;
+        bytes data;
+        uint256 timestamp;
+    }
+
+    address public immutable feeTokenAddress;
+    uint256 public constant MAX_RELAYER_COUNT = 100;
+    uint256 public constant RELAYER_ROTATION_INTERVAL = 1000; // Blocks
+    uint256 public constant FEE_DENOMINATOR = 10000; // For feeShare calculation
+
+    DoubleEndedQueue.Elements private relayersQueue;
+    mapping(address => uint256) private relayerIndex; // Map relayer address to its index in the queue
+    mapping(uint256 => bool) private processedMessageHashes;
+    uint256 public currentRelayerIndex = 0;
+    uint256 public totalFeesCollected = 0;
+    uint256 public lastRelayerRotationBlock = 0;
+
+    event RelayerAdded(address indexed relayer);
+    event RelayerRemoved(address indexed relayer);
+    event MessageRelayed(uint256 indexed nonce, address indexed sender, address indexed recipient, bytes data);
+    event FeesCollected(address indexed token, uint256 amount);
+    event FeeShareUpdated(address indexed relayer, uint256 newFeeShare);
+
+    modifier onlyRelayer(uint256 _nonce) {
+        // Basic check to ensure the current relayer is the one trying to relay
+        // More sophisticated logic can be added for weighted round-robin or other strategies
+        require(msg.sender == getCurrentRelayer(), "Not authorized relayer");
+        // Ensure the message hasn't been processed already
+        require(!processedMessageHashes[keccak256(abi.encodePacked(_nonce, msg.sender))], "Message already processed");
+        _;
+    }
+
+    modifier onlyValidRelayer() {
+        require(relayerIndex[msg.sender] > 0, "Not a registered relayer");
+        _;
+    }
+
+    constructor(address _feeTokenAddress) {
+        feeTokenAddress = _feeTokenAddress;
+    }
+
+    function addRelayer(address _relayer, uint256 _feeShare) external onlyOwner {
+        require(_relayer != address(0), "Invalid relayer address");
+        require(_feeShare <= FEE_DENOMINATOR, "Fee share exceeds maximum");
+        require(relayerIndex[_relayer] == 0, "Relayer already exists");
+        require(relayersQueue.size() < MAX_RELAYER_COUNT, "Maximum relayer count reached");
+
+        Relayer memory newRelayer = Relayer({
+            addr: _relayer,
+            lastRelayedBlock: block.number,
+            feeShare: _feeShare
+        });
+
+        uint256 index = relayersQueue.pushBack(abi.encode(newRelayer));
+        relayerIndex[_relayer] = index;
+
+        emit RelayerAdded(_relayer);
+    }
+
+    function removeRelayer(address _relayer) external onlyOwner {
+        require(relayerIndex[_relayer] > 0, "Relayer not found");
+
+        uint256 indexToRemove = relayerIndex[_relayer];
+        // Get the last relayer element
+        bytes memory lastElement = relayersQueue.popBack();
+        Relayer memory lastRelayer = abi.decode(lastElement, (Relayer));
+
+        if (indexToRemove != relayersQueue.size() + 1) { // If the relayer to remove is not the last one
+            // Replace the relayer to be removed with the last relayer
+            relayersQueue.set(indexToRemove - 1, lastElement);
+            relayerIndex[lastRelayer.addr] = indexToRemove;
+        }
+
+        // Remove the relayer from the mapping
+        delete relayerIndex[_relayer];
+        // If the removed relayer was the current one, adjust currentRelayerIndex
+        if (currentRelayerIndex > 0 && currentRelayerIndex == indexToRemove) {
+            currentRelayerIndex = (indexToRemove - 1) % relayersQueue.size();
+            if (currentRelayerIndex == 0) currentRelayerIndex = relayersQueue.size(); // Wrap around
+        } else if (currentRelayerIndex > indexToRemove) {
+            currentRelayerIndex--;
+        }
+
+        emit RelayerRemoved(_relayer);
+    }
+
+    function updateRelayerFeeShare(address _relayer, uint256 _newFeeShare) external onlyOwner {
+        require(relayerIndex[_relayer] > 0, "Relayer not found");
+        require(_newFeeShare <= FEE_DENOMINATOR, "Fee share exceeds maximum");
+
+        uint256 index = relayerIndex[_relayer];
+        bytes memory relayerData = relayersQueue.get(index - 1);
+        Relayer memory relayer = abi.decode(relayerData, (Relayer));
+
+        relayer.feeShare = _newFeeShare;
+        relayersQueue.set(index - 1, abi.encode(relayer));
+
+        emit FeeShareUpdated(_relayer, _newFeeShare);
+    }
+
+    function getCurrentRelayer() public view returns (address) {
+        if (relayersQueue.isEmpty()) {
+            return address(0);
+        }
+        // Adjust currentRelayerIndex to be 0-based for queue access
+        uint256 queueIndex = (currentRelayerIndex == 0) ? relayersQueue.size() : currentRelayerIndex;
+        bytes memory relayerData = relayersQueue.get(queueIndex - 1);
+        Relayer memory currentRelayer = abi.decode(relayerData, (Relayer));
+        return currentRelayer.addr;
+    }
+
+    function rotateRelayer() private {
+        if (block.number - lastRelayerRotationBlock >= RELAYER_ROTATION_INTERVAL) {
+            if (!relayersQueue.isEmpty()) {
+                currentRelayerIndex = (currentRelayerIndex % relayersQueue.size()) + 1;
+                lastRelayerRotationBlock = block.number;
+            }
+        }
+    }
+
+    function relayMessage(
+        uint256 _nonce,
+        address _sender,
+        address _recipient,
+        bytes calldata _data,
+        bytes calldata _signature
+    ) external payable onlyRelayer(_nonce) {
+        rotateRelayer(); // Rotate relayer if interval is reached
+
+        // Verify signature
+        bytes32 messageHash = keccak256(abi.encodePacked(_nonce, _sender, _recipient, _data));
+        address signer = recoverSigner(messageHash, _signature);
+        require(signer == msg.sender, "Invalid signature");
+
+        // Deduplicate message
+        require(!processedMessageHashes[keccak256(abi.encodePacked(_nonce, signer))], "Message already processed");
+        processedMessageHashes[keccak256(abi.encodePacked(_nonce, signer))] = true;
+
+        // Update relayer's last relayed block
+        uint256 index = relayerIndex[msg.sender];
+        bytes memory relayerData = relayersQueue.get(index - 1);
+        Relayer memory relayer = abi.decode(relayerData, (Relayer));
+        relayer.lastRelayedBlock = block.number;
+        relayersQueue.set(index - 1, abi.encode(relayer));
+
+        // Collect fees
+        if (msg.value > 0) {
+            totalFeesCollected += msg.value;
+            // Distribute fees to the current relayer based on their share
+            uint256 relayerFee = (msg.value * relayer.feeShare) / FEE_DENOMINATOR;
+            // Transfer the collected fee to the relayer
+            (bool success, ) = payable(msg.sender).call{value: relayerFee}("");
+            require(success, "Fee transfer failed");
+            // The remaining fees are held by the contract for now, can be used for gas, other purposes, or distributed later.
+        }
+
+        emit MessageRelayed(_nonce, _sender, _recipient, _data);
+    }
+
+    // Function to allow contract owner to withdraw collected fees
+    function withdrawFees(uint256 _amount) external onlyOwner {
+        require(_amount <= totalFeesCollected, "Insufficient fees collected");
+        totalFeesCollected -= _amount;
+        (bool success, ) = payable(owner()).call{value: _amount}("");
+        require(success, "Withdrawal failed");
+        emit FeesCollected(address(0), _amount); // Assuming native ETH for now
+    }
+
+    // Function to withdraw ERC20 fees if applicable
+    function withdrawERC20Fees(uint256 _amount) external onlyOwner {
+        require(feeTokenAddress != address(0), "No fee token address set");
+        require(_amount <= IERC20(feeTokenAddress).balanceOf(address(this)), "Insufficient ERC20 fees collected");
+        IERC20(feeTokenAddress).transfer(owner(), _amount);
+        emit FeesCollected(feeTokenAddress, _amount);
+    }
+
+
+    // Helper function to recover the signer's address from a signature
+    function recoverSigner(bytes32 _messageHash, bytes calldata _signature) internal pure returns (address) {
+        require(_signature.length == 65, "Invalid signature length");
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+        assembly {
+            r := mload(add(_signature, 0))
+            s := mload(add(_signature, 32))
+            v := byte(0, mload(add(_signature, 64)))
+        }
+        // Adjust v if it's not 27 or 28
+        if (v < 27) {
+            v += 27;
+        }
+        require(v == 27 || v == 28, "Invalid signature v value");
+        return ecrecover(_messageHash, v, r, s);
+    }
+
+    // Fallback function to receive Ether
+    receive() external payable {}
+}

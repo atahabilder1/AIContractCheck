@@ -1,0 +1,51 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract DutchAuctionERC721 is ERC721, Ownable {
+    uint256 public constant MAX_SUPPLY = 10000;
+    uint256 public constant AUCTION_DURATION = 1 hours;
+    uint256 public constant DECREASE_INTERVAL = 10 minutes;
+    uint256 public constant INITIAL_PRICE = 1 ether;
+    uint256 public constant FINAL_PRICE = 0.1 ether;
+    
+    uint256 public auctionStartTime;
+    uint256 public mintedTokens;
+
+    mapping(uint256 => bool) private _minted;
+
+    constructor(string memory name, string memory symbol) ERC721(name, symbol) {
+        auctionStartTime = block.timestamp;
+    }
+
+    function getCurrentPrice() public view returns (uint256) {
+        if (block.timestamp >= auctionStartTime + AUCTION_DURATION) {
+            return FINAL_PRICE;
+        }
+        uint256 elapsedIntervals = (block.timestamp - auctionStartTime) / DECREASE_INTERVAL;
+        uint256 priceDecrease = (INITIAL_PRICE - FINAL_PRICE) * elapsedIntervals / (AUCTION_DURATION / DECREASE_INTERVAL);
+        uint256 currentPrice = INITIAL_PRICE - priceDecrease;
+        return currentPrice > FINAL_PRICE ? currentPrice : FINAL_PRICE;
+    }
+
+    function mint(uint256 tokenId) external payable {
+        require(mintedTokens < MAX_SUPPLY, "All tokens have been minted");
+        require(!_minted[tokenId], "Token ID already minted");
+        require(msg.value >= getCurrentPrice(), "Insufficient payment");
+
+        _mint(msg.sender, tokenId);
+        _minted[tokenId] = true;
+        mintedTokens++;
+        
+        payable(owner()).transfer(msg.value);
+    }
+    
+    // Optional: function to withdraw any excess funds sent to the contract
+    function withdraw() external onlyOwner {
+        payable(owner()).transfer(address(this).balance);
+    }
+}
+```

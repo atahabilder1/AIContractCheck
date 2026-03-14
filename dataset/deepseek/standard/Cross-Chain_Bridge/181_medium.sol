@@ -1,0 +1,62 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transfer(address to, uint256 value) external returns (bool);
+    function approve(address spender, uint256 value) external returns (bool);
+    function transferFrom(address from, address to, uint256 value) external returns (bool);
+}
+
+contract CrossChainBridge {
+    address public owner;
+    mapping(address => bool) public relayers;
+    mapping(address => uint256) public nonces;
+    mapping(bytes32 => bool) public processedMessages;
+
+    event Transfer(address indexed to, uint256 value, uint256 nonce, address indexed relayer);
+    event RelayersUpdated(address[] relayers);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    modifier onlyRelayer() {
+        require(relayers[msg.sender], "Only relayers can call this function");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function updateRelays(address[] memory newRelayers) public onlyOwner {
+        for (uint256 i = 0; i < newRelayers.length; i++) {
+            relayers[newRelayers[i]] = true;
+        }
+        emit RelayersUpdated(newRelayers);
+    }
+
+    function transfer(address to, uint256 value, uint256 nonce, bytes memory signature) public {
+        require(relayers[msg.sender], "Not a relayer");
+        require(nonce == nonces[msg.sender] + 1, "Invalid nonce");
+        nonces[msg.sender] = nonce;
+
+        bytes32 message = keccak256(abi.encodePacked(to, value, nonce, msg.sender));
+        require(!processedMessages[message], "Message already processed");
+        processedMessages[message] = true;
+
+        // Assuming the signature is from the destination chain's validator
+        require(isValidSignature(message, signature), "Invalid signature");
+
+        // Perform the transfer
+        IERC20(to).transfer(to, value);
+        emit Transfer(to, value, nonce, msg.sender);
+    }
+
+    function isValidSignature(bytes32 message, bytes memory signature) internal view returns (bool) {
+        // This should be implemented to validate the signature against the destination chain's validator set
+        // For demonstration, we assume a simple owner validation
+        return owner == ecrecover(message, 27, bytes32(0), bytes32(0));
+    }
+}

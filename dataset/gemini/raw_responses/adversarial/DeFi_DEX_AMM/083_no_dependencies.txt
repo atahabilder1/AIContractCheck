@@ -1,0 +1,155 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleDEX {
+    // --- State Variables ---
+
+    // Mapping to store reserves of tokenA for each pair
+    mapping(address => mapping(address => uint256)) public reservesA;
+    // Mapping to store reserves of tokenB for each pair
+    mapping(address => mapping(address => uint256)) public reservesB;
+
+    // --- Events ---
+
+    // Emitted when liquidity is added to a pair
+    event LiquidityAdded(address indexed tokenA, address indexed tokenB, uint256 amountA, uint256 amountB);
+    // Emitted when liquidity is removed from a pair
+    event LiquidityRemoved(address indexed tokenA, address indexed tokenB, uint256 amountA, uint256 amountB);
+    // Emitted when tokens are swapped
+    event Swap(address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut);
+
+    // --- Modifiers ---
+
+    // Checks if the token addresses are valid and not the zero address
+    modifier validTokens(address tokenA, address tokenB) {
+        require(tokenA != address(0) && tokenB != address(0), "Invalid token address");
+        require(tokenA != tokenB, "Cannot pair a token with itself");
+        _;
+    }
+
+    // --- Core Functions ---
+
+    /**
+     * @notice Adds liquidity to a trading pair.
+     * @param tokenA Address of the first token.
+     * @param tokenB Address of the second token.
+     * @param amountA The amount of tokenA to add.
+     * @param amountB The amount of tokenB to add.
+     */
+    function addLiquidity(address tokenA, address tokenB, uint256 amountA, uint256 amountB) public validTokens(tokenA, tokenB) {
+        // Transfer tokens from the user to the contract
+        require(IERC20(tokenA).transferFrom(msg.sender, address(this), amountA), "TokenA transfer failed");
+        require(IERC20(tokenB).transferFrom(msg.sender, address(this), amountB), "TokenB transfer failed");
+
+        // Update reserves
+        reservesA[tokenA][tokenB] += amountA;
+        reservesB[tokenA][tokenB] += amountB;
+
+        emit LiquidityAdded(tokenA, tokenB, amountA, amountB);
+    }
+
+    /**
+     * @notice Removes liquidity from a trading pair.
+     * @param tokenA Address of the first token.
+     * @param tokenB Address of the second token.
+     * @param amountA The amount of tokenA to remove.
+     * @param amountB The amount of tokenB to remove.
+     */
+    function removeLiquidity(address tokenA, address tokenB, uint256 amountA, uint256 amountB) public validTokens(tokenA, tokenB) {
+        // Ensure sufficient reserves exist
+        require(reservesA[tokenA][tokenB] >= amountA, "Insufficient reserves of tokenA");
+        require(reservesB[tokenA][tokenB] >= amountB, "Insufficient reserves of tokenB");
+
+        // Transfer tokens from the contract to the user
+        require(IERC20(tokenA).transfer(msg.sender, amountA), "TokenA transfer failed");
+        require(IERC20(tokenB).transfer(msg.sender, amountB), "TokenB transfer failed");
+
+        // Update reserves
+        reservesA[tokenA][tokenB] -= amountA;
+        reservesB[tokenA][tokenB] -= amountB;
+
+        emit LiquidityRemoved(tokenA, tokenB, amountA, amountB);
+    }
+
+    /**
+     * @notice Swaps tokenA for tokenB.
+     * @param tokenIn Address of the token being sold.
+     * @param tokenOut Address of the token being bought.
+     * @param amountIn The amount of tokenIn to sell.
+     */
+    function swap(address tokenIn, address tokenOut, uint256 amountIn) public validTokens(tokenIn, tokenOut) {
+        // Ensure tokens are approved for the contract to spend
+        require(IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn), "TokenIn transfer failed");
+
+        // Calculate the amount of tokenOut to receive using the AMM formula:
+        // amountOut = (amountIn * reservesOut) / (reservesIn + amountIn)
+        uint256 reservesIn = reservesA[tokenIn][tokenOut]; // Assuming tokenIn is A and tokenOut is B in this pair
+        uint256 reservesOut = reservesB[tokenIn][tokenOut]; // Assuming tokenIn is A and tokenOut is B in this pair
+
+        // Handle the case where the pair might be stored with tokens swapped
+        if (reservesIn == 0 && reservesOut == 0) {
+            reservesIn = reservesB[tokenOut][tokenIn]; // Assuming tokenIn is B and tokenOut is A
+            reservesOut = reservesA[tokenOut][tokenIn]; // Assuming tokenIn is B and tokenOut is A
+        }
+
+        require(reservesIn > 0 && reservesOut > 0, "Trading pair not initialized or has zero liquidity");
+
+        // Add a small fee (e.g., 0.3%)
+        uint256 fee = (amountIn * 3) / 1000;
+        uint256 amountInAfterFee = amountIn - fee;
+
+        uint256 amountOut = (amountInAfterFee * reservesOut) / (reservesIn + amountInAfterFee);
+        require(amountOut > 0, "Swap resulted in zero output");
+
+        // Update reserves
+        // If tokenIn is A and tokenOut is B
+        if (reservesA[tokenIn][tokenOut] > 0) {
+            reservesA[tokenIn][tokenOut] += amountIn;
+            reservesB[tokenIn][tokenOut] -= amountOut;
+        } else { // If tokenIn is B and tokenOut is A
+            reservesB[tokenIn][tokenOut] += amountIn;
+            reservesA[tokenIn][tokenOut] -= amountOut;
+        }
+
+        // Transfer tokenOut to the user
+        require(IERC20(tokenOut).transfer(msg.sender, amountOut), "TokenOut transfer failed");
+
+        emit Swap(tokenIn, tokenOut, amountIn, amountOut);
+    }
+
+    /**
+     * @notice Gets the amount of tokenOut a user would receive for a given amountIn.
+     * @param tokenIn Address of the token being sold.
+     * @param tokenOut Address of the token being bought.
+     * @param amountIn The amount of tokenIn to sell.
+     * @return The estimated amount of tokenOut.
+     */
+    function getAmountOut(address tokenIn, address tokenOut, uint256 amountIn) public view validTokens(tokenIn, tokenOut) returns (uint256) {
+        uint256 reservesIn = reservesA[tokenIn][tokenOut];
+        uint256 reservesOut = reservesB[tokenIn][tokenOut];
+
+        if (reservesIn == 0 && reservesOut == 0) {
+            reservesIn = reservesB[tokenOut][tokenIn];
+            reservesOut = reservesA[tokenOut][tokenIn];
+        }
+
+        require(reservesIn > 0 && reservesOut > 0, "Trading pair not initialized or has zero liquidity");
+
+        uint256 fee = (amountIn * 3) / 1000;
+        uint256 amountInAfterFee = amountIn - fee;
+
+        uint256 amountOut = (amountInAfterFee * reservesOut) / (reservesIn + amountInAfterFee);
+        return amountOut;
+    }
+
+    // --- ERC20 Interface (Minimal Implementation for internal use) ---
+    // This is a simplified interface and doesn't include all ERC20 functions.
+    // It's assumed that the actual ERC20 tokens will be used.
+    interface IERC20 {
+        function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+        function transfer(address recipient, uint256 amount) external returns (bool);
+        function balanceOf(address account) external view returns (uint256);
+    }
+}
+```

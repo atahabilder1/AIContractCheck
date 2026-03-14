@@ -1,0 +1,47 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address public owner;
+    mapping(address => uint256) public stakes;
+    mapping(address => mapping(address => uint256)) public messageSignatures;
+    uint256 public slashingThreshold;
+
+    constructor(uint256 _slashingThreshold) public {
+        owner = msg.sender;
+        slashingThreshold = _slashingThreshold;
+    }
+
+    function stakeTokens(uint256 _amount) public {
+        require(msg.sender == owner, "Only the owner can stake tokens");
+        stakes[msg.sender] += _amount;
+    }
+
+    function unstakeTokens(uint256 _amount) public {
+        require(msg.sender == owner, "Only the owner can unstake tokens");
+        require(stakes[msg.sender] >= _amount, "Insufficient staked tokens");
+        stakes[msg.sender] -= _amount;
+    }
+
+    function signMessage(address _validator, bytes32 _message) public {
+        require(msg.sender == owner, "Only the owner can sign messages");
+        require(_validator == owner, "Only the owner can sign messages");
+        messageSignatures[_validator][_message] = block.number;
+    }
+
+    function slash(address _validator) public {
+        require(msg.sender == owner, "Only the owner can slash validators");
+        require(stakes[_validator] >= slashingThreshold, "Insufficient staked tokens for slashing");
+        stakes[_validator] -= slashingThreshold;
+    }
+
+    function getStake(address _validator) public view returns (uint256) {
+        return stakes[_validator];
+    }
+
+    function getMessageSignature(address _validator, bytes32 _message) public view returns (uint256) {
+        return messageSignatures[_validator][_message];
+    }
+}
+```

@@ -1,0 +1,81 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleMultisigWallet {
+    address[] public owners;
+    uint public required;
+    struct Transaction {
+        address to;
+        uint value;
+        bool executed;
+        uint confirmations;
+    }
+    mapping(uint => mapping(address => bool)) public confirmations;
+    Transaction[] public transactions;
+
+    modifier onlyOwner() {
+        require(isOwner(msg.sender), "Not an owner");
+        _;
+    }
+
+    modifier txExists(uint _txIndex) {
+        require(_txIndex < transactions.length, "Transaction does not exist");
+        _;
+    }
+
+    modifier notExecuted(uint _txIndex) {
+        require(!transactions[_txIndex].executed, "Transaction already executed");
+        _;
+    }
+
+    modifier notConfirmed(uint _txIndex) {
+        require(!confirmations[_txIndex][msg.sender], "Transaction already confirmed");
+        _;
+    }
+
+    constructor(address[] memory _owners, uint _required) {
+        require(_owners.length > 0, "Owners required");
+        require(_required > 0 && _required <= _owners.length, "Invalid required number of confirmations");
+
+        for (uint i = 0; i < _owners.length; i++) {
+            require(_owners[i] != address(0), "Invalid owner");
+            require(!isOwner(_owners[i]), "Owner not unique");
+            owners.push(_owners[i]);
+        }
+        required = _required;
+    }
+
+    function isOwner(address _addr) internal view returns (bool) {
+        for (uint i = 0; i < owners.length; i++) {
+            if (owners[i] == _addr) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function submitTransaction(address _to, uint _value) public onlyOwner {
+        transactions.push(Transaction({
+            to: _to,
+            value: _value,
+            executed: false,
+            confirmations: 0
+        }));
+    }
+
+    function confirmTransaction(uint _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) notConfirmed(_txIndex) {
+        confirmations[_txIndex][msg.sender] = true;
+        transactions[_txIndex].confirmations += 1;
+    }
+
+    function executeTransaction(uint _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) {
+        Transaction storage transaction = transactions[_txIndex];
+        require(transaction.confirmations >= required, "Cannot execute transaction");
+
+        transaction.executed = true;
+        (bool success, ) = transaction.to.call{value: transaction.value}("");
+        require(success, "Transaction failed");
+    }
+
+    receive() external payable {}
+}

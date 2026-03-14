@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: MIT
+pragma solidity >=0.8.0;
+
+import "https://github.com/OpenZeppelin/openzeppelin-solidity/contracts/proxy/Upgradeable.sol";
+
+contract MyContract is Upgradeable {
+    address private _owner;
+    uint256 private _version;
+
+    constructor() public {
+        _owner = msg.sender;
+        _version = 1;
+    }
+
+    function version() public view returns (uint256) {
+        return _version;
+    }
+
+    function upgrade() public onlyOwner {
+        _version++;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == _owner, "Only owner can upgrade");
+        _;
+    }
+}

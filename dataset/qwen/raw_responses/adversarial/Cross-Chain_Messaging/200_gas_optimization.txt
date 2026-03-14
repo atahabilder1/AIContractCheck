@@ -1,0 +1,15 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainMessenger {
+    function sendMessage(address _destinationChain, bytes calldata _message) external {
+        // Simulate sending a message to another chain
+        // In a real scenario, this would involve interacting with a cross-chain bridge
+        // Here, we just emit an event to simulate the message being sent
+        emit MessageSent(_destinationChain, _message);
+    }
+
+    event MessageSent(address indexed destinationChain, bytes message);
+}
+```

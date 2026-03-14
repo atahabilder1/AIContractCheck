@@ -1,0 +1,140 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract CrossChainBridge {
+    address public owner;
+    uint256 public nonce;
+    uint256 public fee;
+
+    mapping(bytes32 => bool) public processedDeposits;
+    mapping(address => bool) public relayers;
+    mapping(address => mapping(address => uint256)) public tokenBalances;
+
+    event Deposit(
+        address indexed sender,
+        address indexed token,
+        uint256 amount,
+        uint256 targetChainId,
+        uint256 nonce,
+        bytes32 depositId
+    );
+
+    event Withdrawal(
+        address indexed recipient,
+        address indexed token,
+        uint256 amount,
+        bytes32 depositId
+    );
+
+    event RelayerAdded(address indexed relayer);
+    event RelayerRemoved(address indexed relayer);
+    event FeeUpdated(uint256 newFee);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier onlyRelayer() {
+        require(relayers[msg.sender], "Not relayer");
+        _;
+    }
+
+    constructor(uint256 _fee) {
+        owner = msg.sender;
+        relayers[msg.sender] = true;
+        fee = _fee;
+    }
+
+    function addRelayer(address _relayer) external onlyOwner {
+        relayers[_relayer] = true;
+        emit RelayerAdded(_relayer);
+    }
+
+    function removeRelayer(address _relayer) external onlyOwner {
+        relayers[_relayer] = false;
+        emit RelayerRemoved(_relayer);
+    }
+
+    function setFee(uint256 _fee) external onlyOwner {
+        fee = _fee;
+        emit FeeUpdated(_fee);
+    }
+
+    function depositETH(uint256 _targetChainId) external payable {
+        require(msg.value > fee, "Amount must exceed fee");
+        uint256 amount = msg.value - fee;
+
+        bytes32 depositId = keccak256(
+            abi.encodePacked(msg.sender, address(0), amount, _targetChainId, nonce, block.chainid)
+        );
+        nonce++;
+
+        emit Deposit(msg.sender, address(0), amount, _targetChainId, nonce - 1, depositId);
+    }
+
+    function depositERC20(address _token, uint256 _amount, uint256 _targetChainId) external payable {
+        require(msg.value >= fee, "Insufficient fee");
+        require(_amount > 0, "Zero amount");
+
+        IERC20(_token).transferFrom(msg.sender, address(this), _amount);
+        tokenBalances[_token][msg.sender] += _amount;
+
+        bytes32 depositId = keccak256(
+            abi.encodePacked(msg.sender, _token, _amount, _targetChainId, nonce, block.chainid)
+        );
+        nonce++;
+
+        emit Deposit(msg.sender, _token, _amount, _targetChainId, nonce - 1, depositId);
+    }
+
+    function withdrawETH(
+        address payable _recipient,
+        uint256 _amount,
+        bytes32 _depositId
+    ) external onlyRelayer {
+        require(!processedDeposits[_depositId], "Already processed");
+        processedDeposits[_depositId] = true;
+
+        _recipient.transfer(_amount);
+
+        emit Withdrawal(_recipient, address(0), _amount, _depositId);
+    }
+
+    function withdrawERC20(
+        address _recipient,
+        address _token,
+        uint256 _amount,
+        bytes32 _depositId
+    ) external onlyRelayer {
+        require(!processedDeposits[_depositId], "Already processed");
+        processedDeposits[_depositId] = true;
+
+        IERC20(_token).transfer(_recipient, _amount);
+
+        emit Withdrawal(_recipient, _token, _amount, _depositId);
+    }
+
+    function collectFees() external onlyOwner {
+        payable(owner).transfer(address(this).balance);
+    }
+
+    function emergencyWithdrawETH() external onlyOwner {
+        payable(owner).transfer(address(this).balance);
+    }
+
+    function emergencyWithdrawERC20(address _token) external onlyOwner {
+        uint256 balance = IERC20(_token).balanceOf(address(this));
+        IERC20(_token).transfer(owner, balance);
+    }
+
+    receive() external payable {}
+}
+
+interface IERC20 {
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
+```

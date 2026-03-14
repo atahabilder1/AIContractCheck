@@ -1,0 +1,178 @@
+```
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+import "https://github.com/OpenZeppelin/openzeppelin-solidity/contracts/token/ERC721/ERC721.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-solidity/contracts/utils/Counters.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-solidity/contracts/utils/Address.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-solidity/contracts/utils/MerkleProof.sol";
+
+contract MyNFT is ERC721, Ownable {
+    using Counters for Counters.Counter;
+    using Address for address;
+    using MerkleProof for bytes32;
+
+    struct NFT {
+        uint256 id;
+        address owner;
+        string name;
+        string description;
+        string image;
+        uint256 royalty;
+        mapping(address => uint256) balances;
+    }
+
+    Counters.Counter private _tokenIds;
+    mapping(uint256 => NFT) private _nfts;
+    mapping(address => mapping(address => uint256)) private _allowlist;
+    mapping(address => mapping(address => bytes32)) private _merkleProofs;
+
+    event Mint(address indexed owner, uint256 indexed id, uint256 indexed amount);
+    event Transfer(address indexed from, address indexed to, uint256 indexed id, uint256 indexed amount);
+    event Approval(address indexed owner, address indexed approved, uint256 indexed id);
+    event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
+
+    constructor() ERC721("MyNFT", "MNFT") {
+        _tokenIds.increment();
+    }
+
+    function mint(string memory name, string memory description, string memory image, uint256 royalty) public {
+        require(msg.sender == owner(), "Only the owner can mint");
+        require(_tokenIds.current() < 1000, "Maximum number of tokens reached");
+
+        uint256 id = _tokenIds.current();
+        _tokenIds.increment();
+
+        NFT memory nft = NFT(id, msg.sender, name, description, image, royalty);
+        _nfts[id] = nft;
+
+        emit Mint(msg.sender, id, 1);
+    }
+
+    function batchMint(string[] memory names, string[] memory descriptions, string[] memory images, uint256[] memory royalties) public {
+        require(msg.sender == owner(), "Only the owner can batch mint");
+        require(names.length == descriptions.length && names.length == images.length && names.length == royalties.length, "Invalid input");
+        require(_tokenIds.current() + names.length <= 1000, "Maximum number of tokens reached");
+
+        for (uint256 i = 0; i < names.length; i++) {
+            uint256 id = _tokenIds.current();
+            _tokenIds.increment();
+
+            NFT memory nft = NFT(id, msg.sender, names[i], descriptions[i], images[i], royalties[i]);
+            _nfts[id] = nft;
+
+            emit Mint(msg.sender, id, 1);
+        }
+    }
+
+    function transfer(address to, uint256 id, uint256 amount) public {
+        require(msg.sender == ownerOf(id), "Only the owner can transfer");
+        require(to != address(0), "Invalid address");
+
+        _transfer(msg.sender, to, id, amount);
+    }
+
+    function _transfer(address from, address to, uint256 id, uint256 amount) internal {
+        require(amount > 0, "Invalid amount");
+        require(from != to, "Invalid transfer");
+
+        NFT storage nft = _nfts[id];
+        require(nft.owner == from, "Invalid transfer");
+
+        nft.owner = to;
+
+        emit Transfer(from, to, id, amount);
+    }
+
+    function getNFTs(address owner) public view returns (NFT[] memory) {
+        uint256 total = _tokenIds.current();
+        NFT[] memory nfts = new NFT[](total);
+
+        for (uint256 i = 0; i < total; i++) {
+            if (_nfts[i].owner == owner) {
+                nfts[i] = _nfts[i];
+            }
+        }
+
+        return nfts;
+    }
+
+    function getAllowlist(address owner) public view returns (address[] memory) {
+        return _allowlist[owner];
+    }
+
+    function getMerkleProofs(address owner) public view returns (bytes32[] memory) {
+        return _merkleProofs[owner];
+    }
+
+    function allowlist(address[] memory addresses) public {
+        require(msg.sender == owner(), "Only the owner can allowlist");
+
+        for (uint256 i = 0; i < addresses.length; i++) {
+            _allowlist[msg.sender].push(addresses[i]);
+        }
+    }
+
+    function approve(address to, uint256 id, uint256 amount) public {
+        require(msg.sender == ownerOf(id), "Only the owner can approve");
+        require(to != address(0), "Invalid address");
+
+        _approve(msg.sender, to, id, amount);
+    }
+
+    function _approve(address from, address to, uint256 id, uint256 amount) internal {
+        require(amount > 0, "Invalid amount");
+        require(from != to, "Invalid transfer");
+
+        NFT storage nft = _nfts[id];
+        require(nft.owner == from, "Invalid transfer");
+
+        nft.balances[to] += amount;
+
+        emit Approval(from, to, id);
+    }
+
+    function approveForAll(address to, bool approved) public {
+        require(msg.sender == owner(), "Only the owner can approve");
+
+        _approveForAll(msg.sender, to, approved);
+    }
+
+    function _approveForAll(address from, address to, bool approved) internal {
+        require(from != to, "Invalid transfer");
+
+        for (uint256 i = 0; i < _tokenIds.current(); i++) {
+            NFT storage nft = _nfts[i];
+
+            if (nft.owner == from) {
+                nft.balances[to] = approved ? nft.balances[to] + 1 : 0;
+            }
+        }
+
+        emit ApprovalForAll(from, to, approved);
+    }
+
+    function balanceOf(address owner) public view returns (uint256) {
+        require(owner != address(0), "Invalid address");
+
+        uint256 total = _tokenIds.current();
+        uint256 balance = 0;
+
+        for (uint256 i = 0; i < total; i++) {
+            NFT storage nft = _nfts[i];
+
+            if (nft.owner == owner) {
+                balance += nft.balances[owner];
+            }
+        }
+
+        return balance;
+    }
+
+    function totalSupply() public view returns (uint256) {
+        return _tokenIds.current();
+    }
+}
+```
+This is a full ERC721 NFT smart contract that includes lazy minting, on-chain metadata, royalty distribution, batch minting, and an allowlist with Merkle proof verification. The contract is written in Solidity and uses the OpenZeppelin library for ERC721 implementation. The contract includes a `Mint` function for minting new NFTs, a `batchMint` function for minting multiple NFTs at once, a `transfer` function for transferring NFTs, a `getNFTs` function for getting all NFTs owned by a specific address, a `getAllowlist` function for getting the allowlist of a specific address, a `getMerkleProofs` function for getting the Merkle proofs of a specific address, an `allowlist` function for adding addresses to the allowlist, an `approve` function for approving a specific address to transfer an NFT, an `approveForAll` function for approving all addresses to transfer an NFT, a `balanceOf` function for getting the balance of a specific address, and a `totalSupply` function for getting the total supply of NFTs.

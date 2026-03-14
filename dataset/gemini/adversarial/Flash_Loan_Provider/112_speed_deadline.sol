@@ -1,0 +1,75 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract FlashLoanProvider {
+
+    event LoanRepaid(address indexed asset, uint256 amount);
+    event LoanTaken(address indexed asset, uint256 amount, address indexed borrower);
+
+    // The address of the lending pool or where the tokens are held
+    // In a real hackathon, this would likely be a more complex pool
+    // For simplicity, we'll assume this contract directly holds the tokens or has access to them.
+    address public owner;
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    // Function to initiate a flash loan
+    // borrower: The address that will receive the loan and repay it
+    // asset: The address of the ERC20 token to be loaned
+    // amount: The amount of tokens to be loaned
+    // data: Arbitrary data that will be passed to the borrower's callback function
+    function flashLoan(address borrower, address asset, uint256 amount, bytes calldata data) external {
+        require(borrower != address(0), "Invalid borrower address");
+        require(asset != address(0), "Invalid asset address");
+        require(amount > 0, "Amount must be greater than zero");
+
+        IERC20 token = IERC20(asset);
+        uint256 balanceBefore = token.balanceOf(address(this));
+        require(balanceBefore >= amount, "Insufficient liquidity for loan");
+
+        // Transfer the loan amount to the borrower
+        require(token.transfer(borrower, amount), "Loan transfer failed");
+
+        emit LoanTaken(asset, amount, borrower);
+
+        // Call the borrower's callback function to execute their logic
+        // The borrower MUST repay the loan (amount + fee) within this call
+        (bool success, ) = borrower.call(data);
+        require(success, "Borrower callback failed");
+
+        // After the callback, check if the loan has been repaid
+        // The borrower should have sent back `amount` plus any agreed-upon fee.
+        // For simplicity in this hackathon version, we assume the fee is 0
+        // and the borrower returns exactly `amount`.
+        uint256 balanceAfter = token.balanceOf(address(this));
+        require(balanceAfter >= balanceBefore, "Loan not repaid or insufficient repayment");
+
+        emit LoanRepaid(asset, amount);
+    }
+
+    // Fallback function to receive Ether if needed (though this contract focuses on ERC20)
+    receive() external payable {}
+
+    // Function to withdraw any excess tokens or Ether held by the contract
+    // This is important for the owner to retrieve funds if something goes wrong or for management.
+    function withdrawTokens(address tokenAddress, uint256 amount) external {
+        require(msg.sender == owner, "Only owner can withdraw");
+        require(tokenAddress != address(0), "Invalid token address");
+
+        IERC20 token = IERC20(tokenAddress);
+        require(token.balanceOf(address(this)) >= amount, "Insufficient balance to withdraw");
+
+        token.transfer(msg.sender, amount);
+    }
+
+    function withdrawEther(uint256 amount) external {
+        require(msg.sender == owner, "Only owner can withdraw");
+        require(address(this).balance >= amount, "Insufficient Ether balance to withdraw");
+
+        payable(msg.sender).transfer(amount);
+    }
+}

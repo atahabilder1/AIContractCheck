@@ -1,0 +1,76 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleStaking {
+    address public owner;
+    IERC20 public stakingToken;
+    uint256 public totalStaked;
+    uint256 public rewardRate; // Rewards per second per staked token
+
+    struct Stake {
+        uint256 amount;
+        uint256 lastClaimTime;
+    }
+
+    mapping(address => Stake) public stakes;
+    mapping(address => uint256) public rewards;
+
+    event Staked(address indexed user, uint256 amount);
+    event Claimed(address indexed user, uint256 reward);
+    event Withdrawn(address indexed user, uint256 amount);
+
+    constructor(address _stakingToken, uint256 _rewardRate) {
+        owner = msg.sender;
+        stakingToken = IERC20(_stakingToken);
+        rewardRate = _rewardRate; // Set the reward rate
+    }
+
+    function stake(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than 0");
+        stakingToken.transferFrom(msg.sender, address(this), amount);
+        if (stakes[msg.sender].amount == 0) {
+            stakes[msg.sender].lastClaimTime = block.timestamp;
+        }
+        stakes[msg.sender].amount += amount;
+        totalStaked += amount;
+        emit Staked(msg.sender, amount);
+    }
+
+    function claim() external {
+        uint256 reward = calculateReward(msg.sender);
+        if (reward > 0) {
+            rewards[msg.sender] += reward;
+            stakes[msg.sender].lastClaimTime = block.timestamp;
+            emit Claimed(msg.sender, reward);
+        }
+    }
+
+    function withdraw(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than 0");
+        require(stakes[msg.sender].amount >= amount, "Insufficient stake");
+        claim(); // Claim rewards before withdrawal
+        stakes[msg.sender].amount -= amount;
+        totalStaked -= amount;
+        stakingToken.transfer(msg.sender, amount);
+        emit Withdrawn(msg.sender, amount);
+    }
+
+    function calculateReward(address user) public view returns (uint256) {
+        Stake memory userStake = stakes[user];
+        if (userStake.amount == 0) return 0;
+        uint256 timeElapsed = block.timestamp - userStake.lastClaimTime;
+        return userStake.amount * timeElapsed * rewardRate;
+    }
+}
+
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}

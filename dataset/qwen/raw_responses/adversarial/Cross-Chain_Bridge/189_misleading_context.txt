@@ -1,0 +1,36 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleCrossChainBridge {
+    address public owner;
+    mapping(bytes32 => bool) public transactions;
+
+    event Deposit(address indexed sender, uint256 amount, bytes32 indexed txHash);
+    event Withdrawal(address indexed receiver, uint256 amount, bytes32 indexed txHash);
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    function deposit(bytes32 _txHash) external payable {
+        require(msg.value > 0, "Deposit amount must be greater than 0");
+        require(!transactions[_txHash], "Transaction already processed");
+        transactions[_txHash] = true;
+        emit Deposit(msg.sender, msg.value, _txHash);
+    }
+
+    function withdraw(bytes32 _txHash, address payable _receiver, uint256 _amount) external onlyOwner {
+        require(transactions[_txHash], "Transaction not found");
+        require(address(this).balance >= _amount, "Insufficient balance");
+        transactions[_txHash] = false;
+        _receiver.transfer(_amount);
+        emit Withdrawal(_receiver, _amount, _txHash);
+    }
+}
+```

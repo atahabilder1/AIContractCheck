@@ -1,0 +1,328 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+interface IKYCVerifier {
+    function isVerified(address account) external view returns (bool);
+}
+
+contract ICOTokenSale is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
+    IERC20 public immutable token;
+    IKYCVerifier public kycVerifier;
+
+    enum RoundStatus { NotStarted, Active, Paused, Ended }
+
+    struct Round {
+        string name;
+        uint256 pricePerToken; // wei per token (smallest unit)
+        uint256 tokenAllocation;
+        uint256 tokensSold;
+        uint256 startTime;
+        uint256 endTime;
+        RoundStatus status;
+    }
+
+    enum WhitelistTier { None, Bronze, Silver, Gold }
+
+    struct TierConfig {
+        uint256 maxContribution;
+        uint256 minContribution;
+        bool earlyAccess; // can buy before public round start
+    }
+
+    struct VestingSchedule {
+        uint256 totalAmount;
+        uint256 released;
+        uint256 cliff; // timestamp
+        uint256 start; // timestamp
+        uint256 duration; // seconds
+    }
+
+    struct Contribution {
+        uint256 weiContributed;
+        uint256 tokensAllocated;
+    }
+
+    uint256 public softCap;
+    uint256 public hardCap;
+    uint256 public totalWeiRaised;
+    uint256 public currentRoundId;
+    bool public finalized;
+    bool public softCapReached;
+
+    uint256 public vestingCliff = 30 days;
+    uint256 public vestingDuration = 180 days;
+
+    Round[] public rounds;
+    mapping(address => WhitelistTier) public whitelist;
+    mapping(WhitelistTier => TierConfig) public tierConfigs;
+    mapping(address => mapping(uint256 => Contribution)) public contributions;
+    mapping(address => VestingSchedule) public vestingSchedules;
+    mapping(address => uint256) public totalContributed;
+
+    event RoundCreated(uint256 indexed roundId, string name, uint256 price, uint256 allocation);
+    event RoundStatusChanged(uint256 indexed roundId, RoundStatus status);
+    event TokensPurchased(address indexed buyer, uint256 indexed roundId, uint256 weiAmount, uint256 tokenAmount);
+    event TokensVested(address indexed beneficiary, uint256 amount);
+    event Refund(address indexed buyer, uint256 amount);
+    event SaleFinalized(bool softCapMet, uint256 totalRaised);
+    event WhitelistUpdated(address indexed account, WhitelistTier tier);
+    event KYCVerifierUpdated(address indexed verifier);
+
+    modifier whenNotFinalized() {
+        require(!finalized, "Sale finalized");
+        _;
+    }
+
+    constructor(
+        address _token,
+        address _kycVerifier,
+        uint256 _softCap,
+        uint256 _hardCap
+    ) Ownable(msg.sender) {
+        require(_token != address(0), "Invalid token");
+        require(_softCap > 0 && _hardCap > _softCap, "Invalid caps");
+
+        token = IERC20(_token);
+        kycVerifier = IKYCVerifier(_kycVerifier);
+        softCap = _softCap;
+        hardCap = _hardCap;
+
+        tierConfigs[WhitelistTier.Bronze] = TierConfig(1 ether, 0.01 ether, false);
+        tierConfigs[WhitelistTier.Silver] = TierConfig(5 ether, 0.01 ether, false);
+        tierConfigs[WhitelistTier.Gold] = TierConfig(20 ether, 0.01 ether, true);
+    }
+
+    function createRound(
+        string calldata name,
+        uint256 pricePerToken,
+        uint256 tokenAllocation,
+        uint256 startTime,
+        uint256 endTime
+    ) external onlyOwner whenNotFinalized {
+        require(pricePerToken > 0, "Invalid price");
+        require(tokenAllocation > 0, "Invalid allocation");
+        require(startTime < endTime, "Invalid times");
+        require(startTime >= block.timestamp, "Start in past");
+
+        uint256 roundId = rounds.length;
+        rounds.push(Round({
+            name: name,
+            pricePerToken: pricePerToken,
+            tokenAllocation: tokenAllocation,
+            tokensSold: 0,
+            startTime: startTime,
+            endTime: endTime,
+            status: RoundStatus.NotStarted
+        }));
+
+        emit RoundCreated(roundId, name, pricePerToken, tokenAllocation);
+    }
+
+    function activateRound(uint256 roundId) external onlyOwner whenNotFinalized {
+        require(roundId < rounds.length, "Invalid round");
+        rounds[roundId].status = RoundStatus.Active;
+        currentRoundId = roundId;
+        emit RoundStatusChanged(roundId, RoundStatus.Active);
+    }
+
+    function pauseRound(uint256 roundId) external onlyOwner {
+        require(roundId < rounds.length, "Invalid round");
+        rounds[roundId].status = RoundStatus.Paused;
+        emit RoundStatusChanged(roundId, RoundStatus.Paused);
+    }
+
+    function endRound(uint256 roundId) external onlyOwner {
+        require(roundId < rounds.length, "Invalid round");
+        rounds[roundId].status = RoundStatus.Ended;
+        emit RoundStatusChanged(roundId, RoundStatus.Ended);
+    }
+
+    function setWhitelist(address[] calldata accounts, WhitelistTier tier) external onlyOwner {
+        for (uint256 i = 0; i < accounts.length; i++) {
+            whitelist[accounts[i]] = tier;
+            emit WhitelistUpdated(accounts[i], tier);
+        }
+    }
+
+    function setTierConfig(WhitelistTier tier, uint256 maxContrib, uint256 minContrib, bool earlyAccess) external onlyOwner {
+        require(tier != WhitelistTier.None, "Cannot config None tier");
+        tierConfigs[tier] = TierConfig(maxContrib, minContrib, earlyAccess);
+    }
+
+    function setKYCVerifier(address _verifier) external onlyOwner {
+        kycVerifier = IKYCVerifier(_verifier);
+        emit KYCVerifierUpdated(_verifier);
+    }
+
+    function setVestingParams(uint256 _cliff, uint256 _duration) external onlyOwner whenNotFinalized {
+        vestingCliff = _cliff;
+        vestingDuration = _duration;
+    }
+
+    function buyTokens() external payable nonReentrant whenNotFinalized {
+        require(msg.value > 0, "Zero value");
+        require(totalWeiRaised + msg.value <= hardCap, "Exceeds hard cap");
+
+        address buyer = msg.sender;
+
+        // KYC check
+        if (address(kycVerifier) != address(0)) {
+            require(kycVerifier.isVerified(buyer), "KYC not verified");
+        }
+
+        // Whitelist & tier check
+        WhitelistTier tier = whitelist[buyer];
+        require(tier != WhitelistTier.None, "Not whitelisted");
+
+        TierConfig memory config = tierConfigs[tier];
+        require(msg.value >= config.minContribution, "Below min contribution");
+        require(totalContributed[buyer] + msg.value <= config.maxContribution, "Exceeds tier max");
+
+        // Round check
+        uint256 roundId = currentRoundId;
+        Round storage round = rounds[roundId];
+        require(round.status == RoundStatus.Active, "Round not active");
+
+        if (!config.earlyAccess) {
+            require(block.timestamp >= round.startTime, "Round not started");
+        }
+        require(block.timestamp <= round.endTime, "Round ended");
+
+        // Calculate tokens
+        uint256 tokenAmount = (msg.value * 1e18) / round.pricePerToken;
+        require(tokenAmount > 0, "Token amount zero");
+        require(round.tokensSold + tokenAmount <= round.tokenAllocation, "Exceeds round allocation");
+
+        // Update state
+        round.tokensSold += tokenAmount;
+        totalWeiRaised += msg.value;
+        totalContributed[buyer] += msg.value;
+        contributions[buyer][roundId].weiContributed += msg.value;
+        contributions[buyer][roundId].tokensAllocated += tokenAmount;
+
+        if (!softCapReached && totalWeiRaised >= softCap) {
+            softCapReached = true;
+        }
+
+        // Set up or extend vesting
+        VestingSchedule storage vest = vestingSchedules[buyer];
+        vest.totalAmount += tokenAmount;
+
+        emit TokensPurchased(buyer, roundId, msg.value, tokenAmount);
+    }
+
+    function finalize() external onlyOwner whenNotFinalized {
+        finalized = true;
+
+        if (softCapReached) {
+            uint256 vestStart = block.timestamp;
+            // Vesting start is set at finalization for all participants
+            // (individual schedules get start/cliff set on first release or here)
+            emit SaleFinalized(true, totalWeiRaised);
+        } else {
+            emit SaleFinalized(false, totalWeiRaised);
+        }
+    }
+
+    function claimRefund() external nonReentrant {
+        require(finalized, "Not finalized");
+        require(!softCapReached, "Soft cap reached, no refunds");
+
+        uint256 contributed = totalContributed[msg.sender];
+        require(contributed > 0, "Nothing to refund");
+
+        totalContributed[msg.sender] = 0;
+        vestingSchedules[msg.sender].totalAmount = 0;
+
+        (bool success, ) = payable(msg.sender).call{value: contributed}("");
+        require(success, "Refund failed");
+
+        emit Refund(msg.sender, contributed);
+    }
+
+    function releaseVestedTokens() external nonReentrant {
+        require(finalized && softCapReached, "Cannot release yet");
+
+        VestingSchedule storage vest = vestingSchedules[msg.sender];
+        require(vest.totalAmount > 0, "No vesting schedule");
+
+        // Initialize vesting start on first release call if not set
+        if (vest.start == 0) {
+            vest.start = block.timestamp;
+            vest.cliff = block.timestamp + vestingCliff;
+            vest.duration = vestingDuration;
+        }
+
+        uint256 vested = _vestedAmount(vest);
+        uint256 releasable = vested - vest.released;
+        require(releasable > 0, "Nothing to release");
+
+        vest.released += releasable;
+        token.safeTransfer(msg.sender, releasable);
+
+        emit TokensVested(msg.sender, releasable);
+    }
+
+    function _vestedAmount(VestingSchedule memory vest) internal view returns (uint256) {
+        if (block.timestamp < vest.cliff) {
+            return 0;
+        } else if (block.timestamp >= vest.start + vest.duration) {
+            return vest.totalAmount;
+        } else {
+            return (vest.totalAmount * (block.timestamp - vest.start)) / vest.duration;
+        }
+    }
+
+    function getVestedAmount(address account) external view returns (uint256 vested, uint256 releasable) {
+        VestingSchedule memory vest = vestingSchedules[account];
+        if (vest.start == 0) {
+            return (0, 0);
+        }
+        vested = _vestedAmount(vest);
+        releasable = vested - vest.released;
+    }
+
+    function withdrawFunds(address payable to) external onlyOwner {
+        require(finalized && softCapReached, "Cannot withdraw");
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No funds");
+        (bool success, ) = to.call{value: balance}("");
+        require(success, "Transfer failed");
+    }
+
+    function recoverUnsoldTokens(address to) external onlyOwner {
+        require(finalized, "Not finalized");
+        uint256 totalSold;
+        for (uint256 i = 0; i < rounds.length; i++) {
+            totalSold += rounds[i].tokensSold;
+        }
+        uint256 balance = token.balanceOf(address(this));
+        uint256 unreleased;
+        // Cannot recover tokens still owed to vestees — this is a simplified recovery
+        // Owner should only call after all vesting is complete or account for outstanding
+        if (balance > 0) {
+            token.safeTransfer(to, balance - totalSold);
+        }
+    }
+
+    function getRoundCount() external view returns (uint256) {
+        return rounds.length;
+    }
+
+    function getRound(uint256 roundId) external view returns (Round memory) {
+        return rounds[roundId];
+    }
+
+    receive() external payable {
+        revert("Use buyTokens()");
+    }
+}
+```

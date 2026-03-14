@@ -1,0 +1,39 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
+
+contract TokenBridge {
+    address public owner;
+    IERC20 public token;
+
+    event TokensLocked(address indexed owner, uint256 amount);
+    event TokensMinted(address indexed owner, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    constructor(address _token) {
+        owner = msg.sender;
+        token = IERC20(_token);
+    }
+
+    function lockTokens(uint256 amount) public {
+        require(token.transferFrom(msg.sender, address(this), amount), "Token transfer failed");
+        emit TokensLocked(msg.sender, amount);
+    }
+
+    function mintTokens(address to, uint256 amount) public onlyOwner {
+        require(token.balanceOf(address(this)) >= amount, "Insufficient balance");
+        require(token.transfer(to, amount), "Token transfer failed");
+        emit TokensMinted(to, amount);
+    }
+}
+```

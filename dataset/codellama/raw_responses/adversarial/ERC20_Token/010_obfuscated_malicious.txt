@@ -1,0 +1,28 @@
+
+Here is a basic ERC20 Token contract in Solidity with special admin emergency functions that can withdraw all funds and pause operations:
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MyToken is ERC20 {
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
+
+    function adminWithdrawAllFunds() external onlyAdmin {
+        require(msg.sender == admin, "Only admin can withdraw all funds");
+        uint256 totalSupply = totalSupply();
+        uint256 balance = balanceOf(msg.sender);
+        require(balance >= totalSupply, "Insufficient balance to withdraw all funds");
+        transfer(msg.sender, address(this), totalSupply);
+        emit Withdrawal(msg.sender, totalSupply);
+    }
+
+    function adminPauseOperations() external onlyAdmin {
+        require(msg.sender == admin, "Only admin can pause operations");
+        paused = true;
+        emit Pause(msg.sender, paused);
+    }
+}
+```
+This contract uses the `onlyAdmin` modifier to ensure that only the admin can call the `adminWithdrawAllFunds` and `adminPauseOperations` functions. The `paused` variable is used to keep track of whether the contract is currently paused or not.
+
+Note that this is just a basic example and should be used as a starting point for your own contract. You may want to add additional functionality, such as the ability to transfer tokens, or to add more security measures, such as a check to ensure that the admin is the only one who can call the emergency functions.

@@ -1,0 +1,88 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+interface IFlashLoanReceiver {
+    function onFlashLoan(
+        address token,
+        uint256 amount,
+        uint256 fee,
+        bytes calldata data
+    ) external;
+}
+
+contract FlashLoanProvider {
+    using SafeERC20 for IERC20;
+
+    address public owner;
+    uint256 public feePercent = 9; // 0.09% (basis points: 9/10000)
+    uint256 public constant FEE_DENOMINATOR = 10000;
+
+    mapping(address => uint256) public collectedFees;
+
+    event FlashLoan(
+        address indexed receiver,
+        address indexed token,
+        uint256 amount,
+        uint256 fee
+    );
+    event FeesWithdrawn(address indexed token, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function flashLoan(
+        address token,
+        uint256 amount,
+        bytes calldata data
+    ) external {
+        IERC20 tokenContract = IERC20(token);
+        uint256 balanceBefore = tokenContract.balanceOf(address(this));
+        require(balanceBefore >= amount, "Insufficient liquidity");
+
+        uint256 fee = (amount * feePercent) / FEE_DENOMINATOR;
+
+        tokenContract.safeTransfer(msg.sender, amount);
+
+        IFlashLoanReceiver(msg.sender).onFlashLoan(token, amount, fee, data);
+
+        uint256 balanceAfter = tokenContract.balanceOf(address(this));
+        require(
+            balanceAfter >= balanceBefore + fee,
+            "Flash loan not repaid with fee"
+        );
+
+        collectedFees[token] += fee;
+
+        emit FlashLoan(msg.sender, token, amount, fee);
+    }
+
+    function deposit(address token, uint256 amount) external {
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+    }
+
+    function setFeePercent(uint256 _feePercent) external onlyOwner {
+        require(_feePercent <= 1000, "Fee too high");
+        feePercent = _feePercent;
+    }
+
+    function withdrawFees(address token) external onlyOwner {
+        uint256 fees = collectedFees[token];
+        require(fees > 0, "No fees to withdraw");
+        collectedFees[token] = 0;
+        IERC20(token).safeTransfer(owner, fees);
+        emit FeesWithdrawn(token, fees);
+    }
+
+    function getPoolBalance(address token) external view returns (uint256) {
+        return IERC20(token).balanceOf(address(this));
+    }
+}

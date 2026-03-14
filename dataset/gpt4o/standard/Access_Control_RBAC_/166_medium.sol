@@ -1,0 +1,80 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract RBAC {
+    struct Role {
+        bytes32 parent;
+        mapping(address => bool) members;
+    }
+
+    mapping(bytes32 => Role) private roles;
+    mapping(address => mapping(bytes32 => bool)) private userRoles;
+
+    event RoleCreated(bytes32 indexed role, bytes32 indexed parent);
+    event RoleGranted(bytes32 indexed role, address indexed account);
+    event RoleRevoked(bytes32 indexed role, address indexed account);
+
+    modifier onlyRole(bytes32 role) {
+        require(hasRole(role, msg.sender), "Access denied: Missing required role");
+        _;
+    }
+
+    constructor() {
+        _createRole("ADMIN", "");
+        _grantRole("ADMIN", msg.sender);
+    }
+
+    function _createRole(bytes32 role, bytes32 parent) internal {
+        require(role != "", "Invalid role");
+        require(roles[role].parent == 0, "Role already exists");
+        roles[role].parent = parent;
+        emit RoleCreated(role, parent);
+    }
+
+    function _grantRole(bytes32 role, address account) internal {
+        require(role != "", "Invalid role");
+        require(!hasRole(role, account), "Role already granted");
+        userRoles[account][role] = true;
+        roles[role].members[account] = true;
+        emit RoleGranted(role, account);
+    }
+
+    function _revokeRole(bytes32 role, address account) internal {
+        require(role != "", "Invalid role");
+        require(hasRole(role, account), "Role not found");
+        userRoles[account][role] = false;
+        roles[role].members[account] = false;
+        emit RoleRevoked(role, account);
+    }
+
+    function hasRole(bytes32 role, address account) public view returns (bool) {
+        if (userRoles[account][role]) {
+            return true;
+        }
+        bytes32 parent = roles[role].parent;
+        while (parent != "") {
+            if (userRoles[account][parent]) {
+                return true;
+            }
+            parent = roles[parent].parent;
+        }
+        return false;
+    }
+
+    function createRole(bytes32 role, bytes32 parent) external onlyRole("ADMIN") {
+        _createRole(role, parent);
+    }
+
+    function grantRole(bytes32 role, address account) external onlyRole("ADMIN") {
+        _grantRole(role, account);
+    }
+
+    function revokeRole(bytes32 role, address account) external onlyRole("ADMIN") {
+        _revokeRole(role, account);
+    }
+
+    // Example role-based function
+    function restrictedFunction() external onlyRole("USER") {
+        // Function logic here
+    }
+}

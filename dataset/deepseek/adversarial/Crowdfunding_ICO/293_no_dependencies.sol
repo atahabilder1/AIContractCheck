@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Crowdfunding {
+    address public owner;
+    uint256 public targetAmount;
+    uint256 public raisedAmount;
+    uint256 public startTime;
+    uint256 public endTime;
+    mapping(address => uint256) public contributions;
+
+    event ContributionReceived(address indexed contributor, uint256 amount);
+    event GoalReached(uint256 amountRaised);
+    event Refund(address indexed contributor, uint256 amount);
+
+    constructor(uint256 _targetAmount, uint256 _durationInMinutes) {
+        require(_targetAmount > 0, "Target amount must be greater than 0");
+        require(_durationInMinutes > 0, "Duration must be greater than 0 minutes");
+        owner = msg.sender;
+        targetAmount = _targetAmount;
+        startTime = block.timestamp;
+        endTime = startTime + (_durationInMinutes * 1 minutes);
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    function contribute() public payable {
+        require(block.timestamp < endTime, "Contribution period has ended");
+        require(msg.value > 0, "Contribution amount must be greater than 0");
+        contributions[msg.sender] += msg.value;
+        raisedAmount += msg.value;
+        emit ContributionReceived(msg.sender, msg.value);
+    }
+
+    function withdraw() public onlyOwner {
+        require(block.timestamp >= endTime, "Crowdfunding period is still ongoing");
+        require(raisedAmount >= targetAmount, "Target amount not reached");
+        uint256 balance = address(this).balance;
+        payable(owner).transfer(balance);
+        emit GoalReached(raisedAmount);
+    }
+
+    function refund(uint256 amount) public {
+        require(block.timestamp >= endTime, "Crowdfunding period is still ongoing");
+        require(raisedAmount < targetAmount, "Target amount already reached");
+        require(contributions[msg.sender] >= amount, "Insufficient contribution amount");
+        contributions[msg.sender] -= amount;
+        raisedAmount -= amount;
+        payable(msg.sender).transfer(amount);
+        emit Refund(msg.sender, amount);
+    }
+}

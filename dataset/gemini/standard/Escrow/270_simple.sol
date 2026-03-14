@@ -1,0 +1,70 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address payable public buyer;
+    address payable public seller;
+    uint public depositAmount;
+    bool public itemDelivered;
+    bool public paymentReleased;
+
+    event FundsDeposited(address indexed _buyer, uint _amount);
+    event ItemDelivered(address indexed _seller);
+    event PaymentReleased(address indexed _seller, uint _amount);
+    event RefundIssued(address indexed _buyer, uint _amount);
+
+    modifier onlyBuyer() {
+        require(msg.sender == buyer, "Only the buyer can perform this action.");
+        _;
+    }
+
+    modifier onlySeller() {
+        require(msg.sender == seller, "Only the seller can perform this action.");
+        _;
+    }
+
+    modifier notDelivered() {
+        require(!itemDelivered, "Item has already been marked as delivered.");
+        _;
+    }
+
+    modifier notReleased() {
+        require(!paymentReleased, "Payment has already been released.");
+        _;
+    }
+
+    constructor(address payable _seller) payable {
+        buyer = payable(msg.sender);
+        seller = _seller;
+        depositAmount = msg.value;
+        emit FundsDeposited(buyer, depositAmount);
+    }
+
+    function confirmDelivery() public onlySeller notDelivered notReleased {
+        itemDelivered = true;
+        emit ItemDelivered(seller);
+    }
+
+    function releasePayment() public onlyBuyer notDelivered notReleased {
+        require(itemDelivered, "Item has not been delivered yet.");
+        paymentReleased = true;
+        emit PaymentReleased(seller, depositAmount);
+        (bool success, ) = seller.call{value: depositAmount}("");
+        require(success, "Payment release failed.");
+    }
+
+    function refund() public onlyBuyer notReleased {
+        require(!itemDelivered, "Item has been delivered, cannot refund.");
+        emit RefundIssued(buyer, depositAmount);
+        (bool success, ) = buyer.call{value: depositAmount}("");
+        require(success, "Refund failed.");
+        selfdestruct(payable(buyer)); // Contract self-destructs after refund
+    }
+
+    // Fallback function to receive Ether if someone sends it directly to the contract
+    receive() external payable {
+        // Optionally, you could revert or handle this differently
+        // For this basic escrow, we assume the initial deposit is the only expected Ether
+        revert("Direct ether transfers are not supported. Use the constructor for deposit.");
+    }
+}

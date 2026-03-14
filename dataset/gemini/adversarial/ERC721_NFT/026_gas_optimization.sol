@@ -1,0 +1,58 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
+
+contract GasOptimizedNFT is ERC721, ERC721Burnable, Ownable {
+    using Counters for Counters.Counter;
+    Counters.Counter private _tokenIdCounter;
+
+    constructor(string memory name, string memory symbol) ERC721(name, symbol) {}
+
+    function safeMint(address to, uint256 tokenId) public onlyOwner {
+        require(
+            !_exists(tokenId),
+            "ERC721: token already minted"
+        );
+        _safeMint(to, tokenId);
+    }
+
+    function safeMintBatch(address to, uint256[] memory tokenIds) public onlyOwner {
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            uint256 tokenId = tokenIds[i];
+            require(
+                !_exists(tokenId),
+                "ERC721: token already minted"
+            );
+            _mint(to, tokenId);
+        }
+    }
+
+    function _update(address to, uint256 tokenId, address auth)
+        internal
+        override(ERC721)
+        returns (address)
+    {
+        return super._update(to, tokenId, auth);
+    }
+
+    function _increaseBalance(address account, uint128 value)
+        internal
+        override(ERC721)
+        returns (uint128)
+    {
+        return super._increaseBalance(account, value);
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC721, ERC721Burnable)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
+    }
+}

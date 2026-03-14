@@ -1,0 +1,96 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Crowdfunding {
+    address payable public owner;
+    string public projectName;
+    uint256 public fundingGoal;
+    uint256 public deadline;
+    uint256 public raisedAmount;
+    mapping(address => uint256) public contributors;
+    bool public fundingSuccessful;
+    bool public claimable;
+
+    event Contribution(address indexed contributor, uint256 amount);
+    event Refund(address indexed contributor, uint256 amount);
+    event ProjectCompleted(uint256 amountRaised);
+
+    constructor(
+        string memory _projectName,
+        uint256 _fundingGoal,
+        uint256 _durationInDays
+    ) {
+        owner = payable(msg.sender);
+        projectName = _projectName;
+        fundingGoal = _fundingGoal;
+        deadline = block.timestamp + (_durationInDays * 1 days);
+        fundingSuccessful = false;
+        claimable = false;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can perform this action.");
+        _;
+    }
+
+    modifier beforeDeadline() {
+        require(block.timestamp < deadline, "Action cannot be performed after the deadline.");
+        _;
+    }
+
+    modifier afterDeadline() {
+        require(block.timestamp >= deadline, "Action can only be performed after the deadline.");
+        _;
+    }
+
+    function contribute() external payable beforeDeadline {
+        require(msg.value > 0, "Contribution amount must be greater than zero.");
+        contributors[msg.sender] += msg.value;
+        raisedAmount += msg.value;
+        emit Contribution(msg.sender, msg.value);
+    }
+
+    function checkFundingStatus() public afterDeadline {
+        require(!claimable, "Funding status has already been checked.");
+
+        if (raisedAmount >= fundingGoal) {
+            fundingSuccessful = true;
+            emit ProjectCompleted(raisedAmount);
+        } else {
+            fundingSuccessful = false;
+        }
+        claimable = true;
+    }
+
+    function withdrawFunds() public onlyOwner afterDeadline {
+        require(claimable, "Funding status must be checked before withdrawing.");
+        require(fundingSuccessful, "Funding was not successful.");
+        require(address(this).balance >= fundingGoal, "Not enough funds to withdraw the full goal.");
+
+        (bool success, ) = owner.call{value: address(this).balance}("");
+        require(success, "Fund withdrawal failed.");
+    }
+
+    function refund() public afterDeadline {
+        require(claimable, "Funding status must be checked before refunding.");
+        require(!fundingSuccessful, "Funding was successful, no refunds.");
+
+        uint256 amountToRefund = contributors[msg.sender];
+        require(amountToRefund > 0, "You have not contributed any funds.");
+
+        contributors[msg.sender] = 0;
+        (bool success, ) = payable(msg.sender).call{value: amountToRefund}("");
+        require(success, "Refund failed.");
+        emit Refund(msg.sender, amountToRefund);
+    }
+
+    receive() external payable {
+        contribute();
+    }
+
+    fallback() external payable {
+        contribute();
+    }
+}
+```

@@ -1,0 +1,153 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract StakingPool {
+    address public owner;
+    bool public paused;
+
+    IERC20 public stakingToken;
+    uint256 public rewardRatePerSecond;
+    uint256 public totalStaked;
+
+    struct StakeInfo {
+        uint256 amount;
+        uint256 rewardDebt;
+        uint256 lastStakedTime;
+    }
+
+    mapping(address => StakeInfo) public stakes;
+
+    event Staked(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
+    event RewardClaimed(address indexed user, uint256 reward);
+    event Paused(address indexed admin);
+    event Unpaused(address indexed admin);
+    event EmergencyWithdraw(address indexed admin, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
+    constructor(address _stakingToken, uint256 _rewardRatePerSecond) {
+        owner = msg.sender;
+        stakingToken = IERC20(_stakingToken);
+        rewardRatePerSecond = _rewardRatePerSecond;
+    }
+
+    function stake(uint256 _amount) external whenNotPaused {
+        require(_amount > 0, "Cannot stake 0");
+
+        StakeInfo storage user = stakes[msg.sender];
+
+        if (user.amount > 0) {
+            uint256 pending = _pendingReward(msg.sender);
+            if (pending > 0) {
+                user.rewardDebt += pending;
+            }
+        }
+
+        stakingToken.transferFrom(msg.sender, address(this), _amount);
+        user.amount += _amount;
+        user.lastStakedTime = block.timestamp;
+        totalStaked += _amount;
+
+        emit Staked(msg.sender, _amount);
+    }
+
+    function withdraw(uint256 _amount) external whenNotPaused {
+        StakeInfo storage user = stakes[msg.sender];
+        require(user.amount >= _amount, "Insufficient staked balance");
+
+        uint256 pending = _pendingReward(msg.sender);
+        if (pending > 0) {
+            user.rewardDebt += pending;
+        }
+
+        user.amount -= _amount;
+        user.lastStakedTime = block.timestamp;
+        totalStaked -= _amount;
+
+        stakingToken.transfer(msg.sender, _amount);
+
+        emit Withdrawn(msg.sender, _amount);
+    }
+
+    function claimRewards() external whenNotPaused {
+        StakeInfo storage user = stakes[msg.sender];
+        uint256 pending = _pendingReward(msg.sender) + user.rewardDebt;
+        require(pending > 0, "No rewards to claim");
+
+        user.rewardDebt = 0;
+        user.lastStakedTime = block.timestamp;
+
+        stakingToken.transfer(msg.sender, pending);
+
+        emit RewardClaimed(msg.sender, pending);
+    }
+
+    function pendingReward(address _user) external view returns (uint256) {
+        return _pendingReward(_user) + stakes[_user].rewardDebt;
+    }
+
+    function _pendingReward(address _user) internal view returns (uint256) {
+        StakeInfo storage user = stakes[_user];
+        if (user.amount == 0) return 0;
+        uint256 elapsed = block.timestamp - user.lastStakedTime;
+        return (user.amount * rewardRatePerSecond * elapsed) / 1e18;
+    }
+
+    // --- Admin Emergency Functions ---
+
+    function pause() external onlyOwner {
+        paused = true;
+        emit Paused(msg.sender);
+    }
+
+    function unpause() external onlyOwner {
+        paused = false;
+        emit Unpaused(msg.sender);
+    }
+
+    function emergencyWithdrawAll() external onlyOwner {
+        uint256 balance = stakingToken.balanceOf(address(this));
+        require(balance > 0, "No funds to withdraw");
+        stakingToken.transfer(owner, balance);
+        totalStaked = 0;
+        emit EmergencyWithdraw(msg.sender, balance);
+    }
+
+    function emergencyWithdrawETH() external onlyOwner {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No ETH to withdraw");
+        (bool success, ) = owner.call{value: balance}("");
+        require(success, "ETH transfer failed");
+    }
+
+    function setRewardRate(uint256 _newRate) external onlyOwner {
+        rewardRatePerSecond = _newRate;
+    }
+
+    function transferOwnership(address _newOwner) external onlyOwner {
+        require(_newOwner != address(0), "Zero address");
+        owner = _newOwner;
+    }
+
+    receive() external payable {}
+}
+
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address to, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+}
+```

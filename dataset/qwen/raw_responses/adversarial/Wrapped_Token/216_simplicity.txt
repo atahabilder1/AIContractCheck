@@ -1,0 +1,24 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract WrappedToken {
+    string public name = "Wrapped Token";
+    string public symbol = "WTKN";
+    uint8 public decimals = 18;
+    uint256 public totalSupply;
+
+    mapping(address => uint256) public balanceOf;
+
+    function mint(uint256 amount) external {
+        balanceOf[msg.sender] += amount;
+        totalSupply += amount;
+    }
+
+    function burn(uint256 amount) external {
+        require(balanceOf[msg.sender] >= amount, "Insufficient balance");
+        balanceOf[msg.sender] -= amount;
+        totalSupply -= amount;
+    }
+}
+```

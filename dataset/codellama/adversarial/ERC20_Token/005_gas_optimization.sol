@@ -1,0 +1,63 @@
+SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+contract ERC20Token {
+    string public name;
+    string public symbol;
+    uint8 public decimals;
+    uint public totalSupply;
+    mapping(address => uint) public balances;
+
+    constructor(string memory _name, string memory _symbol, uint8 _decimals, uint _totalSupply) {
+        name = _name;
+        symbol = _symbol;
+        decimals = _decimals;
+        totalSupply = _totalSupply;
+    }
+
+    function transfer(address _to, uint _value) public returns (bool) {
+        require(_to != address(0), "Invalid address");
+        require(_value <= balances[msg.sender], "Insufficient balance");
+
+        balances[msg.sender] -= _value;
+        balances[_to] += _value;
+
+        return true;
+    }
+
+    function approve(address _spender, uint _value) public returns (bool) {
+        require(_spender != address(0), "Invalid address");
+        require(_value <= balances[msg.sender], "Insufficient balance");
+
+        allowed[_spender][msg.sender] = _value;
+
+        return true;
+    }
+
+    function transferFrom(address _from, address _to, uint _value) public returns (bool) {
+        require(_from != address(0), "Invalid address");
+        require(_to != address(0), "Invalid address");
+        require(_value <= balances[_from], "Insufficient balance");
+        require(_value <= allowed[_from][msg.sender], "Insufficient allowance");
+
+        balances[_from] -= _value;
+        balances[_to] += _value;
+
+        allowed[_from][msg.sender] -= _value;
+
+        return true;
+    }
+
+    function totalSupply() public view returns (uint) {
+        return totalSupply;
+    }
+
+    function balanceOf(address _owner) public view returns (uint) {
+        return balances[_owner];
+    }
+
+    function allowance(address _owner, address _spender) public view returns (uint) {
+        return allowed[_owner][_spender];
+    }
+}

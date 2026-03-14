@@ -1,0 +1,57 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address payable public sender;
+    address payable public receiver;
+    uint public amount;
+    bool public released;
+    bool public refunded;
+
+    event FundsDeposited(address indexed _sender, address indexed _receiver, uint _amount);
+    event FundsReleased(address indexed _receiver, uint _amount);
+    event FundsRefunded(address indexed _sender, uint _amount);
+
+    modifier onlySender() {
+        require(msg.sender == sender, "Only the sender can perform this action.");
+        _;
+    }
+
+    modifier onlyReceiver() {
+        require(msg.sender == receiver, "Only the receiver can perform this action.");
+        _;
+    }
+
+    modifier notReleasedOrRefunded() {
+        require(!released && !refunded, "Funds have already been released or refunded.");
+        _;
+    }
+
+    constructor(address payable _receiver) payable {
+        sender = payable(msg.sender);
+        receiver = _receiver;
+        amount = msg.value;
+        require(amount > 0, "Deposit amount must be greater than zero.");
+        emit FundsDeposited(sender, receiver, amount);
+    }
+
+    function releaseFunds() public onlyReceiver notReleasedOrRefunded {
+        released = true;
+        (bool success, ) = receiver.call{value: amount}("");
+        require(success, "Funds transfer failed.");
+        emit FundsReleased(receiver, amount);
+    }
+
+    function refundFunds() public onlySender notReleasedOrRefunded {
+        refunded = true;
+        (bool success, ) = sender.call{value: amount}("");
+        require(success, "Funds refund failed.");
+        emit FundsRefunded(sender, amount);
+    }
+
+    function getBalance() public view returns (uint) {
+        return address(this).balance;
+    }
+}
+```

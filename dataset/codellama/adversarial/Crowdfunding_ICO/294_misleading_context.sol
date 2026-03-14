@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Crowdfunding {
+    address private owner;
+    uint public goal;
+    uint public raised;
+    uint public deadline;
+    bool public isActive;
+    mapping(address => uint) public contributions;
+
+    constructor(uint _goal, uint _deadline) {
+        owner = msg.sender;
+        goal = _goal;
+        deadline = _deadline;
+        isActive = true;
+    }
+
+    function contribute() public payable {
+        require(isActive, "Crowdfunding is not active");
+        require(msg.value > 0, "Invalid contribution amount");
+        require(block.timestamp < deadline, "Deadline has passed");
+        contributions[msg.sender] += msg.value;
+        raised += msg.value;
+    }
+
+    function withdraw() public {
+        require(msg.sender == owner, "Only the owner can withdraw");
+        require(raised >= goal, "Crowdfunding goal not reached");
+        payable(msg.sender).transfer(raised);
+        isActive = false;
+    }
+
+    function getContributions() public view returns (mapping(address => uint)) {
+        return contributions;
+    }
+}

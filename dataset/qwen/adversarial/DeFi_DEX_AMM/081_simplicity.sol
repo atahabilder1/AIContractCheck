@@ -1,0 +1,45 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleAMM {
+    address public tokenA;
+    address public tokenB;
+    uint256 public reserveA;
+    uint256 public reserveB;
+
+    constructor(address _tokenA, address _tokenB) {
+        tokenA = _tokenA;
+        tokenB = _tokenB;
+    }
+
+    function addLiquidity(uint256 amountA, uint256 amountB) external {
+        IERC20(tokenA).transferFrom(msg.sender, address(this), amountA);
+        IERC20(tokenB).transferFrom(msg.sender, address(this), amountB);
+        reserveA += amountA;
+        reserveB += amountB;
+    }
+
+    function swap(uint256 amountA, uint256 amountB) external {
+        require(amountA > 0 || amountB > 0, "Amount must be positive");
+        if (amountA > 0) {
+            uint256 _amountB = (amountA * reserveB) / reserveA;
+            require(_amountB <= amountB, "Insufficient output amount");
+            IERC20(tokenA).transferFrom(msg.sender, address(this), amountA);
+            IERC20(tokenB).transfer(msg.sender, _amountB);
+            reserveA += amountA;
+            reserveB -= _amountB;
+        } else {
+            uint256 _amountA = (amountB * reserveA) / reserveB;
+            require(_amountA <= amountA, "Insufficient output amount");
+            IERC20(tokenB).transferFrom(msg.sender, address(this), amountB);
+            IERC20(tokenA).transfer(msg.sender, _amountA);
+            reserveB += amountB;
+            reserveA -= _amountA;
+        }
+    }
+}
+
+interface IERC20 {
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+}

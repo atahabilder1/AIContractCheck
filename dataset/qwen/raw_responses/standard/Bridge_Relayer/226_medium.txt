@@ -1,0 +1,75 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    address public owner;
+    address public currentRelayer;
+    uint256 public relayerFee;
+    mapping(bytes32 => bool) private processedMessages;
+
+    event RelayerChanged(address indexed newRelayer);
+    event MessageProcessed(bytes32 indexed messageId, address indexed sender, uint256 amount);
+    event FeeCollected(address indexed relayer, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    modifier onlyRelayer() {
+        require(msg.sender == currentRelayer, "Not the current relayer");
+        _;
+    }
+
+    constructor(address _relayer, uint256 _fee) {
+        owner = msg.sender;
+        currentRelayer = _relayer;
+        relayerFee = _fee;
+    }
+
+    function setRelayer(address _newRelayer) external onlyOwner {
+        require(_newRelayer != address(0), "Invalid address");
+        currentRelayer = _newRelayer;
+        emit RelayerChanged(_newRelayer);
+    }
+
+    function setRelayerFee(uint256 _newFee) external onlyOwner {
+        relayerFee = _newFee;
+    }
+
+    function processMessage(bytes32 _messageId, address _sender, uint256 _amount, bytes memory _signature) external onlyRelayer {
+        require(!processedMessages[_messageId], "Message already processed");
+        require(_amount > relayerFee, "Insufficient fee");
+
+        bytes32 messageHash = keccak256(abi.encodePacked(_messageId, _sender, _amount));
+        require(isValidSignature(messageHash, _signature), "Invalid signature");
+
+        processedMessages[_messageId] = true;
+        payable(currentRelayer).transfer(relayerFee);
+        payable(_sender).transfer(_amount - relayerFee);
+
+        emit FeeCollected(currentRelayer, relayerFee);
+        emit MessageProcessed(_messageId, _sender, _amount);
+    }
+
+    function isValidSignature(bytes32 _messageHash, bytes memory _signature) internal view returns (bool) {
+        bytes32 ethSignedMessageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _messageHash));
+        return recoverSigner(ethSignedMessageHash, _signature) == owner;
+    }
+
+    function recoverSigner(bytes32 _ethSignedMessageHash, bytes memory _signature) internal pure returns (address) {
+        (bytes32 r, bytes32 s, uint8 v) = splitSignature(_signature);
+        return ecrecover(_ethSignedMessageHash, v, r, s);
+    }
+
+    function splitSignature(bytes memory _signature) internal pure returns (bytes32 r, bytes32 s, uint8 v) {
+        require(_signature.length == 65, "Invalid signature length");
+        assembly {
+            r := mload(add(_signature, 32))
+            s := mload(add(_signature, 64))
+            v := byte(0, mload(add(_signature, 96)))
+        }
+    }
+}
+```

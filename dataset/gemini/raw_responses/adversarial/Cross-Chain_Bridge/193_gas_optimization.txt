@@ -1,0 +1,149 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import {IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+
+contract CrossChainBridge is Ownable {
+    // Mapping from chain ID to the address of the foreign bridge contract
+    mapping(uint256 => address) public foreignBridges;
+
+    // Mapping from a unique message ID to its status (true if processed, false otherwise)
+    mapping(bytes32 => bool) public processedMessages;
+
+    // Event emitted when a message is successfully relayed
+    event MessageRelayed(
+        uint256 indexed destinationChainId,
+        address indexed sender,
+        address indexed receiver,
+        address token,
+        uint256 amount,
+        bytes32 messageId
+    );
+
+    // Event emitted when a foreign bridge is registered
+    event ForeignBridgeRegistered(uint256 chainId, address bridgeAddress);
+
+    // Constructor to initialize the owner
+    constructor(address initialOwner) Ownable(initialOwner) {}
+
+    /**
+     * @notice Registers a foreign bridge contract for a given chain ID.
+     * @dev Only the owner can call this function.
+     * @param _chainId The ID of the destination chain.
+     * @param _bridgeAddress The address of the bridge contract on the destination chain.
+     */
+    function registerForeignBridge(uint256 _chainId, address _bridgeAddress) external onlyOwner {
+        require(_bridgeAddress != address(0), "Bridge address cannot be zero");
+        foreignBridges[_chainId] = _bridgeAddress;
+        emit ForeignBridgeRegistered(_chainId, _bridgeAddress);
+    }
+
+    /**
+     * @notice Locks tokens on the current chain and initiates a message to the destination chain.
+     * @param _destinationChainId The ID of the destination chain.
+     * @param _receiver The address on the destination chain that will receive the tokens.
+     * @param _token The address of the ERC20 token to be bridged.
+     * @param _amount The amount of tokens to bridge.
+     * @param _messageId A unique identifier for this transaction.
+     */
+    function bridgeTokens(
+        uint256 _destinationChainId,
+        address _receiver,
+        address _token,
+        uint256 _amount,
+        bytes32 _messageId
+    ) external {
+        require(_destinationChainId != 0, "Destination chain ID cannot be zero");
+        require(foreignBridges[_destinationChainId] != address(0), "Foreign bridge not registered for this chain");
+        require(_receiver != address(0), "Receiver address cannot be zero");
+        require(_token != address(0), "Token address cannot be zero");
+        require(_amount > 0, "Amount must be greater than zero");
+        require(!processedMessages[_messageId], "Message already processed");
+
+        IERC20 token = IERC20(_token);
+        require(token.balanceOf(msg.sender) >= _amount, "Insufficient token balance");
+        require(token.transferFrom(msg.sender, address(this), _amount), "Token transfer failed");
+
+        // In a real-world scenario, this would involve sending a signed message
+        // to an off-chain relayer or directly to the foreign bridge via a
+        // cross-chain communication protocol (e.g., LayerZero, Axelar).
+        // For simplicity, we'll simulate the relaying by emitting an event.
+        // The actual relaying logic would be handled by a separate entity.
+
+        processedMessages[_messageId] = true;
+        emit MessageRelayed(_destinationChainId, msg.sender, _receiver, _token, _amount, _messageId);
+    }
+
+    /**
+     * @notice This function would typically be called by the foreign bridge contract
+     *         on the destination chain to finalize the bridge operation.
+     *         For this example, it's included to illustrate the concept, but the
+     *         actual execution would be external to this contract's direct calls.
+     * @dev This function should only be callable by the registered foreign bridge.
+     * @param _sourceChainId The ID of the originating chain.
+     * @param _sender The original sender on the source chain.
+     * @param _receiver The address on the destination chain that will receive the tokens.
+     * @param _token The address of the ERC20 token to be bridged.
+     * @param _amount The amount of tokens to bridge.
+     * @param _messageId A unique identifier for this transaction.
+     */
+    function receiveAndMint(
+        uint256 _sourceChainId,
+        address _sender,
+        address _receiver,
+        address _token,
+        uint256 _amount,
+        bytes32 _messageId
+    ) external {
+        // In a real implementation, you'd verify the signature of the message
+        // from the source chain's bridge or use a trusted relayer mechanism.
+        // Here, we check if the caller is a registered foreign bridge.
+        bool isForeignBridge = false;
+        // This check is inefficient. A better approach would be to have a mapping
+        // from foreign bridge address back to its chain ID or use a dedicated registry.
+        // For demonstration, we iterate. In production, optimize this.
+        // A more gas-efficient way: map foreign bridge address to its chain ID.
+        // mapping(address => uint256) public foreignBridgeToChainId;
+        // require(foreignBridgeToChainId[msg.sender] == _sourceChainId, "Not a valid foreign bridge");
+
+        // For simplicity and gas optimization in this example, we'll assume
+        // the `bridgeTokens` function's emitted event is picked up by an off-chain
+        // service that then calls this `receiveAndMint` function.
+        // The `receiveAndMint` function itself should be callable by the foreign bridge.
+        // A robust solution would involve a mechanism to verify the origin of the call,
+        // e.g., a pre-registered list of foreign bridge addresses or a trusted relayer.
+
+        require(_sourceChainId != 0, "Source chain ID cannot be zero");
+        require(_receiver != address(0), "Receiver address cannot be zero");
+        require(_token != address(0), "Token address cannot be zero");
+        require(_amount > 0, "Amount must be greater than zero");
+        require(!processedMessages[_messageId], "Message already processed");
+
+        // Mark message as processed to prevent re-entrancy/double spending
+        processedMessages[_messageId] = true;
+
+        // In a real bridge, you would either mint new tokens or transfer from a pool.
+        // For this example, we'll assume minting for simplicity.
+        // If using an ERC20 token, this would typically be a call to a `mint` function
+        // on a custom token contract or a transfer from a central vault.
+        // For a generic ERC20, you can't directly mint. You'd need to interact with
+        // a specific token contract that supports minting or transfer from a vault.
+        // Example if `_token` is a contract that allows minting by `this` contract:
+        // IMyMintableToken(_token).mint(_receiver, _amount);
+
+        // Placeholder for actual token handling logic on the destination chain.
+        // This could involve minting, or transferring from a pre-funded vault.
+        // For demonstration purposes, we'll emit an event.
+        // In a real scenario, you'd interact with the token contract here.
+
+        emit MessageRelayed(_sourceChainId, _sender, _receiver, _token, _amount, _messageId);
+    }
+
+    // Getter function for gas optimization if you want to check foreign bridges without calling the mapping directly
+    function getForeignBridge(uint256 _chainId) external view returns (address) {
+        return foreignBridges[_chainId];
+    }
+}
+```

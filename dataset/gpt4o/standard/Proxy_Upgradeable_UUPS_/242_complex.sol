@@ -1,0 +1,77 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/StorageSlotUpgradeable.sol";
+
+contract VersionedUUPSUpgradeable is Initializable, UUPSUpgradeable, OwnableUpgradeable {
+    bytes32 private constant _VERSION_SLOT = keccak256("VersionedUUPSUpgradeable.version");
+    bytes32 private constant _UPGRADE_TIMESTAMP_SLOT = keccak256("VersionedUUPSUpgradeable.upgradeTimestamp");
+    bytes32 private constant _ROLLBACK_SLOT = keccak256("VersionedUUPSUpgradeable.rollback");
+
+    event Upgraded(address indexed implementation, uint256 version);
+    event Rollback(address indexed implementation);
+
+    uint256 private constant UPGRADE_TIMELOCK = 1 days;
+
+    function initialize() public initializer {
+        __Ownable_init();
+        _setVersion(1);
+    }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(block.timestamp >= _getUpgradeTimestamp(), "Upgrade is timelocked");
+        require(_storageLayoutMatches(newImplementation), "Storage layout mismatch");
+        _setVersion(_getVersion() + 1);
+        _setUpgradeTimestamp(block.timestamp + UPGRADE_TIMELOCK);
+    }
+
+    function upgradeTo(address newImplementation) external onlyOwner {
+        _authorizeUpgrade(newImplementation);
+        _upgradeTo(newImplementation);
+        emit Upgraded(newImplementation, _getVersion());
+    }
+
+    function upgradeToAndCall(address newImplementation, bytes memory data) external payable onlyOwner {
+        _authorizeUpgrade(newImplementation);
+        _upgradeToAndCall(newImplementation, data);
+        emit Upgraded(newImplementation, _getVersion());
+    }
+
+    function rollback(address previousImplementation) external onlyOwner {
+        require(StorageSlotUpgradeable.getBooleanSlot(_ROLLBACK_SLOT).value, "Rollback is not enabled");
+        _upgradeTo(previousImplementation);
+        emit Rollback(previousImplementation);
+    }
+
+    function enableRollback() external onlyOwner {
+        StorageSlotUpgradeable.getBooleanSlot(_ROLLBACK_SLOT).value = true;
+    }
+
+    function disableRollback() external onlyOwner {
+        StorageSlotUpgradeable.getBooleanSlot(_ROLLBACK_SLOT).value = false;
+    }
+
+    function _storageLayoutMatches(address newImplementation) private view returns (bool) {
+        // Add storage layout validation logic here
+        return true;
+    }
+
+    function _getVersion() internal view returns (uint256) {
+        return StorageSlotUpgradeable.getUint256Slot(_VERSION_SLOT).value;
+    }
+
+    function _setVersion(uint256 version) private {
+        StorageSlotUpgradeable.getUint256Slot(_VERSION_SLOT).value = version;
+    }
+
+    function _getUpgradeTimestamp() internal view returns (uint256) {
+        return StorageSlotUpgradeable.getUint256Slot(_UPGRADE_TIMESTAMP_SLOT).value;
+    }
+
+    function _setUpgradeTimestamp(uint256 timestamp) private {
+        StorageSlotUpgradeable.getUint256Slot(_UPGRADE_TIMESTAMP_SLOT).value = timestamp;
+    }
+}

@@ -1,0 +1,53 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultiToken is ERC1155 {
+    struct Token {
+        uint256 id;
+        address owner;
+        string name;
+        string symbol;
+        uint256 totalSupply;
+        uint256 balance;
+    }
+
+    mapping(uint256 => Token) public tokens;
+    mapping(address => mapping(uint256 => uint256)) public balances;
+
+    event Transfer(address indexed from, address indexed to, uint256 indexed tokenId, uint256 value);
+
+    constructor() public {
+        // Initialize the multi-token contract
+        _setBaseURI("https://example.com/tokens/");
+    }
+
+    function mint(address to, uint256 tokenId, string memory name, string memory symbol, uint256 totalSupply) public {
+        // Create a new token
+        Token memory token = Token(tokenId, msg.sender, name, symbol, totalSupply, 0);
+        tokens[tokenId] = token;
+        balances[msg.sender][tokenId] = totalSupply;
+
+        emit Transfer(msg.sender, to, tokenId, totalSupply);
+    }
+
+    function transfer(address to, uint256 tokenId, uint256 value) public {
+        // Check if the sender has enough balance
+        require(balances[msg.sender][tokenId] >= value, "Insufficient balance");
+
+        // Update the sender's balance
+        balances[msg.sender][tokenId] -= value;
+
+        // Update the recipient's balance
+        balances[to][tokenId] += value;
+
+        emit Transfer(msg.sender, to, tokenId, value);
+    }
+
+    function balanceOf(address owner, uint256 tokenId) public view returns (uint256) {
+        return balances[owner][tokenId];
+    }
+
+    function totalSupply(uint256 tokenId) public view returns (uint256) {
+        return tokens[tokenId].totalSupply;
+    }
+}

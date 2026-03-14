@@ -1,0 +1,74 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+interface IERC20 {
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function transfer(address to, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+}
+
+contract MinimalDeFiLending {
+    IERC20 public immutable underlyingToken;
+    mapping(address => uint256) public balances;
+    uint256 public totalAssets;
+    uint256 public interestRate; // Simplified interest rate for demonstration
+
+    constructor(address _underlyingTokenAddress) {
+        underlyingToken = IERC20(_underlyingTokenAddress);
+    }
+
+    function deposit(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        require(underlyingToken.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+
+        totalAssets += amount;
+        balances[msg.sender] += amount;
+    }
+
+    function withdraw(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        uint256 userBalance = balances[msg.sender];
+        require(amount <= userBalance, "Insufficient balance");
+
+        totalAssets -= amount;
+        balances[msg.sender] -= amount;
+
+        require(underlyingToken.transfer(msg.sender, amount), "Transfer failed");
+    }
+
+    // Simplified lending function
+    function lend(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        uint256 userBalance = balances[msg.sender];
+        require(amount <= userBalance, "Insufficient balance");
+
+        balances[msg.sender] -= amount;
+        // In a real scenario, this would interact with a lending pool and earn interest.
+        // For gas optimization, we're skipping complex interest calculations here.
+        // The amount lent is conceptually removed from the user's direct balance
+        // and is now part of the pool's lent assets.
+        // The 'totalAssets' would typically represent the total deposited by users.
+        // The interest earned would be managed separately or reflected in token value.
+    }
+
+    // Simplified borrowing function (requires collateral, not implemented here for simplicity)
+    // In a real contract, you'd need collateral management and liquidation mechanisms.
+    function borrow(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        // In a real scenario, this would check collateral and charge interest.
+        // For gas optimization, we assume the borrower has provided sufficient collateral
+        // and the borrow amount is deducted from a conceptual 'borrowed' amount.
+        // The 'totalAssets' would also be affected by borrowed amounts.
+        // This function is a placeholder and needs significant expansion for a real DeFi system.
+        // It's here to illustrate the concept of borrowing in a lending protocol.
+        // We are NOT actually transferring tokens here to keep it minimal.
+        // This implies a more complex system where borrowed tokens are managed externally.
+    }
+
+    function setInterestRate(uint256 _rate) external {
+        // In a real system, this would likely be a governance function
+        // and the rate would be dynamically calculated.
+        interestRate = _rate;
+    }
+}

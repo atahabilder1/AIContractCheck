@@ -1,0 +1,60 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleLending {
+    struct Loan {
+        uint256 amount;
+        uint256 interest;
+        uint256 dueDate;
+        address borrower;
+        bool repaid;
+    }
+
+    mapping(address => uint256) public deposits;
+    mapping(address => Loan) public loans;
+
+    uint256 public interestRate = 5; // 5% interest rate
+    uint256 public loanDuration = 30 days;
+
+    function deposit() public payable {
+        deposits[msg.sender] += msg.value;
+    }
+
+    function requestLoan(uint256 _amount) public {
+        require(loans[msg.sender].amount == 0, "Existing loan must be repaid first");
+        require(_amount <= deposits[address(this)], "Not enough funds in the contract");
+
+        uint256 interest = (_amount * interestRate) / 100;
+        loans[msg.sender] = Loan({
+            amount: _amount,
+            interest: interest,
+            dueDate: block.timestamp + loanDuration,
+            borrower: msg.sender,
+            repaid: false
+        });
+
+        payable(msg.sender).transfer(_amount);
+    }
+
+    function repayLoan() public payable {
+        Loan storage loan = loans[msg.sender];
+        require(loan.amount > 0, "No active loan");
+        require(!loan.repaid, "Loan already repaid");
+        require(msg.value == loan.amount + loan.interest, "Incorrect repayment amount");
+
+        loan.repaid = true;
+        deposits[address(this)] += msg.value;
+    }
+
+    function withdraw(uint256 _amount) public {
+        require(deposits[msg.sender] >= _amount, "Insufficient balance");
+        deposits[msg.sender] -= _amount;
+        payable(msg.sender).transfer(_amount);
+    }
+
+    function checkLoanStatus(address _borrower) public view returns (bool) {
+        return loans[_borrower].repaid;
+    }
+}
+```

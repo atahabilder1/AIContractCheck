@@ -1,0 +1,171 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IMessageBus {
+    function sendMessage(address destinationChain, bytes calldata message) external returns (bytes32);
+    function receiveMessage(address sourceChain, bytes calldata message) external;
+}
+
+contract CrossChainBridge {
+    address public immutable messageBus;
+    address public owner;
+    uint256 public constant MIN_STAKE_AMOUNT = 1 ether;
+    uint256 public constant SLASHING_PENALTY_MULTIPLIER = 10; // 10x penalty
+    uint256 public constant UNSTAKE_DELAY = 7 days;
+
+    struct Validator {
+        bool isValidator;
+        uint256 stake;
+        uint256 lastStakedTimestamp;
+    }
+
+    mapping(address => Validator) public validators;
+    mapping(address => uint256) public unstakeRequests; // Stores timestamp of unstake request
+
+    event ValidatorAdded(address indexed validatorAddress);
+    event ValidatorRemoved(address indexed validatorAddress);
+    event StakeAdded(address indexed validatorAddress, uint256 amount);
+    event StakeRemoved(address indexed validatorAddress, uint256 amount);
+    event MessageSigned(address indexed validatorAddress, bytes32 messageHash);
+    event MessageInvalidated(address indexed validatorAddress, bytes32 messageHash);
+    event SlashingOccurred(address indexed validatorAddress, uint256 slashedAmount);
+    event UnstakeRequested(address indexed validatorAddress, uint256 requestTimestamp);
+    event UnstakeClaimed(address indexed validatorAddress, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Caller is not the owner");
+        _;
+    }
+
+    modifier onlyValidator() {
+        require(validators[msg.sender].isValidator, "Caller is not a validator");
+        _;
+    }
+
+    constructor(address _messageBus) {
+        messageBus = _messageBus;
+        owner = msg.sender;
+    }
+
+    function addValidator(address _validatorAddress) public onlyOwner {
+        require(!validators[_validatorAddress].isValidator, "Already a validator");
+        validators[_validatorAddress].isValidator = true;
+        emit ValidatorAdded(_validatorAddress);
+    }
+
+    function removeValidator(address _validatorAddress) public onlyOwner {
+        require(validators[_validatorAddress].isValidator, "Not a validator");
+        validators[_validatorAddress].isValidator = false;
+        // If validator has stake, they will need to unstake it
+        if (validators[_validatorAddress].stake > 0) {
+            unstakeRequests[_validatorAddress] = block.timestamp;
+        }
+        emit ValidatorRemoved(_validatorAddress);
+    }
+
+    function stake() public payable onlyValidator {
+        require(msg.value >= MIN_STAKE_AMOUNT, "Minimum stake not met");
+        validators[msg.sender].stake += msg.value;
+        validators[msg.sender].lastStakedTimestamp = block.timestamp;
+        emit StakeAdded(msg.sender, msg.value);
+    }
+
+    function unstake() public onlyValidator {
+        uint256 availableStake = validators[msg.sender].stake;
+        require(availableStake > 0, "No stake to unstake");
+
+        // Prevent unstaking if the validator has been removed and is awaiting delay
+        if (unstakeRequests[msg.sender] > 0) {
+            require(block.timestamp >= unstakeRequests[msg.sender] + UNSTAKE_DELAY, "Unstake delay period not met");
+        }
+
+        validators[msg.sender].stake = 0;
+        emit StakeRemoved(msg.sender, availableStake);
+        (bool success, ) = payable(msg.sender).call{value: availableStake}("");
+        require(success, "Unstake transfer failed");
+    }
+
+    function requestUnstake() public onlyValidator {
+        require(validators[msg.sender].stake > 0, "No stake to request unstake");
+        require(unstakeRequests[msg.sender] == 0, "Unstake already requested");
+        unstakeRequests[msg.sender] = block.timestamp;
+        emit UnstakeRequested(msg.sender, block.timestamp);
+    }
+
+    function claimUnstake() public onlyValidator {
+        uint256 requestTimestamp = unstakeRequests[msg.sender];
+        require(requestTimestamp > 0, "No unstake request found");
+        require(block.timestamp >= requestTimestamp + UNSTAKE_DELAY, "Unstake delay period not met");
+
+        uint256 amountToClaim = validators[msg.sender].stake;
+        require(amountToClaim > 0, "No stake available to claim");
+
+        unstakeRequests[msg.sender] = 0; // Clear the request
+        validators[msg.sender].stake = 0; // Remove stake
+
+        emit StakeRemoved(msg.sender, amountToClaim);
+        emit UnstakeClaimed(msg.sender, amountToClaim);
+
+        (bool success, ) = payable(msg.sender).call{value: amountToClaim}("");
+        require(success, "Unstake claim transfer failed");
+    }
+
+    function signMessage(bytes32 _messageHash) public onlyValidator {
+        // In a real implementation, this would involve more complex logic
+        // to verify the message's validity and origin before signing.
+        // For this example, we assume the validator is responsible for this.
+        emit MessageSigned(msg.sender, _messageHash);
+    }
+
+    function reportInvalidMessage(bytes32 _messageHash) public onlyValidator {
+        // This function would be called by a validator if they detect
+        // another validator has signed an invalid message.
+        // The actual mechanism for detecting invalid messages and proving it
+        // would be complex and outside the scope of this basic example.
+
+        // In a real scenario, you'd need a way to track which validator signed which message
+        // and a dispute resolution mechanism.
+
+        // For demonstration, we'll assume a simple scenario where a validator
+        // can report an invalid signature.
+        emit MessageInvalidated(msg.sender, _messageHash);
+        slashing(_messageHash); // Trigger slashing for the presumed invalid signer
+    }
+
+    function slashing(bytes32 _messageHash) internal {
+        // This is a simplified slashing mechanism.
+        // In a real bridge, you'd need to identify the validator(s)
+        // who signed the invalid message and penalize them.
+        // This might involve a signature aggregation and verification process.
+
+        // For this example, we'll assume the `reportInvalidMessage` sender
+        // has identified the culprit and we are penalizing them.
+        // A more robust system would require proof of the invalid signature.
+
+        // Let's assume the reporter knows the address of the validator who signed the invalid message
+        // For simplicity, we'll just slash a random validator or the reporter for demonstration.
+        // A proper implementation would require associating message hashes with validator signatures.
+
+        // This is a placeholder for the actual slashing logic.
+        // A real implementation would need to:
+        // 1. Identify the validator(s) who signed the invalid message.
+        // 2. Calculate the penalty based on their stake.
+        // 3. Transfer the slashed amount to a treasury or burn it.
+
+        // Example: If we could identify the signer `_invalidSigner`
+        // uint256 penaltyAmount = validators[_invalidSigner].stake / SLASHING_PENALTY_MULTIPLIER;
+        // validators[_invalidSigner].stake -= penaltyAmount;
+        // emit SlashingOccurred(_invalidSigner, penaltyAmount);
+        // (bool success, ) = payable(address(this)).call{value: penaltyAmount}(""); // Send to contract for treasury
+        // require(success, "Slashing transfer failed");
+
+        // For this simplified example, we'll emit an event indicating slashing.
+        // In a real system, the `reportInvalidMessage` function would need to provide more context.
+        emit SlashingOccurred(msg.sender, 0); // Placeholder amount
+    }
+
+    // Fallback function to receive Ether
+    receive() external payable {}
+}
+```

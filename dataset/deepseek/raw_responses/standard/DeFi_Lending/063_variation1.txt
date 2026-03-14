@@ -1,0 +1,98 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract PeerToPeerLending is ReentrancyGuard {
+    struct Loan {
+        address lender;
+        address borrower;
+        uint256 amount;
+        uint256 interestRate;
+        uint256 duration;
+        bool funded;
+        bool completed;
+        bool closed;
+    }
+
+    IERC20 public immutable token;
+    uint256 public loanCount;
+    mapping(uint256 => Loan) public loans;
+    mapping(address => uint256[]) public borrowerLoans;
+
+    event LoanCreated(uint256 indexed loanId, address indexed lender, address indexed borrower, uint256 amount, uint256 interestRate, uint256 duration);
+    event LoanFunded(uint256 indexed loanId, uint256 amount);
+    event LoanClosed(uint256 indexed loanId);
+    event LoanCompleted(uint256 indexed loanId);
+
+    constructor(address _token) {
+        token = IERC20(_token);
+    }
+
+    function createLoan(address _borrower, uint256 _amount, uint256 _interestRate, uint256 _duration) external {
+        require(_amount > 0, "Amount must be greater than zero");
+        require(_interestRate > 0, "Interest rate must be greater than zero");
+        require(_duration > 0, "Duration must be greater than zero");
+        require(_borrower != address(0), "Borrower address must be valid");
+
+        loanCount++;
+        loans[loanCount] = Loan({
+            lender: msg.sender,
+            borrower: _borrower,
+            amount: _amount,
+            interestRate: _interestRate,
+            duration: _duration,
+            funded: false,
+            completed: false,
+            closed: false
+        });
+
+        borrowerLoans[_borrower].push(loanCount);
+
+        emit LoanCreated(loanCount, msg.sender, _borrower, _amount, _interestRate, _duration);
+    }
+
+    function fundLoan(uint256 _loanId) external nonReentrant {
+        Loan storage loan = loans[_loanId];
+        require(loan.funded == false, "Loan already funded");
+        require(loan.borrower != address(0), "Borrower must be valid");
+
+        uint256 amount = loan.amount;
+        require(token.transferFrom(msg.sender, address(this), amount), "Token transfer failed");
+
+        loan.funded = true;
+        loan.lender = msg.sender;
+
+        emit LoanFunded(_loanId, amount);
+    }
+
+    function closeLoan(uint256 _loanId) external nonReentrant {
+        Loan storage loan = loans[_loanId];
+        require(loan.funded, "Loan must be funded");
+        require(!loan.completed, "Loan already completed");
+        require(!loan.closed, "Loan already closed");
+        require(msg.sender == loan.borrower || msg.sender == loan.lender, "Only borrower or lender can close the loan");
+
+        loan.closed = true;
+        emit LoanClosed(_loanId);
+    }
+
+    function completeLoan(uint256 _loanId) external nonReentrant {
+        Loan storage loan = loans[_loanId];
+        require(loan.funded, "Loan must be funded");
+        require(!loan.completed, "Loan already completed");
+        require(!loan.closed, "Loan already closed");
+        require(msg.sender == loan.borrower, "Only borrower can complete the loan");
+
+        uint256 interest = (loan.amount * loan.interestRate * loan.duration) / 100 / 365;
+        uint256 totalAmount = loan.amount + interest;
+
+        require(token.transferFrom(msg.sender, loan.lender, totalAmount), "Token transfer failed");
+
+        loan.completed = true;
+        emit LoanCompleted(_loanId);
+    }
+}
+```

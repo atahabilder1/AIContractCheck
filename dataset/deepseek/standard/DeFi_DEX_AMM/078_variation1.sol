@@ -1,0 +1,61 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract OrderBookDEX is Ownable {
+    struct Order {
+        address user;
+        uint256 amount;
+        uint256 price;
+        bool isBuy;
+    }
+
+    mapping(address => mapping(address => Order[])) public orders;
+    mapping(address => mapping(address => uint256)) public orderCounts;
+
+    event OrderPlaced(address indexed tokenBuy, address indexed tokenSell, uint256 amount, uint256 price, bool isBuy, address indexed user);
+    event OrderFilled(address indexed tokenBuy, address indexed tokenSell, uint256 amount, uint256 price, bool isBuy, address indexed user);
+
+    function placeOrder(address tokenBuy, address tokenSell, uint256 amount, uint256 price, bool isBuy) external {
+        require(amount > 0, "Amount must be greater than zero");
+        require(price > 0, "Price must be greater than zero");
+
+        if (isBuy) {
+            require(IERC20(tokenSell).balanceOf(msg.sender) >= amount, "Insufficient balance");
+            require(IERC20(tokenSell).allowance(msg.sender, address(this)) >= amount, "Token allowance too low");
+        } else {
+            require(IERC20(tokenBuy).balanceOf(msg.sender) >= amount, "Insufficient balance");
+            require(IERC20(tokenBuy).allowance(msg.sender, address(this)) >= amount, "Token allowance too low");
+        }
+
+        orders[tokenBuy][tokenSell].push(Order({
+            user: msg.sender,
+            amount: amount,
+            price: price,
+            isBuy: isBuy
+        }));
+        orderCounts[tokenBuy][tokenSell]++;
+
+        emit OrderPlaced(tokenBuy, tokenSell, amount, price, isBuy, msg.sender);
+    }
+
+    function fillOrder(address tokenBuy, address tokenSell, uint256 index, uint256 amount) external {
+        Order storage order = orders[tokenBuy][tokenSell][index];
+        require(order.user == msg.sender, "Not the owner of this order");
+        require(order.amount >= amount, "Insufficient amount to fill");
+
+        if (order.isBuy) {
+            require(IERC20(tokenSell).transferFrom(msg.sender, address(this), amount), "Token transfer failed");
+            require(IERC20(tokenBuy).transfer(order.user, amount * order.price), "Token transfer failed");
+        } else {
+            require(IERC20(tokenBuy).transferFrom(msg.sender, address(this), amount), "Token transfer failed");
+            require(IERC20(tokenSell).transfer(order.user, amount / order.price), "Token transfer failed");
+        }
+
+        order.amount -= amount;
+
+        emit OrderFilled(tokenBuy, tokenSell, amount, order.price, order.isBuy, msg.sender);
+    }
+}

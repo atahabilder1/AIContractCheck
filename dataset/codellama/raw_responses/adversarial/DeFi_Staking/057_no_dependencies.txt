@@ -1,0 +1,89 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiStaking {
+    // Define the staking token
+    address public stakingToken;
+
+    // Define the staking amount
+    uint public stakingAmount;
+
+    // Define the staking period
+    uint public stakingPeriod;
+
+    // Define the staking reward
+    uint public stakingReward;
+
+    // Define the staking reward period
+    uint public stakingRewardPeriod;
+
+    // Define the staking reward amount
+    uint public stakingRewardAmount;
+
+    // Define the staking state
+    enum State {
+        Staking,
+        Unstaking,
+        Rewarded,
+        Unrewarded
+    }
+
+    // Define the staking state variable
+    State public state;
+
+    // Define the staking event
+    event StakingEvent(address indexed from, uint indexed amount, uint indexed period, uint indexed reward);
+
+    // Define the unstaking event
+    event UnstakingEvent(address indexed from, uint indexed amount, uint indexed period, uint indexed reward);
+
+    // Define the rewarded event
+    event RewardedEvent(address indexed from, uint indexed amount, uint indexed period, uint indexed reward);
+
+    // Define the unrewarded event
+    event UnrewardedEvent(address indexed from, uint indexed amount, uint indexed period, uint indexed reward);
+
+    // Define the constructor
+    constructor(address _stakingToken, uint _stakingAmount, uint _stakingPeriod, uint _stakingReward, uint _stakingRewardPeriod) public {
+        stakingToken = _stakingToken;
+        stakingAmount = _stakingAmount;
+        stakingPeriod = _stakingPeriod;
+        stakingReward = _stakingReward;
+        stakingRewardPeriod = _stakingRewardPeriod;
+        state = State.Staking;
+    }
+
+    // Define the staking function
+    function stake(uint _amount) public {
+        require(state == State.Staking, "Staking is not available");
+        require(_amount >= stakingAmount, "Insufficient amount");
+        require(msg.sender == tx.origin, "Only EOA can stake");
+
+        // Calculate the staking reward
+        uint reward = _amount * stakingReward / stakingAmount;
+
+        // Update the staking state
+        state = State.Rewarded;
+
+        // Emit the staking event
+        emit StakingEvent(msg.sender, _amount, stakingPeriod, reward);
+    }
+
+    // Define the unstaking function
+    function unstake(uint _amount) public {
+        require(state == State.Unstaking, "Unstaking is not available");
+        require(_amount >= stakingAmount, "Insufficient amount");
+        require(msg.sender == tx.origin, "Only EOA can unstake");
+
+        // Calculate the unstaking reward
+        uint reward = _amount * stakingReward / stakingAmount;
+
+        // Update the staking state
+        state = State.Unrewarded;
+
+        // Emit the unstaking event
+        emit UnstakingEvent(msg.sender, _amount, stakingPeriod, reward);
+    }
+}
+```

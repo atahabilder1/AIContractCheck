@@ -1,0 +1,74 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract DutchAuction {
+    address payable public seller;
+    uint256 public startPrice;
+    uint256 public reservePrice;
+    uint256 public startTime;
+    uint256 public duration;
+    uint256 public priceDecayPerSecond;
+    bool public sold;
+
+    event AuctionCreated(address seller, uint256 startPrice, uint256 reservePrice, uint256 duration);
+    event ItemSold(address buyer, uint256 price);
+
+    constructor(
+        uint256 _startPrice,
+        uint256 _reservePrice,
+        uint256 _duration,
+        uint256 _priceDecayPerSecond
+    ) {
+        require(_startPrice > _reservePrice, "Start price must exceed reserve");
+        require(_duration > 0, "Duration must be positive");
+        require(_priceDecayPerSecond > 0, "Decay rate must be positive");
+
+        seller = payable(msg.sender);
+        startPrice = _startPrice;
+        reservePrice = _reservePrice;
+        startTime = block.timestamp;
+        duration = _duration;
+        priceDecayPerSecond = _priceDecayPerSecond;
+
+        emit AuctionCreated(msg.sender, _startPrice, _reservePrice, _duration);
+    }
+
+    function currentPrice() public view returns (uint256) {
+        if (block.timestamp >= startTime + duration) {
+            return reservePrice;
+        }
+
+        uint256 elapsed = block.timestamp - startTime;
+        uint256 discount = elapsed * priceDecayPerSecond;
+        uint256 price = startPrice > discount ? startPrice - discount : reservePrice;
+
+        return price < reservePrice ? reservePrice : price;
+    }
+
+    function buy() external payable {
+        require(!sold, "Already sold");
+        require(block.timestamp <= startTime + duration, "Auction expired");
+
+        uint256 price = currentPrice();
+        require(msg.value >= price, "Insufficient payment");
+
+        sold = true;
+
+        uint256 refund = msg.value - price;
+        if (refund > 0) {
+            payable(msg.sender).transfer(refund);
+        }
+
+        seller.transfer(price);
+
+        emit ItemSold(msg.sender, price);
+    }
+
+    function withdraw() external {
+        require(msg.sender == seller, "Only seller");
+        require(block.timestamp > startTime + duration, "Auction not expired");
+        require(!sold, "Already sold");
+
+        sold = true;
+    }
+}

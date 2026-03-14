@@ -1,0 +1,112 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultisigWallet {
+    address[] public owners;
+    uint public required;
+    uint public nonce;
+
+    mapping(uint => Transaction) public transactions;
+
+    struct Transaction {
+        address to;
+        uint value;
+        bytes data;
+        bool executed;
+        uint64 nonce;
+    }
+
+    event Deposit(address indexed sender, uint amount);
+    event SubmitTransaction(address indexed owner, uint indexed txIndex, address indexed to, uint value, bytes data);
+    event ConfirmTransaction(address indexed owner, uint indexed txIndex);
+    event ExecuteTransaction(uint indexed txIndex);
+    event RevokeConfirmation(address indexed owner, uint indexed txIndex);
+
+    modifier onlyOwner() {
+        bool isOwner = false;
+        for (uint i = 0; i < owners.length; i++) {
+            if (owners[i] == msg.sender) {
+                isOwner = true;
+                break;
+            }
+        }
+        require(isOwner, "Not an owner");
+        _;
+    }
+
+    modifier transactionExists(uint _txIndex) {
+        require(_txIndex < nonce, "Transaction does not exist");
+        _;
+    }
+
+    modifier notExecuted(uint _txIndex) {
+        require(!transactions[_txIndex].executed, "Transaction already executed");
+        _;
+    }
+
+    modifier notConfirmed(uint _txIndex) {
+        require(!isConfirmed(_txIndex), "Transaction already confirmed");
+        _;
+    }
+
+    constructor(address[] memory _owners, uint _required) {
+        require(_owners.length > 0 && _required > 0 && _required <= _owners.length, "Invalid owners or required number");
+        owners = _owners;
+        required = _required;
+    }
+
+    receive() external payable {
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function submitTransaction(address _to, uint _value, bytes memory _data) public onlyOwner {
+        transactions[nonce] = Transaction({
+            to: _to,
+            value: _value,
+            data: _data,
+            executed: false,
+            nonce: uint64(nonce)
+        });
+        emit SubmitTransaction(msg.sender, nonce, _to, _value, _data);
+        nonce++;
+    }
+
+    function confirmTransaction(uint _txIndex) public onlyOwner transactionExists(_txIndex) notExecuted(_txIndex) notConfirmed(_txIndex) {
+        transactions[_txIndex].executed = true;
+        emit ConfirmTransaction(msg.sender, _txIndex);
+    }
+
+    function executeTransaction(uint _txIndex) public onlyOwner transactionExists(_txIndex) notExecuted(_txIndex) {
+        Transaction storage transaction = transactions[_txIndex];
+        require(address(this).balance >= transaction.value, "Insufficient balance to execute transaction");
+        (bool success, ) = transaction.to.call{value: transaction.value}(transaction.data);
+        require(success, "Transaction execution failed");
+        transaction.executed = true;
+        emit ExecuteTransaction(_txIndex);
+    }
+
+    function revokeConfirmation(uint _txIndex) public onlyOwner transactionExists(_txIndex) notExecuted(_txIndex) {
+        transactions[_txIndex].executed = true;
+        emit RevokeConfirmation(msg.sender, _txIndex);
+    }
+
+    function getTransactionCount() public view returns (uint) {
+        return nonce;
+    }
+
+    function isConfirmed(uint _txIndex) public view returns (bool) {
+        uint count = 0;
+        for (uint i = 0; i < owners.length; i++) {
+            if (transactions[_txIndex].confirmations[owners[i]]) {
+                count++;
+            }
+        }
+        return count >= required;
+    }
+
+    function getOwners() public view returns (address[] memory) {
+        return owners;
+    }
+}
+```

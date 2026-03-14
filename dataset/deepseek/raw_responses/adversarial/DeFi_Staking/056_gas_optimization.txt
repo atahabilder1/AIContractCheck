@@ -1,0 +1,49 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Staking {
+    mapping(address => uint256) public balances;
+    mapping(address => uint256) public rewards;
+    uint256 public totalStaked;
+    uint256 public rewardRate;
+    uint256 public lastUpdateTime;
+
+    constructor(uint256 _rewardRate) {
+        rewardRate = _rewardRate;
+    }
+
+    function stake(uint256 amount) public {
+        require(amount > 0, "Amount must be greater than zero");
+        balances[msg.sender] += amount;
+        totalStaked += amount;
+        if (lastUpdateTime == 0) {
+            lastUpdateTime = block.timestamp;
+        }
+    }
+
+    function unstake(uint256 amount) public {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        balances[msg.sender] -= amount;
+        totalStaked -= amount;
+        if (balances[msg.sender] == 0) {
+            rewards[msg.sender] = 0;
+        }
+        if (totalStaked == 0) {
+            lastUpdateTime = 0;
+        }
+    }
+
+    function claimReward() public {
+        require(balances[msg.sender] > 0, "No tokens staked");
+        uint256 timeDiff = block.timestamp - lastUpdateTime;
+        uint256 reward = (balances[msg.sender] * rewardRate * timeDiff) / 1 ether;
+        rewards[msg.sender] += reward;
+        lastUpdateTime = block.timestamp;
+    }
+
+    function getReward() public view returns (uint256) {
+        return rewards[msg.sender];
+    }
+}
+```

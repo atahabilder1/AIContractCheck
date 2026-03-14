@@ -1,0 +1,68 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract WrappedToken is ERC20, Ownable {
+    mapping(address => bool) public authorizedRelayers;
+    mapping(bytes32 => bool) public processedTransactions;
+
+    uint256 public sourceChainId;
+    address public sourceToken;
+
+    event TokensWrapped(address indexed recipient, uint256 amount, bytes32 sourceTransactionHash);
+    event TokensUnwrapped(address indexed sender, uint256 amount, uint256 destinationChainId);
+    event RelayerUpdated(address indexed relayer, bool authorized);
+
+    constructor(
+        string memory name_,
+        string memory symbol_,
+        uint256 _sourceChainId,
+        address _sourceToken
+    ) ERC20(name_, symbol_) Ownable(msg.sender) {
+        sourceChainId = _sourceChainId;
+        sourceToken = _sourceToken;
+        authorizedRelayers[msg.sender] = true;
+    }
+
+    modifier onlyRelayer() {
+        require(authorizedRelayers[msg.sender], "Not authorized relayer");
+        _;
+    }
+
+    function setRelayer(address relayer, bool authorized) external onlyOwner {
+        authorizedRelayers[relayer] = authorized;
+        emit RelayerUpdated(relayer, authorized);
+    }
+
+    function wrap(
+        address recipient,
+        uint256 amount,
+        bytes32 sourceTransactionHash,
+        uint256 chainId,
+        address token
+    ) external onlyRelayer {
+        require(chainId == sourceChainId, "Invalid source chain");
+        require(token == sourceToken, "Invalid source token");
+        require(!processedTransactions[sourceTransactionHash], "Already processed");
+        require(recipient != address(0), "Invalid recipient");
+        require(amount > 0, "Zero amount");
+
+        processedTransactions[sourceTransactionHash] = true;
+        _mint(recipient, amount);
+
+        emit TokensWrapped(recipient, amount, sourceTransactionHash);
+    }
+
+    function unwrap(uint256 amount, uint256 destinationChainId) external {
+        require(amount > 0, "Zero amount");
+        require(balanceOf(msg.sender) >= amount, "Insufficient balance");
+
+        _burn(msg.sender, amount);
+
+        emit TokensUnwrapped(msg.sender, amount, destinationChainId);
+    }
+}
+```

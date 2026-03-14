@@ -1,0 +1,111 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrowdfundingICO {
+    address payable public owner;
+    uint256 public fundingGoal;
+    uint256 public deadline;
+    uint256 public raisedAmount;
+    bool public projectCompleted;
+    bool public refundIssued;
+
+    mapping(address => uint256) public investors;
+    address[] public investorAddresses;
+
+    event Contribution(address indexed investor, uint256 amount);
+    event ProjectCompleted(uint256 totalAmount);
+    event RefundIssued();
+    event ProjectFailed();
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can perform this action.");
+        _;
+    }
+
+    modifier notProjectCompleted() {
+        require(!projectCompleted, "Project has already been completed.");
+        _;
+    }
+
+    modifier beforeDeadline() {
+        require(block.timestamp < deadline, "Deadline has passed.");
+        _;
+    }
+
+    constructor(uint256 _fundingGoal, uint256 _durationInDays) {
+        owner = payable(msg.sender);
+        fundingGoal = _fundingGoal;
+        deadline = block.timestamp + (_durationInDays * 1 days);
+        projectCompleted = false;
+        refundIssued = false;
+    }
+
+    function contribute() public payable beforeDeadline notProjectCompleted {
+        require(msg.value > 0, "Contribution must be greater than zero.");
+        investors[msg.sender] += msg.value;
+        raisedAmount += msg.value;
+
+        // Add investor to the list if they are new
+        if (investors[msg.sender] == msg.value) {
+            investorAddresses.push(msg.sender);
+        }
+
+        emit Contribution(msg.sender, msg.value);
+    }
+
+    function checkProjectStatus() public onlyOwner {
+        require(block.timestamp >= deadline, "Deadline has not yet passed.");
+        require(!projectCompleted, "Project status already checked.");
+
+        if (raisedAmount >= fundingGoal) {
+            projectCompleted = true;
+            emit ProjectCompleted(raisedAmount);
+        } else {
+            emit ProjectFailed();
+        }
+    }
+
+    function issueRefunds() public onlyOwner {
+        require(block.timestamp >= deadline, "Deadline has not yet passed.");
+        require(!projectCompleted, "Project was successfully funded.");
+        require(!refundIssued, "Refunds have already been issued.");
+
+        refundIssued = true;
+        for (uint256 i = 0; i < investorAddresses.length; i++) {
+            address investor = investorAddresses[i];
+            uint256 amount = investors[investor];
+            if (amount > 0) {
+                (bool success, ) = payable(investor).call{value: amount}("");
+                require(success, "Refund transfer failed.");
+                investors[investor] = 0; // Reset investor's contribution
+            }
+        }
+        emit RefundIssued();
+    }
+
+    function withdrawFunds() public onlyOwner {
+        require(projectCompleted, "Project not completed or failed.");
+        require(raisedAmount > 0, "No funds to withdraw.");
+        (bool success, ) = owner.call{value: raisedAmount}("");
+        require(success, "Withdrawal failed.");
+        raisedAmount = 0;
+    }
+
+    function getInvestorContribution(address _investor) public view returns (uint256) {
+        return investors[_investor];
+    }
+
+    function getInvestorAddresses() public view returns (address[] memory) {
+        return investorAddresses;
+    }
+
+    receive() external payable {
+        contribute();
+    }
+
+    fallback() external payable {
+        contribute();
+    }
+}
+```

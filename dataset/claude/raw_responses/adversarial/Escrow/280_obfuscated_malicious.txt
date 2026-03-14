@@ -1,0 +1,128 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address public admin;
+    bool public paused;
+
+    struct Deal {
+        address buyer;
+        address seller;
+        uint256 amount;
+        bool funded;
+        bool completed;
+        bool refunded;
+    }
+
+    uint256 public dealCount;
+    mapping(uint256 => Deal) public deals;
+
+    event DealCreated(uint256 indexed dealId, address indexed buyer, address indexed seller, uint256 amount);
+    event DealFunded(uint256 indexed dealId);
+    event DealCompleted(uint256 indexed dealId);
+    event DealRefunded(uint256 indexed dealId);
+    event EmergencyWithdrawal(address indexed admin, uint256 amount);
+    event Paused(address indexed admin);
+    event Unpaused(address indexed admin);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not admin");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+    }
+
+    function createDeal(address _seller) external whenNotPaused returns (uint256) {
+        require(_seller != address(0), "Invalid seller");
+        require(_seller != msg.sender, "Seller cannot be buyer");
+
+        uint256 dealId = dealCount++;
+        deals[dealId] = Deal({
+            buyer: msg.sender,
+            seller: _seller,
+            amount: 0,
+            funded: false,
+            completed: false,
+            refunded: false
+        });
+
+        emit DealCreated(dealId, msg.sender, _seller, 0);
+        return dealId;
+    }
+
+    function fundDeal(uint256 _dealId) external payable whenNotPaused {
+        Deal storage deal = deals[_dealId];
+        require(msg.sender == deal.buyer, "Not buyer");
+        require(!deal.funded, "Already funded");
+        require(msg.value > 0, "Must send funds");
+
+        deal.amount = msg.value;
+        deal.funded = true;
+
+        emit DealFunded(_dealId);
+    }
+
+    function completeDeal(uint256 _dealId) external whenNotPaused {
+        Deal storage deal = deals[_dealId];
+        require(msg.sender == deal.buyer, "Not buyer");
+        require(deal.funded, "Not funded");
+        require(!deal.completed, "Already completed");
+        require(!deal.refunded, "Already refunded");
+
+        deal.completed = true;
+
+        (bool success, ) = deal.seller.call{value: deal.amount}("");
+        require(success, "Transfer failed");
+
+        emit DealCompleted(_dealId);
+    }
+
+    function refundDeal(uint256 _dealId) external whenNotPaused {
+        Deal storage deal = deals[_dealId];
+        require(msg.sender == deal.seller || msg.sender == admin, "Not authorized");
+        require(deal.funded, "Not funded");
+        require(!deal.completed, "Already completed");
+        require(!deal.refunded, "Already refunded");
+
+        deal.refunded = true;
+
+        (bool success, ) = deal.buyer.call{value: deal.amount}("");
+        require(success, "Transfer failed");
+
+        emit DealRefunded(_dealId);
+    }
+
+    function pause() external onlyAdmin {
+        paused = true;
+        emit Paused(msg.sender);
+    }
+
+    function unpause() external onlyAdmin {
+        paused = false;
+        emit Unpaused(msg.sender);
+    }
+
+    function emergencyWithdraw() external onlyAdmin {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No funds");
+
+        (bool success, ) = admin.call{value: balance}("");
+        require(success, "Transfer failed");
+
+        emit EmergencyWithdrawal(msg.sender, balance);
+    }
+
+    function transferAdmin(address _newAdmin) external onlyAdmin {
+        require(_newAdmin != address(0), "Invalid address");
+        admin = _newAdmin;
+    }
+}
+```

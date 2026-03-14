@@ -1,0 +1,32 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract CrossChainMessenger {
+    address public immutable owner;
+    mapping(bytes32 => bool) private processedMessages;
+
+    event MessageSent(bytes32 indexed messageId, address indexed sender, bytes data);
+    event MessageReceived(bytes32 indexed messageId, address indexed receiver, bytes data);
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    function sendMessage(address _receiver, bytes memory _data) external payable {
+        bytes32 messageId = keccak256(abi.encodePacked(msg.sender, _receiver, _data, block.timestamp, msg.value));
+        emit MessageSent(messageId, msg.sender, _data);
+    }
+
+    function receiveMessage(bytes32 _messageId, address _receiver, bytes memory _data) external onlyOwner {
+        require(!processedMessages[_messageId], "Message already processed");
+        processedMessages[_messageId] = true;
+        emit MessageReceived(_messageId, _receiver, _data);
+    }
+}
+```

@@ -1,0 +1,380 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract MilestoneEscrow {
+    enum EscrowState { Active, Completed, Cancelled }
+    enum MilestoneState { Pending, Funded, Approved, Disputed, Released, Refunded }
+    enum DisputeState { Open, EvidencePeriod, ArbiterVoting, Resolved }
+
+    struct Milestone {
+        string description;
+        uint256 amount;
+        MilestoneState state;
+        uint256 deadline;
+    }
+
+    struct Dispute {
+        uint256 milestoneIndex;
+        DisputeState state;
+        uint256 evidenceDeadline;
+        uint256 votingDeadline;
+        address[] arbiters;
+        mapping(address => bool) hasVoted;
+        mapping(address => bool) votedForFreelancer;
+        uint256 votesForFreelancer;
+        uint256 votesForClient;
+        uint256 totalVotes;
+        bytes32[] clientEvidence;
+        bytes32[] freelancerEvidence;
+    }
+
+    struct Escrow {
+        address client;
+        address freelancer;
+        EscrowState state;
+        uint256 totalAmount;
+        uint256 releasedAmount;
+        Milestone[] milestones;
+        uint256 disputeCount;
+        mapping(uint256 => Dispute) disputes;
+        uint256 autoReleaseTimeout;
+    }
+
+    uint256 public escrowCount;
+    mapping(uint256 => Escrow) public escrows;
+
+    address[] public arbiterPool;
+    mapping(address => bool) public isArbiter;
+    uint256 public constant EVIDENCE_PERIOD = 3 days;
+    uint256 public constant VOTING_PERIOD = 2 days;
+    uint256 public constant MIN_ARBITERS = 3;
+    uint256 public constant ARBITER_FEE_BPS = 100; // 1%
+
+    event EscrowCreated(uint256 indexed escrowId, address client, address freelancer);
+    event MilestoneFunded(uint256 indexed escrowId, uint256 milestoneIndex);
+    event MilestoneApproved(uint256 indexed escrowId, uint256 milestoneIndex);
+    event MilestoneReleased(uint256 indexed escrowId, uint256 milestoneIndex, uint256 amount);
+    event MilestoneRefunded(uint256 indexed escrowId, uint256 milestoneIndex, uint256 amount);
+    event DisputeOpened(uint256 indexed escrowId, uint256 disputeId, uint256 milestoneIndex);
+    event EvidenceSubmitted(uint256 indexed escrowId, uint256 disputeId, address submitter, bytes32 evidenceHash);
+    event ArbiterVoted(uint256 indexed escrowId, uint256 disputeId, address arbiter, bool forFreelancer);
+    event DisputeResolved(uint256 indexed escrowId, uint256 disputeId, bool freelancerWins);
+    event ArbiterRegistered(address arbiter);
+    event AutoReleased(uint256 indexed escrowId, uint256 milestoneIndex);
+
+    modifier onlyClient(uint256 escrowId) {
+        require(msg.sender == escrows[escrowId].client, "Not client");
+        _;
+    }
+
+    modifier onlyFreelancer(uint256 escrowId) {
+        require(msg.sender == escrows[escrowId].freelancer, "Not freelancer");
+        _;
+    }
+
+    modifier onlyParty(uint256 escrowId) {
+        require(
+            msg.sender == escrows[escrowId].client || msg.sender == escrows[escrowId].freelancer,
+            "Not a party"
+        );
+        _;
+    }
+
+    function registerArbiter() external {
+        require(!isArbiter[msg.sender], "Already registered");
+        isArbiter[msg.sender] = true;
+        arbiterPool.push(msg.sender);
+        emit ArbiterRegistered(msg.sender);
+    }
+
+    function createEscrow(
+        address _freelancer,
+        string[] calldata _descriptions,
+        uint256[] calldata _amounts,
+        uint256[] calldata _deadlines,
+        uint256 _autoReleaseTimeout
+    ) external payable returns (uint256) {
+        require(_freelancer != address(0) && _freelancer != msg.sender, "Invalid freelancer");
+        require(_descriptions.length == _amounts.length && _amounts.length == _deadlines.length, "Length mismatch");
+        require(_descriptions.length > 0, "No milestones");
+
+        uint256 total;
+        for (uint256 i = 0; i < _amounts.length; i++) {
+            require(_amounts[i] > 0, "Zero amount");
+            total += _amounts[i];
+        }
+        require(msg.value == total, "Incorrect ETH");
+
+        uint256 escrowId = escrowCount++;
+        Escrow storage e = escrows[escrowId];
+        e.client = msg.sender;
+        e.freelancer = _freelancer;
+        e.state = EscrowState.Active;
+        e.totalAmount = total;
+        e.autoReleaseTimeout = _autoReleaseTimeout;
+
+        for (uint256 i = 0; i < _descriptions.length; i++) {
+            e.milestones.push(Milestone({
+                description: _descriptions[i],
+                amount: _amounts[i],
+                state: MilestoneState.Funded,
+                deadline: _deadlines[i]
+            }));
+        }
+
+        emit EscrowCreated(escrowId, msg.sender, _freelancer);
+        return escrowId;
+    }
+
+    function approveMilestone(uint256 escrowId, uint256 milestoneIndex) external onlyClient(escrowId) {
+        Escrow storage e = escrows[escrowId];
+        require(e.state == EscrowState.Active, "Not active");
+        Milestone storage m = e.milestones[milestoneIndex];
+        require(m.state == MilestoneState.Funded, "Not funded");
+
+        m.state = MilestoneState.Approved;
+        emit MilestoneApproved(escrowId, milestoneIndex);
+
+        _releaseMilestone(escrowId, milestoneIndex);
+    }
+
+    function _releaseMilestone(uint256 escrowId, uint256 milestoneIndex) internal {
+        Escrow storage e = escrows[escrowId];
+        Milestone storage m = e.milestones[milestoneIndex];
+        require(m.state == MilestoneState.Approved, "Not approved");
+
+        m.state = MilestoneState.Released;
+        e.releasedAmount += m.amount;
+
+        (bool sent,) = e.freelancer.call{value: m.amount}("");
+        require(sent, "Transfer failed");
+
+        emit MilestoneReleased(escrowId, milestoneIndex, m.amount);
+
+        _checkCompletion(escrowId);
+    }
+
+    function autoReleaseMilestone(uint256 escrowId, uint256 milestoneIndex) external {
+        Escrow storage e = escrows[escrowId];
+        require(e.state == EscrowState.Active, "Not active");
+        require(e.autoReleaseTimeout > 0, "No auto-release");
+        Milestone storage m = e.milestones[milestoneIndex];
+        require(m.state == MilestoneState.Funded, "Not funded");
+        require(m.deadline > 0, "No deadline");
+        require(block.timestamp >= m.deadline + e.autoReleaseTimeout, "Timeout not reached");
+
+        m.state = MilestoneState.Approved;
+        emit AutoReleased(escrowId, milestoneIndex);
+        _releaseMilestone(escrowId, milestoneIndex);
+    }
+
+    function openDispute(uint256 escrowId, uint256 milestoneIndex) external onlyParty(escrowId) {
+        Escrow storage e = escrows[escrowId];
+        require(e.state == EscrowState.Active, "Not active");
+        Milestone storage m = e.milestones[milestoneIndex];
+        require(m.state == MilestoneState.Funded, "Not funded");
+        require(arbiterPool.length >= MIN_ARBITERS, "Not enough arbiters");
+
+        m.state = MilestoneState.Disputed;
+
+        uint256 disputeId = e.disputeCount++;
+        Dispute storage d = e.disputes[disputeId];
+        d.milestoneIndex = milestoneIndex;
+        d.state = DisputeState.EvidencePeriod;
+        d.evidenceDeadline = block.timestamp + EVIDENCE_PERIOD;
+        d.votingDeadline = block.timestamp + EVIDENCE_PERIOD + VOTING_PERIOD;
+
+        _selectArbiters(d, escrowId);
+
+        emit DisputeOpened(escrowId, disputeId, milestoneIndex);
+    }
+
+    function _selectArbiters(Dispute storage d, uint256 escrowId) internal {
+        Escrow storage e = escrows[escrowId];
+        uint256 count;
+        uint256 seed = uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao, escrowId)));
+
+        address[] memory candidates = new address[](arbiterPool.length);
+        uint256 candidateCount = arbiterPool.length;
+        for (uint256 i = 0; i < arbiterPool.length; i++) {
+            candidates[i] = arbiterPool[i];
+        }
+
+        while (count < MIN_ARBITERS && candidateCount > 0) {
+            uint256 idx = seed % candidateCount;
+            address candidate = candidates[idx];
+            seed = uint256(keccak256(abi.encodePacked(seed)));
+
+            if (candidate != e.client && candidate != e.freelancer) {
+                d.arbiters.push(candidate);
+                count++;
+            }
+            candidates[idx] = candidates[candidateCount - 1];
+            candidateCount--;
+        }
+        require(count == MIN_ARBITERS, "Could not select enough arbiters");
+    }
+
+    function submitEvidence(uint256 escrowId, uint256 disputeId, bytes32 evidenceHash) external onlyParty(escrowId) {
+        Escrow storage e = escrows[escrowId];
+        Dispute storage d = e.disputes[disputeId];
+        require(d.state == DisputeState.EvidencePeriod, "Not evidence period");
+        require(block.timestamp <= d.evidenceDeadline, "Evidence period ended");
+
+        if (msg.sender == e.client) {
+            d.clientEvidence.push(evidenceHash);
+        } else {
+            d.freelancerEvidence.push(evidenceHash);
+        }
+
+        emit EvidenceSubmitted(escrowId, disputeId, msg.sender, evidenceHash);
+    }
+
+    function voteOnDispute(uint256 escrowId, uint256 disputeId, bool forFreelancer) external {
+        Escrow storage e = escrows[escrowId];
+        Dispute storage d = e.disputes[disputeId];
+
+        if (d.state == DisputeState.EvidencePeriod && block.timestamp > d.evidenceDeadline) {
+            d.state = DisputeState.ArbiterVoting;
+        }
+        require(d.state == DisputeState.ArbiterVoting, "Not voting period");
+        require(block.timestamp <= d.votingDeadline, "Voting ended");
+        require(!d.hasVoted[msg.sender], "Already voted");
+
+        bool isSelectedArbiter;
+        for (uint256 i = 0; i < d.arbiters.length; i++) {
+            if (d.arbiters[i] == msg.sender) {
+                isSelectedArbiter = true;
+                break;
+            }
+        }
+        require(isSelectedArbiter, "Not an arbiter for this dispute");
+
+        d.hasVoted[msg.sender] = true;
+        d.votedForFreelancer[msg.sender] = forFreelancer;
+        d.totalVotes++;
+
+        if (forFreelancer) {
+            d.votesForFreelancer++;
+        } else {
+            d.votesForClient++;
+        }
+
+        emit ArbiterVoted(escrowId, disputeId, msg.sender, forFreelancer);
+
+        if (d.totalVotes == d.arbiters.length) {
+            _resolveDispute(escrowId, disputeId);
+        }
+    }
+
+    function resolveDispute(uint256 escrowId, uint256 disputeId) external {
+        Escrow storage e = escrows[escrowId];
+        Dispute storage d = e.disputes[disputeId];
+        require(block.timestamp > d.votingDeadline, "Voting not ended");
+        require(d.state == DisputeState.ArbiterVoting || d.state == DisputeState.EvidencePeriod, "Already resolved");
+        _resolveDispute(escrowId, disputeId);
+    }
+
+    function _resolveDispute(uint256 escrowId, uint256 disputeId) internal {
+        Escrow storage e = escrows[escrowId];
+        Dispute storage d = e.disputes[disputeId];
+        d.state = DisputeState.Resolved;
+
+        Milestone storage m = e.milestones[d.milestoneIndex];
+        bool freelancerWins = d.votesForFreelancer > d.votesForClient;
+
+        uint256 arbiterFee = (m.amount * ARBITER_FEE_BPS) / 10000;
+        uint256 payout = m.amount - arbiterFee;
+
+        if (freelancerWins) {
+            m.state = MilestoneState.Released;
+            e.releasedAmount += m.amount;
+            (bool sent,) = e.freelancer.call{value: payout}("");
+            require(sent, "Transfer failed");
+            emit MilestoneReleased(escrowId, d.milestoneIndex, payout);
+        } else {
+            m.state = MilestoneState.Refunded;
+            e.releasedAmount += m.amount;
+            (bool sent,) = e.client.call{value: payout}("");
+            require(sent, "Transfer failed");
+            emit MilestoneRefunded(escrowId, d.milestoneIndex, payout);
+        }
+
+        // Pay arbiters
+        if (d.totalVotes > 0 && arbiterFee > 0) {
+            uint256 perArbiter = arbiterFee / d.totalVotes;
+            for (uint256 i = 0; i < d.arbiters.length; i++) {
+                if (d.hasVoted[d.arbiters[i]]) {
+                    (bool sent,) = d.arbiters[i].call{value: perArbiter}("");
+                    require(sent, "Arbiter payment failed");
+                }
+            }
+        }
+
+        emit DisputeResolved(escrowId, disputeId, freelancerWins);
+        _checkCompletion(escrowId);
+    }
+
+    function cancelEscrow(uint256 escrowId) external onlyClient(escrowId) {
+        Escrow storage e = escrows[escrowId];
+        require(e.state == EscrowState.Active, "Not active");
+
+        uint256 refund;
+        for (uint256 i = 0; i < e.milestones.length; i++) {
+            if (e.milestones[i].state == MilestoneState.Funded) {
+                e.milestones[i].state = MilestoneState.Refunded;
+                refund += e.milestones[i].amount;
+            }
+        }
+
+        e.state = EscrowState.Cancelled;
+        if (refund > 0) {
+            (bool sent,) = e.client.call{value: refund}("");
+            require(sent, "Refund failed");
+        }
+    }
+
+    function _checkCompletion(uint256 escrowId) internal {
+        Escrow storage e = escrows[escrowId];
+        for (uint256 i = 0; i < e.milestones.length; i++) {
+            MilestoneState s = e.milestones[i].state;
+            if (s == MilestoneState.Funded || s == MilestoneState.Pending || s == MilestoneState.Disputed) {
+                return;
+            }
+        }
+        e.state = EscrowState.Completed;
+    }
+
+    function getMilestones(uint256 escrowId) external view returns (Milestone[] memory) {
+        return escrows[escrowId].milestones;
+    }
+
+    function getDisputeArbiters(uint256 escrowId, uint256 disputeId) external view returns (address[] memory) {
+        return escrows[escrowId].disputes[disputeId].arbiters;
+    }
+
+    function getDisputeInfo(uint256 escrowId, uint256 disputeId) external view returns (
+        uint256 milestoneIndex,
+        DisputeState state,
+        uint256 evidenceDeadline,
+        uint256 votingDeadline,
+        uint256 votesForFreelancer,
+        uint256 votesForClient,
+        uint256 totalVotes
+    ) {
+        Dispute storage d = escrows[escrowId].disputes[disputeId];
+        return (d.milestoneIndex, d.state, d.evidenceDeadline, d.votingDeadline, d.votesForFreelancer, d.votesForClient, d.totalVotes);
+    }
+
+    function getDisputeEvidence(uint256 escrowId, uint256 disputeId) external view returns (
+        bytes32[] memory clientEvidence,
+        bytes32[] memory freelancerEvidence
+    ) {
+        Dispute storage d = escrows[escrowId].disputes[disputeId];
+        return (d.clientEvidence, d.freelancerEvidence);
+    }
+
+    function getArbiterPoolSize() external view returns (uint256) {
+        return arbiterPool.length;
+    }
+}

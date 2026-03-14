@@ -1,0 +1,92 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleDEX {
+    address public tokenA;
+    address public tokenB;
+    uint public reserveA;
+    uint public reserveB;
+    
+    event Swap(address indexed user, address indexed tokenIn, uint amountIn, address indexed tokenOut, uint amountOut);
+    event LiquidityProvided(address indexed provider, uint amountA, uint amountB);
+    event LiquidityRemoved(address indexed provider, uint amountA, uint amountB);
+
+    constructor(address _tokenA, address _tokenB) {
+        require(_tokenA != _tokenB, "Tokens must be different");
+        tokenA = _tokenA;
+        tokenB = _tokenB;
+    }
+
+    function getReserves() public view returns (uint, uint) {
+        return (reserveA, reserveB);
+    }
+
+    function addLiquidity(uint amountA, uint amountB) external {
+        require(amountA > 0 && amountB > 0, "Amounts must be greater than zero");
+        
+        reserveA += amountA;
+        reserveB += amountB;
+        
+        emit LiquidityProvided(msg.sender, amountA, amountB);
+
+        bool sentA = IERC20(tokenA).transferFrom(msg.sender, address(this), amountA);
+        require(sentA, "Failed to transfer tokenA");
+
+        bool sentB = IERC20(tokenB).transferFrom(msg.sender, address(this), amountB);
+        require(sentB, "Failed to transfer tokenB");
+    }
+
+    function removeLiquidity(uint amountA, uint amountB) external {
+        require(amountA <= reserveA && amountB <= reserveB, "Insufficient liquidity");
+
+        reserveA -= amountA;
+        reserveB -= amountB;
+        
+        emit LiquidityRemoved(msg.sender, amountA, amountB);
+
+        bool sentA = IERC20(tokenA).transfer(msg.sender, amountA);
+        require(sentA, "Failed to transfer tokenA");
+
+        bool sentB = IERC20(tokenB).transfer(msg.sender, amountB);
+        require(sentB, "Failed to transfer tokenB");
+    }
+
+    function swap(address tokenIn, uint amountIn) external returns (uint amountOut) {
+        require(amountIn > 0, "Amount must be greater than zero");
+        require(tokenIn == tokenA || tokenIn == tokenB, "Invalid token");
+
+        bool isTokenA = tokenIn == tokenA;
+        (uint reserveIn, uint reserveOut) = isTokenA ? (reserveA, reserveB) : (reserveB, reserveA);
+
+        uint amountInWithFee = amountIn * 997 / 1000;
+        amountOut = amountInWithFee * reserveOut / (reserveIn + amountInWithFee);
+
+        require(amountOut > 0, "Insufficient output amount");
+
+        if (isTokenA) {
+            reserveA += amountIn;
+            reserveB -= amountOut;
+
+            bool sent = IERC20(tokenB).transfer(msg.sender, amountOut);
+            require(sent, "Failed to transfer tokenB");
+        } else {
+            reserveB += amountIn;
+            reserveA -= amountOut;
+
+            bool sent = IERC20(tokenA).transfer(msg.sender, amountOut);
+            require(sent, "Failed to transfer tokenA");
+        }
+
+        emit Swap(msg.sender, tokenIn, amountIn, isTokenA ? tokenB : tokenA, amountOut);
+
+        bool received = IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
+        require(received, "Failed to transfer tokenIn");
+    }
+}
+
+interface IERC20 {
+    function transfer(address recipient, uint amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint amount) external returns (bool);
+}
+```

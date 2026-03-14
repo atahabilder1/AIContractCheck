@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "https://github.com/aave/aave-v3-core/blob/master/contracts/interfaces/IAaveProtocolDataProvider.sol";
+import "https://github.com/aave/aave-v3-core/blob/master/contracts/interfaces/IPool.sol";
+import "https://github.com/aave/aave-v3-core/blob/master/contracts/interfaces/ILendingPool.sol";
+import "https://github.com/aave/aave-v3-core/blob/master/contracts/interfaces/ILendingPoolAddressesProvider.sol";
+
+contract FlashLoanProvider {
+    address public constant AAVE_POOL_ADDRESSES_PROVIDER = 0x24a42fD28C976A7dF4Ae1834a4E0bDd9fF7E0d0D;
+    address public constant AAVE_POOL = 0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9;
+
+    function flashLoan(address[] memory assets, uint256[] memory amounts, address[] memory modes) external {
+        ILendingPoolAddressesProvider provider = ILendingPoolAddressesProvider(AAVE_POOL_ADDRESSES_PROVIDER);
+        ILendingPool pool = ILendingPool(provider.getLendingPool());
+
+        for (uint256 i = 0; i < assets.length; i++) {
+            pool.flashLoan(assets[i], amounts[i], modes[i], address(this), abi.encode(""), 0);
+        }
+    }
+
+    function executeOperation(address asset, uint256 amount, uint256 premium, address initiator, bytes calldata data) external returns (bool) {
+        // Implement the logic you want to execute during the flash loan
+        // This function is called by the Aave protocol after the flash loan is executed
+        // You can return false to revert the flash loan, or true to accept it
+        // The amount received includes the flash loan amount plus the premium
+        // The premium is the cost of the flash loan
+        // The initiator is the address of the flash loan provider
+        // The data is the encoded data passed to the flash loan function
+
+        // Example: Repay the flash loan and log the amount
+        require(initiator == address(this), "Only the flash loan provider can call this function");
+        require(msg.sender == AAVE_POOL, "Only the AAVE lending pool can call this function");
+
+        uint256 totalDebt = amount + premium;
+        // Perform your operations here
+        // For example, you can swap the flash loaned amount to repay the debt
+
+        // Log the amount for demonstration purposes
+        emit FlashLoanExecuted(asset, amount, premium, initiator, totalDebt);
+
+        // Return true to confirm the flash loan
+        return true;
+    }
+
+    event FlashLoanExecuted(address indexed asset, uint256 amount, uint256 premium, address indexed initiator, uint256 totalDebt);
+}

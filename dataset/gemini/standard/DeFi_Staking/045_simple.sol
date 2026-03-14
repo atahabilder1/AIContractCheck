@@ -1,0 +1,187 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract Staking is Ownable {
+    using SafeMath for uint256;
+
+    IERC20 public immutable rewardToken;
+    IERC20 public immutable stakeToken;
+
+    struct UserInfo {
+        uint256 amount;
+        uint256 rewardDebt;
+    }
+
+    mapping(address => UserInfo) public userInfo;
+    uint256 public totalStaked;
+    uint256 public rewardRate; // Rewards per block
+    uint256 public lastRewardBlock;
+
+    event Deposit(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
+    event RewardPaid(address indexed user, uint256 reward);
+
+    constructor(address _rewardToken, address _stakeToken) {
+        rewardToken = IERC20(_rewardToken);
+        stakeToken = IERC20(_stakeToken);
+        lastRewardBlock = block.number;
+        rewardRate = 0; // Initialize reward rate to 0
+    }
+
+    function setRewardRate(uint256 _rewardRate) public onlyOwner {
+        // Before changing reward rate, update rewards for all stakers
+        massUpdatePools();
+        rewardRate = _rewardRate;
+        lastRewardBlock = block.number;
+    }
+
+    function massUpdatePools() internal {
+        uint256 currentBlock = block.number;
+        uint256 blocksSinceLastUpdate = currentBlock.sub(lastRewardBlock);
+        if (blocksSinceLastUpdate > 0 && totalStaked > 0) {
+            // Calculate and distribute rewards to all stakers
+            // This is a simplified approach. In a real-world scenario,
+            // you might want to iterate over all stakers or use a more
+            // efficient distribution mechanism.
+            // For this basic example, we'll assume rewards are distributed
+            // proportionally to staked amount when a user interacts.
+            // The actual distribution happens in deposit/withdraw/claim.
+        }
+        lastRewardBlock = currentBlock;
+    }
+
+    function pendingReward(address _user) public view returns (uint256) {
+        UserInfo storage user = userInfo[_user];
+        if (user.amount == 0) {
+            return 0;
+        }
+
+        uint256 blocksSinceLastUpdate = block.number.sub(lastRewardBlock);
+        uint256 rewards = blocksSinceLastUpdate.mul(rewardRate);
+        // This calculation is simplified. In a real contract, you'd track
+        // the user's share of rewards based on their stake and time.
+        // The rewardDebt logic is more robust for tracking individual rewards.
+
+        // Placeholder for more accurate reward calculation based on rewardDebt
+        // This part needs to be implemented based on how rewardDebt is managed.
+        return 0; // Placeholder
+    }
+
+    function deposit(uint256 _amount) public {
+        require(_amount > 0, "Amount must be greater than 0");
+
+        UserInfo storage user = userInfo[msg.sender];
+        require(stakeToken.balanceOf(msg.sender) >= user.amount.add(_amount), "Insufficient stake token balance");
+
+        // Transfer stake tokens from user to the contract
+        require(stakeToken.transferFrom(msg.sender, address(this), _amount), "Transfer failed");
+
+        // Update reward debt before deposit
+        updateUserReward(msg.sender);
+
+        user.amount = user.amount.add(_amount);
+        totalStaked = totalStaked.add(_amount);
+
+        emit Deposit(msg.sender, _amount);
+    }
+
+    function withdraw(uint256 _amount) public {
+        require(_amount > 0, "Amount must be greater than 0");
+
+        UserInfo storage user = userInfo[msg.sender];
+        require(user.amount >= _amount, "Insufficient staked amount");
+
+        // Update reward debt before withdrawal
+        updateUserReward(msg.sender);
+
+        user.amount = user.amount.sub(_amount);
+        totalStaked = totalStaked.sub(_amount);
+
+        // Transfer stake tokens back to the user
+        require(stakeToken.transfer(msg.sender, _amount), "Transfer failed");
+
+        emit Withdraw(msg.sender, _amount);
+    }
+
+    function claimRewards() public {
+        UserInfo storage user = userInfo[msg.sender];
+        require(user.amount > 0, "No tokens staked");
+
+        // Update reward debt and calculate earned rewards
+        uint256 rewards = updateUserReward(msg.sender);
+
+        require(rewards > 0, "No rewards to claim");
+
+        // Transfer reward tokens to the user
+        require(rewardToken.transfer(msg.sender, rewards), "Transfer failed");
+
+        emit RewardPaid(msg.sender, rewards);
+    }
+
+    // This function calculates and returns the rewards earned by a user
+    // and updates their reward debt.
+    function updateUserReward(address _user) internal returns (uint256) {
+        UserInfo storage user = userInfo[_user];
+        if (user.amount == 0) {
+            return 0;
+        }
+
+        uint256 blocksSinceLastUpdate = block.number.sub(lastRewardBlock);
+        uint256 rewardsGenerated = blocksSinceLastUpdate.mul(rewardRate);
+
+        // This is a simplified reward distribution.
+        // A more robust implementation would involve tracking the total rewards
+        // generated and distributing them proportionally.
+        // The rewardDebt mechanism is crucial for accurate individual reward tracking.
+
+        // For this basic example, we'll assume rewards are directly proportional
+        // to the amount staked and time.
+        // A common pattern is:
+        // userReward = (totalRewardDistributed / totalStaked) * user.amount
+        // user.rewardDebt = userReward
+
+        // The actual calculation of rewardDebt and earned rewards needs to be
+        // more sophisticated. The below is a conceptual placeholder.
+
+        // In a real scenario, you'd calculate how many rewards have been
+        // generated since the last update for this user and add it to their debt.
+        // For example:
+        // uint256 earned = (blocksSinceLastUpdate * rewardRate * user.amount) / totalStaked;
+        // user.rewardDebt = user.rewardDebt.add(earned);
+        // lastRewardBlock = block.number; // Update lastRewardBlock here
+
+        // For this basic contract, we'll keep it simple and assume rewards
+        // are calculated on claim based on current rewardRate and staked amount.
+        // This is not a typical rewardDebt model but demonstrates the idea.
+
+        uint256 earnedRewards = (blocksSinceLastUpdate.mul(rewardRate).mul(user.amount)).div(totalStaked);
+        // We don't actually subtract from rewardDebt here in this simplified model,
+        // but in a real contract, you would.
+
+        // Update lastRewardBlock to prevent re-calculation for the same block
+        if (blocksSinceLastUpdate > 0) {
+            lastRewardBlock = block.number;
+        }
+
+        return earnedRewards;
+    }
+
+    // Function to allow the owner to deposit reward tokens into the contract
+    function depositRewards(uint256 _amount) public onlyOwner {
+        require(_amount > 0, "Amount must be greater than 0");
+        require(rewardToken.transferFrom(msg.sender, address(this), _amount), "Transfer failed");
+    }
+
+    // Function to allow the owner to withdraw any remaining reward tokens
+    function withdrawStuckTokens(address _tokenAddress) public onlyOwner {
+        require(_tokenAddress != address(0), "Invalid token address");
+        IERC20 token = IERC20(_tokenAddress);
+        uint256 balance = token.balanceOf(address(this));
+        require(balance > 0, "No tokens to withdraw");
+        require(token.transfer(msg.sender, balance), "Transfer failed");
+    }
+}

@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleDEX {
+    address public token1;
+    address public token2;
+    uint256 public reserve1;
+    uint256 public reserve2;
+
+    event Swap(address indexed user, address indexed fromToken, address indexed toToken, uint256 amountIn, uint256 amountOut);
+
+    constructor(address _token1, address _token2) {
+        token1 = _token1;
+        token2 = _token2;
+    }
+
+    function addLiquidity(uint256 amount1, uint256 amount2) external {
+        require(IERC20(token1).transferFrom(msg.sender, address(this), amount1), "Transfer failed");
+        require(IERC20(token2).transferFrom(msg.sender, address(this), amount2), "Transfer failed");
+        reserve1 += amount1;
+        reserve2 += amount2;
+    }
+
+    function swap(address fromToken, uint256 amountIn) external returns (uint256 amountOut) {
+        require(fromToken == token1 || fromToken == token2, "Invalid token");
+        require(amountIn > 0, "Invalid amount");
+
+        if (fromToken == token1) {
+            uint256 amountInWithFee = amountIn * 997 / 1000;
+            amountOut = reserve2 * amountInWithFee / (reserve1 + amountInWithFee);
+            require(IERC20(token1).transferFrom(msg.sender, address(this), amountIn), "Transfer failed");
+            require(IERC20(token2).transfer(msg.sender, amountOut), "Transfer failed");
+            reserve1 += amountIn;
+            reserve2 -= amountOut;
+        } else {
+            uint256 amountInWithFee = amountIn * 997 / 1000;
+            amountOut = reserve1 * amountInWithFee / (reserve2 + amountInWithFee);
+            require(IERC20(token2).transferFrom(msg.sender, address(this), amountIn), "Transfer failed");
+            require(IERC20(token1).transfer(msg.sender, amountOut), "Transfer failed");
+            reserve2 += amountIn;
+            reserve1 -= amountOut;
+        }
+
+        emit Swap(msg.sender, fromToken, fromToken == token1 ? token2 : token1, amountIn, amountOut);
+    }
+
+    function getReserves() external view returns (uint256, uint256) {
+        return (reserve1, reserve2);
+    }
+}
+
+interface IERC20 {
+    function transfer(address to, uint256 value) external returns (bool);
+    function transferFrom(address from, address to, uint256 value) external returns (bool);
+}

@@ -1,0 +1,101 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract StakingProtocol {
+    address public owner;
+    uint256 public totalStaked;
+    uint256 public totalRewards;
+    uint256 public rewardDuration;
+    uint256 public rewardInterval;
+    mapping(address => uint256) public stakers;
+    mapping(address => uint256) public rewards;
+    mapping(address => uint256) public boostMultipliers;
+    mapping(address => uint256) public nftHoldings;
+
+    constructor() {
+        owner = msg.sender;
+        totalStaked = 0;
+        totalRewards = 0;
+        rewardDuration = 1 days;
+        rewardInterval = 1 hours;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can perform this action");
+        _;
+    }
+
+    function stake(uint256 amount) public {
+        require(amount > 0, "Cannot stake zero tokens");
+        require(amount <= address(this).balance, "Insufficient balance");
+        totalStaked += amount;
+        stakers[msg.sender] += amount;
+    }
+
+    function withdraw(uint256 amount) public {
+        require(amount > 0, "Cannot withdraw zero tokens");
+        require(amount <= stakers[msg.sender], "Insufficient staked balance");
+        totalStaked -= amount;
+        stakers[msg.sender] -= amount;
+        payable(msg.sender).transfer(amount);
+    }
+
+    function addRewardToken(address token, uint256 rewardAmount) public onlyOwner {
+        require(token != address(0), "Invalid token address");
+        require(rewardAmount > 0, "Invalid reward amount");
+        totalRewards += rewardAmount;
+        rewards[token] += rewardAmount;
+    }
+
+    function setRewardDuration(uint256 _rewardDuration) public onlyOwner {
+        require(_rewardDuration > 0, "Invalid reward duration");
+        rewardDuration = _rewardDuration;
+    }
+
+    function setRewardInterval(uint256 _rewardInterval) public onlyOwner {
+        require(_rewardInterval > 0, "Invalid reward interval");
+        rewardInterval = _rewardInterval;
+    }
+
+    function setBoostMultiplier(address nft, uint256 multiplier) public onlyOwner {
+        require(multiplier > 0, "Invalid multiplier");
+        boostMultipliers[nft] = multiplier;
+    }
+
+    function setNFTHoldings(address nft, uint256 holdings) public onlyOwner {
+        require(holdings >= 0, "Invalid holdings");
+        nftHoldings[nft] = holdings;
+    }
+
+    function getRewardTokens() public view returns (mapping(address => uint256)) {
+        return rewards;
+    }
+
+    function getStakers() public view returns (mapping(address => uint256)) {
+        return stakers;
+    }
+
+    function getTotalStaked() public view returns (uint256) {
+        return totalStaked;
+    }
+
+    function getTotalRewards() public view returns (uint256) {
+        return totalRewards;
+    }
+
+    function getRewardDuration() public view returns (uint256) {
+        return rewardDuration;
+    }
+
+    function getRewardInterval() public view returns (uint256) {
+        return rewardInterval;
+    }
+
+    function getBoostMultiplier(address nft) public view returns (uint256) {
+        return boostMultipliers[nft];
+    }
+
+    function getNFTHoldings(address nft) public view returns (uint256) {
+        return nftHoldings[nft];
+    }
+}

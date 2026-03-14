@@ -1,0 +1,113 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract MinimalLending {
+    struct Loan {
+        address borrower;
+        uint256 amount;
+        uint256 interestRatePerSecond;
+        uint256 startTime;
+        uint256 endTime;
+        bool isActive;
+    }
+
+    mapping(uint256 => Loan) public loans;
+    uint256 public nextLoanId;
+
+    IERC20 public collateralToken;
+    IERC20 public debtToken;
+
+    constructor(address _collateralToken, address _debtToken) {
+        collateralToken = IERC20(_collateralToken);
+        debtToken = IERC20(_debtToken);
+    }
+
+    function createLoan(
+        uint256 _amount,
+        uint256 _interestRatePerSecond,
+        uint256 _durationSeconds
+    ) external {
+        require(_amount > 0, "Loan amount must be positive");
+        require(_interestRatePerSecond > 0, "Interest rate must be positive");
+        require(_durationSeconds > 0, "Duration must be positive");
+
+        uint256 loanId = nextLoanId++;
+        uint256 endTime = block.timestamp + _durationSeconds;
+
+        // Borrower must approve the contract to spend their debt tokens
+        debtToken.transferFrom(msg.sender, address(this), _amount);
+
+        loans[loanId] = Loan({
+            borrower: msg.sender,
+            amount: _amount,
+            interestRatePerSecond: _interestRatePerSecond,
+            startTime: block.timestamp,
+            endTime: endTime,
+            isActive: true
+        });
+    }
+
+    function repayLoan(uint256 _loanId) external {
+        Loan storage loan = loans[_loanId];
+        require(loan.isActive, "Loan is not active");
+        require(loan.borrower == msg.sender, "Only borrower can repay");
+
+        uint256 owedAmount = calculateOwedAmount(_loanId);
+
+        // Borrower must approve the contract to spend their debt tokens
+        debtToken.transferFrom(msg.sender, address(this), owedAmount);
+
+        // Transfer collateral back to the borrower
+        collateralToken.transfer(msg.sender, loan.amount);
+
+        loan.isActive = false;
+    }
+
+    function liquidateLoan(uint256 _loanId) external {
+        Loan storage loan = loans[_loanId];
+        require(loan.isActive, "Loan is not active");
+        require(block.timestamp > loan.endTime, "Loan not yet due for liquidation");
+
+        // Assume some liquidation logic here, e.g., a liquidator pays back the debt
+        // and takes a portion of the collateral. For simplicity, we'll just return
+        // collateral to the contract and mark the loan as inactive.
+        // In a real system, this would involve a liquidator interacting.
+
+        // For this minimal example, we'll just consider the loan defaulted and
+        // the collateral forfeited to the protocol (or a liquidator in a real scenario).
+        // In a real scenario, a liquidator would call this function, pay back the debt,
+        // and receive a portion of the collateral.
+
+        loan.isActive = false;
+    }
+
+    function calculateOwedAmount(uint256 _loanId) public view returns (uint256) {
+        Loan storage loan = loans[_loanId];
+        if (!loan.isActive) {
+            return 0;
+        }
+
+        uint256 timeElapsed = block.timestamp > loan.startTime ? block.timestamp - loan.startTime : 0;
+        uint256 interest = (loan.amount * loan.interestRatePerSecond * timeElapsed) / (10**18); // Assuming rate is per second and scaled appropriately
+        return loan.amount + interest;
+    }
+
+    // --- Functions to deposit and withdraw collateral (simplified) ---
+    // In a real lending protocol, this would be more complex, involving
+    // interest bearing tokens, reserves, etc.
+
+    function depositCollateral(uint256 _amount) external {
+        require(_amount > 0, "Deposit amount must be positive");
+        collateralToken.transferFrom(msg.sender, address(this), _amount);
+    }
+
+    function withdrawCollateral(uint256 _amount) external {
+        require(_amount > 0, "Withdrawal amount must be positive");
+        // In a real system, you'd check if the user has enough free collateral
+        // and not currently used as a loan collateral.
+        require(address(this).balance >= _amount, "Insufficient contract balance"); // Simplified check
+        collateralToken.transfer(msg.sender, _amount);
+    }
+}

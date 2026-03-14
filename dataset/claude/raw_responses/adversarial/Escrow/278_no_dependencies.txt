@@ -1,0 +1,113 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    enum State { Created, Funded, Released, Refunded, Disputed }
+
+    struct EscrowAgreement {
+        address payable buyer;
+        address payable seller;
+        uint256 amount;
+        State state;
+        uint256 createdAt;
+    }
+
+    address public arbiter;
+    uint256 public escrowCount;
+    mapping(uint256 => EscrowAgreement) public escrows;
+
+    event EscrowCreated(uint256 indexed escrowId, address indexed buyer, address indexed seller, uint256 amount);
+    event EscrowFunded(uint256 indexed escrowId);
+    event EscrowReleased(uint256 indexed escrowId);
+    event EscrowRefunded(uint256 indexed escrowId);
+    event DisputeRaised(uint256 indexed escrowId);
+
+    modifier onlyBuyer(uint256 _escrowId) {
+        require(msg.sender == escrows[_escrowId].buyer, "Not buyer");
+        _;
+    }
+
+    modifier onlyArbiter() {
+        require(msg.sender == arbiter, "Not arbiter");
+        _;
+    }
+
+    modifier inState(uint256 _escrowId, State _state) {
+        require(escrows[_escrowId].state == _state, "Invalid state");
+        _;
+    }
+
+    constructor(address _arbiter) {
+        require(_arbiter != address(0), "Invalid arbiter");
+        arbiter = _arbiter;
+    }
+
+    function createEscrow(address payable _seller) external payable returns (uint256) {
+        require(_seller != address(0), "Invalid seller");
+        require(msg.value > 0, "Must send ETH");
+        require(msg.sender != _seller, "Buyer cannot be seller");
+
+        uint256 escrowId = escrowCount++;
+        escrows[escrowId] = EscrowAgreement({
+            buyer: payable(msg.sender),
+            seller: _seller,
+            amount: msg.value,
+            state: State.Funded,
+            createdAt: block.timestamp
+        });
+
+        emit EscrowCreated(escrowId, msg.sender, _seller, msg.value);
+        emit EscrowFunded(escrowId);
+
+        return escrowId;
+    }
+
+    function release(uint256 _escrowId) external onlyBuyer(_escrowId) inState(_escrowId, State.Funded) {
+        EscrowAgreement storage escrow = escrows[_escrowId];
+        escrow.state = State.Released;
+
+        (bool success, ) = escrow.seller.call{value: escrow.amount}("");
+        require(success, "Transfer failed");
+
+        emit EscrowReleased(_escrowId);
+    }
+
+    function raiseDispute(uint256 _escrowId) external inState(_escrowId, State.Funded) {
+        EscrowAgreement storage escrow = escrows[_escrowId];
+        require(msg.sender == escrow.buyer || msg.sender == escrow.seller, "Not a party");
+
+        escrow.state = State.Disputed;
+        emit DisputeRaised(_escrowId);
+    }
+
+    function resolveDispute(uint256 _escrowId, bool _releaseToBuyer) external onlyArbiter inState(_escrowId, State.Disputed) {
+        EscrowAgreement storage escrow = escrows[_escrowId];
+
+        address payable recipient;
+        if (_releaseToBuyer) {
+            escrow.state = State.Refunded;
+            recipient = escrow.buyer;
+            emit EscrowRefunded(_escrowId);
+        } else {
+            escrow.state = State.Released;
+            recipient = escrow.seller;
+            emit EscrowReleased(_escrowId);
+        }
+
+        (bool success, ) = recipient.call{value: escrow.amount}("");
+        require(success, "Transfer failed");
+    }
+
+    function getEscrow(uint256 _escrowId) external view returns (
+        address buyer,
+        address seller,
+        uint256 amount,
+        State state,
+        uint256 createdAt
+    ) {
+        EscrowAgreement storage escrow = escrows[_escrowId];
+        return (escrow.buyer, escrow.seller, escrow.amount, escrow.state, escrow.createdAt);
+    }
+}
+```

@@ -1,0 +1,95 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract P2PLending {
+    struct Loan {
+        address payable borrower;
+        address payable lender;
+        uint256 amount;
+        uint256 interest;
+        uint256 duration;
+        uint256 collateral;
+        bool isActive;
+        bool isRepaid;
+    }
+
+    mapping(uint256 => Loan) public loans;
+    uint256 public loanCounter;
+    mapping(address => uint256) public collaterals;
+
+    event LoanCreated(uint256 loanId, address borrower, address lender, uint256 amount, uint256 interest, uint256 duration, uint256 collateral);
+    event LoanFunded(uint256 loanId);
+    event LoanRepaid(uint256 loanId);
+    event CollateralWithdrawn(uint256 loanId);
+
+    modifier onlyBorrower(uint256 loanId) {
+        require(loans[loanId].borrower == msg.sender, "Not the borrower");
+        _;
+    }
+
+    modifier onlyLender(uint256 loanId) {
+        require(loans[loanId].lender == msg.sender, "Not the lender");
+        _;
+    }
+
+    function createLoan(
+        address payable _lender,
+        uint256 _amount,
+        uint256 _interest,
+        uint256 _duration
+    ) external payable {
+        require(msg.value > 0, "Collateral required");
+
+        loans[loanCounter] = Loan({
+            borrower: payable(msg.sender),
+            lender: _lender,
+            amount: _amount,
+            interest: _interest,
+            duration: _duration,
+            collateral: msg.value,
+            isActive: false,
+            isRepaid: false
+        });
+
+        emit LoanCreated(loanCounter, msg.sender, _lender, _amount, _interest, _duration, msg.value);
+        loanCounter++;
+    }
+
+    function fundLoan(uint256 loanId) external payable onlyLender(loanId) {
+        Loan storage loan = loans[loanId];
+        require(!loan.isActive, "Loan already funded");
+        require(msg.value == loan.amount, "Incorrect funding amount");
+
+        loan.isActive = true;
+        loan.borrower.transfer(loan.amount);
+
+        emit LoanFunded(loanId);
+    }
+
+    function repayLoan(uint256 loanId) external payable onlyBorrower(loanId) {
+        Loan storage loan = loans[loanId];
+        require(loan.isActive, "Loan not active");
+        require(!loan.isRepaid, "Loan already repaid");
+        uint256 repaymentAmount = loan.amount + loan.interest;
+        require(msg.value == repaymentAmount, "Incorrect repayment amount");
+
+        loan.isRepaid = true;
+        loan.lender.transfer(repaymentAmount);
+
+        emit LoanRepaid(loanId);
+    }
+
+    function withdrawCollateral(uint256 loanId) external {
+        Loan storage loan = loans[loanId];
+        require(loan.isRepaid, "Loan not repaid");
+        require(loan.isActive, "Loan not active");
+
+        uint256 collateralAmount = loan.collateral;
+        loan.collateral = 0;
+        loan.isActive = false;
+
+        loan.borrower.transfer(collateralAmount);
+
+        emit CollateralWithdrawn(loanId);
+    }
+}

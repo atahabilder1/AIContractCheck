@@ -1,0 +1,112 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+
+contract NftEscrow {
+    address public owner;
+    IERC721 public nftContract;
+    uint256 public tokenId;
+    address public buyer;
+    address public seller;
+    uint256 public price;
+
+    enum State {
+        Created,
+        Funded,
+        Fulfilled,
+        Cancelled
+    }
+
+    State public currentState;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    modifier onlyBuyer() {
+        require(msg.sender == buyer, "Not the buyer");
+        _;
+    }
+
+    modifier onlySeller() {
+        require(msg.sender == seller, "Not the seller");
+        _;
+    }
+
+    modifier inState(State _state) {
+        require(currentState == _state, "Invalid state");
+        _;
+    }
+
+    event EscrowCreated(address indexed _buyer, address indexed _seller, address indexed _nftContract, uint256 _tokenId, uint256 _price);
+    event Funded(address indexed _buyer, uint256 _price);
+    event Fulfilled(address indexed _buyer, address indexed _seller, address indexed _nftContract, uint256 _tokenId);
+    event Cancelled(address indexed _buyer, address indexed _seller);
+
+    constructor(
+        address _nftContractAddress,
+        uint256 _tokenId,
+        address _buyer,
+        address _seller,
+        uint256 _price
+    ) {
+        owner = msg.sender;
+        nftContract = IERC721(_nftContractAddress);
+        tokenId = _tokenId;
+        buyer = _buyer;
+        seller = _seller;
+        price = _price;
+        currentState = State.Created;
+        emit EscrowCreated(_buyer, _seller, _nftContractAddress, _tokenId, _price);
+    }
+
+    function fundEscrow() external payable inState(State.Created) onlyBuyer {
+        require(msg.value == price, "Incorrect ETH amount");
+        currentState = State.Funded;
+        emit Funded(msg.sender, msg.value);
+    }
+
+    function fulfillEscrow() external inState(State.Funded) onlySeller {
+        // Seller must approve the NFT transfer to the escrow contract
+        require(nftContract.getApproved(tokenId) == address(this), "NFT not approved for escrow");
+
+        // Transfer NFT from seller to buyer
+        nftContract.transferFrom(seller, buyer, tokenId);
+
+        // Transfer ETH from escrow to seller
+        payable(seller).transfer(address(this).balance);
+
+        currentState = State.Fulfilled;
+        emit Fulfilled(buyer, seller, address(nftContract), tokenId);
+    }
+
+    function cancelEscrow() external inState(State.Funded) {
+        // Only buyer or seller can cancel if funded
+        require(msg.sender == buyer || msg.sender == seller, "Only buyer or seller can cancel");
+
+        // Return ETH to buyer
+        payable(buyer).transfer(address(this).balance);
+
+        // The NFT remains with the seller as it was never transferred
+        // No explicit NFT return needed as it's still in seller's ownership
+
+        currentState = State.Cancelled;
+        emit Cancelled(buyer, seller);
+    }
+
+    // Function to allow seller to approve the NFT transfer to this contract *before* buyer funds.
+    // This is crucial for the `fulfillEscrow` to work.
+    function approveNftTransfer() external onlySeller inState(State.Created) {
+        nftContract.approve(address(this), tokenId);
+    }
+
+    // Fallback function to receive Ether if needed, though `fundEscrow` is the primary way.
+    receive() external payable {}
+
+    // Function to recover any accidental ETH sent to the contract (e.g., if not funded correctly)
+    function withdrawETH() external onlyOwner {
+        payable(owner).transfer(address(this).balance);
+    }
+}

@@ -1,0 +1,63 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
+
+contract InGameAssets is ERC1155, Ownable {
+    using Counters for Counters.Counter;
+    Counters.Counter private _tokenTypeCounter;
+
+    mapping(uint256 => uint256) public tokenSupply;
+    mapping(uint256 => uint256) public tokenRarity;
+
+    constructor() ERC1155("") {}
+
+    function createTokenType(uint256 initialSupply, uint256 rarity) public onlyOwner {
+        _tokenTypeCounter.increment();
+        uint256 newTokenType = _tokenTypeCounter.current();
+        tokenSupply[newTokenType] = initialSupply;
+        tokenRarity[newTokenType] = rarity;
+        _mint(msg.sender, newTokenType, initialSupply, "");
+    }
+
+    function mint(address to, uint256 id, uint256 amount) public onlyOwner {
+        require(tokenSupply[id] >= amount, "Not enough tokens left to mint");
+        tokenSupply[id] -= amount;
+        _mint(to, id, amount, "");
+    }
+
+    function burn(address from, uint256 id, uint256 amount) public {
+        require(balanceOf(from, id) >= amount, "Not enough balance to burn");
+        _burn(from, id, amount);
+    }
+
+    function uri(uint256 tokenId) public view override returns (string memory) {
+        return string(abi.encodePacked("https://example.com/tokens/", uint2str(tokenId), ".json"));
+    }
+
+    function uint2str(uint256 _i) internal pure returns (string memory) {
+        if (_i == 0) {
+            return "0";
+        }
+        uint256 j = _i;
+        uint256 length;
+        while (j != 0) {
+            length++;
+            j /= 10;
+        }
+        bytes memory bstr = new bytes(length);
+        uint256 k = length;
+        while (_i != 0) {
+            k = k - 1;
+            uint8 temp = (48 + uint8(_i - _i / 10 * 10));
+            bytes1 b1 = bytes1(temp);
+            bstr[k] = b1;
+            _i /= 10;
+        }
+        return string(bstr);
+    }
+}
+```

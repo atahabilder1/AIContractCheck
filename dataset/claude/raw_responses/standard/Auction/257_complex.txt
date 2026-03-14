@@ -1,0 +1,451 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/interfaces/IERC2981.sol";
+
+contract NFTAuctionHouse is ERC721Holder, ReentrancyGuard, Ownable {
+    enum AuctionType { English, SealedBid, Batch }
+    enum AuctionState { Active, Ended, Cancelled }
+
+    struct Auction {
+        address seller;
+        address nftContract;
+        uint256 tokenId;
+        AuctionType auctionType;
+        AuctionState state;
+        uint256 startTime;
+        uint256 endTime;
+        uint256 reservePrice;
+        uint256 highestBid;
+        address highestBidder;
+        uint256 antiSnipeExtension;
+        uint256 antiSnipeThreshold;
+    }
+
+    struct SealedBidEntry {
+        bytes32 commitHash;
+        uint256 revealedAmount;
+        bool revealed;
+        bool refunded;
+    }
+
+    struct BatchItem {
+        address nftContract;
+        uint256 tokenId;
+    }
+
+    struct BatchAuction {
+        address seller;
+        BatchItem[] items;
+        AuctionState state;
+        uint256 startTime;
+        uint256 endTime;
+        uint256 reservePrice;
+        uint256 highestBid;
+        address highestBidder;
+        uint256 antiSnipeExtension;
+        uint256 antiSnipeThreshold;
+    }
+
+    uint256 public nextAuctionId;
+    uint256 public nextBatchAuctionId;
+    uint256 public platformFeeBps = 250; // 2.5%
+
+    mapping(uint256 => Auction) public auctions;
+    mapping(uint256 => mapping(address => uint256)) public englishBids;
+    mapping(uint256 => mapping(address => SealedBidEntry)) public sealedBids;
+    mapping(uint256 => address[]) public sealedBidders;
+    mapping(uint256 => uint256) public sealedBidRevealEnd;
+    mapping(uint256 => BatchAuction) public batchAuctions;
+    mapping(uint256 => mapping(address => uint256)) public batchBids;
+
+    event AuctionCreated(uint256 indexed auctionId, AuctionType auctionType, address seller, address nftContract, uint256 tokenId);
+    event BidPlaced(uint256 indexed auctionId, address bidder, uint256 amount);
+    event SealedBidCommitted(uint256 indexed auctionId, address bidder);
+    event SealedBidRevealed(uint256 indexed auctionId, address bidder, uint256 amount);
+    event AuctionEnded(uint256 indexed auctionId, address winner, uint256 amount);
+    event AuctionCancelled(uint256 indexed auctionId);
+    event BatchAuctionCreated(uint256 indexed batchAuctionId, address seller, uint256 itemCount);
+    event BatchAuctionEnded(uint256 indexed batchAuctionId, address winner, uint256 amount);
+    event AntiSnipeExtended(uint256 indexed auctionId, uint256 newEndTime);
+
+    constructor() Ownable() {}
+
+    // ========================
+    // English Auction
+    // ========================
+
+    function createEnglishAuction(
+        address _nftContract,
+        uint256 _tokenId,
+        uint256 _reservePrice,
+        uint256 _duration,
+        uint256 _antiSnipeExtension,
+        uint256 _antiSnipeThreshold
+    ) external returns (uint256) {
+        require(_duration > 0, "Invalid duration");
+        IERC721(_nftContract).transferFrom(msg.sender, address(this), _tokenId);
+
+        uint256 auctionId = nextAuctionId++;
+        auctions[auctionId] = Auction({
+            seller: msg.sender,
+            nftContract: _nftContract,
+            tokenId: _tokenId,
+            auctionType: AuctionType.English,
+            state: AuctionState.Active,
+            startTime: block.timestamp,
+            endTime: block.timestamp + _duration,
+            reservePrice: _reservePrice,
+            highestBid: 0,
+            highestBidder: address(0),
+            antiSnipeExtension: _antiSnipeExtension,
+            antiSnipeThreshold: _antiSnipeThreshold > 0 ? _antiSnipeThreshold : 5 minutes
+        });
+
+        emit AuctionCreated(auctionId, AuctionType.English, msg.sender, _nftContract, _tokenId);
+        return auctionId;
+    }
+
+    function placeBid(uint256 _auctionId) external payable nonReentrant {
+        Auction storage auction = auctions[_auctionId];
+        require(auction.auctionType == AuctionType.English, "Not English auction");
+        require(auction.state == AuctionState.Active, "Not active");
+        require(block.timestamp < auction.endTime, "Auction ended");
+        require(msg.value > auction.highestBid, "Bid too low");
+        require(msg.value >= auction.reservePrice, "Below reserve");
+
+        if (auction.highestBidder != address(0)) {
+            englishBids[_auctionId][auction.highestBidder] += auction.highestBid;
+        }
+
+        auction.highestBid = msg.value;
+        auction.highestBidder = msg.sender;
+
+        // Anti-sniping
+        if (auction.endTime - block.timestamp < auction.antiSnipeThreshold) {
+            auction.endTime += auction.antiSnipeExtension;
+            emit AntiSnipeExtended(_auctionId, auction.endTime);
+        }
+
+        emit BidPlaced(_auctionId, msg.sender, msg.value);
+    }
+
+    function withdrawBid(uint256 _auctionId) external nonReentrant {
+        uint256 amount = englishBids[_auctionId][msg.sender];
+        require(amount > 0, "Nothing to withdraw");
+        englishBids[_auctionId][msg.sender] = 0;
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        require(success, "Transfer failed");
+    }
+
+    function endEnglishAuction(uint256 _auctionId) external nonReentrant {
+        Auction storage auction = auctions[_auctionId];
+        require(auction.auctionType == AuctionType.English, "Not English auction");
+        require(auction.state == AuctionState.Active, "Not active");
+        require(block.timestamp >= auction.endTime, "Not ended yet");
+
+        auction.state = AuctionState.Ended;
+
+        if (auction.highestBidder == address(0)) {
+            IERC721(auction.nftContract).transferFrom(address(this), auction.seller, auction.tokenId);
+        } else {
+            _settlePayment(auction.nftContract, auction.tokenId, auction.seller, auction.highestBid);
+            IERC721(auction.nftContract).transferFrom(address(this), auction.highestBidder, auction.tokenId);
+        }
+
+        emit AuctionEnded(_auctionId, auction.highestBidder, auction.highestBid);
+    }
+
+    // ========================
+    // Sealed-Bid Auction
+    // ========================
+
+    function createSealedBidAuction(
+        address _nftContract,
+        uint256 _tokenId,
+        uint256 _reservePrice,
+        uint256 _biddingDuration,
+        uint256 _revealDuration
+    ) external returns (uint256) {
+        require(_biddingDuration > 0 && _revealDuration > 0, "Invalid duration");
+        IERC721(_nftContract).transferFrom(msg.sender, address(this), _tokenId);
+
+        uint256 auctionId = nextAuctionId++;
+        auctions[auctionId] = Auction({
+            seller: msg.sender,
+            nftContract: _nftContract,
+            tokenId: _tokenId,
+            auctionType: AuctionType.SealedBid,
+            state: AuctionState.Active,
+            startTime: block.timestamp,
+            endTime: block.timestamp + _biddingDuration,
+            reservePrice: _reservePrice,
+            highestBid: 0,
+            highestBidder: address(0),
+            antiSnipeExtension: 0,
+            antiSnipeThreshold: 0
+        });
+
+        sealedBidRevealEnd[auctionId] = block.timestamp + _biddingDuration + _revealDuration;
+
+        emit AuctionCreated(auctionId, AuctionType.SealedBid, msg.sender, _nftContract, _tokenId);
+        return auctionId;
+    }
+
+    function commitSealedBid(uint256 _auctionId, bytes32 _commitHash) external payable {
+        Auction storage auction = auctions[_auctionId];
+        require(auction.auctionType == AuctionType.SealedBid, "Not sealed-bid");
+        require(auction.state == AuctionState.Active, "Not active");
+        require(block.timestamp < auction.endTime, "Bidding closed");
+        require(sealedBids[_auctionId][msg.sender].commitHash == bytes32(0), "Already committed");
+
+        sealedBids[_auctionId][msg.sender] = SealedBidEntry({
+            commitHash: _commitHash,
+            revealedAmount: 0,
+            revealed: false,
+            refunded: false
+        });
+        sealedBidders[_auctionId].push(msg.sender);
+
+        emit SealedBidCommitted(_auctionId, msg.sender);
+    }
+
+    function generateCommitHash(uint256 _amount, bytes32 _salt) external pure returns (bytes32) {
+        return keccak256(abi.encodePacked(_amount, _salt));
+    }
+
+    function revealSealedBid(uint256 _auctionId, uint256 _amount, bytes32 _salt) external payable nonReentrant {
+        Auction storage auction = auctions[_auctionId];
+        require(auction.auctionType == AuctionType.SealedBid, "Not sealed-bid");
+        require(block.timestamp >= auction.endTime, "Bidding not closed");
+        require(block.timestamp < sealedBidRevealEnd[_auctionId], "Reveal closed");
+
+        SealedBidEntry storage entry = sealedBids[_auctionId][msg.sender];
+        require(entry.commitHash != bytes32(0), "No commit");
+        require(!entry.revealed, "Already revealed");
+        require(keccak256(abi.encodePacked(_amount, _salt)) == entry.commitHash, "Invalid reveal");
+        require(msg.value == _amount, "Must send bid amount");
+
+        entry.revealed = true;
+        entry.revealedAmount = _amount;
+
+        if (_amount > auction.highestBid && _amount >= auction.reservePrice) {
+            if (auction.highestBidder != address(0)) {
+                // Refund previous highest bidder
+                SealedBidEntry storage prevEntry = sealedBids[_auctionId][auction.highestBidder];
+                prevEntry.refunded = true;
+                (bool success, ) = payable(auction.highestBidder).call{value: auction.highestBid}("");
+                require(success, "Refund failed");
+            }
+            auction.highestBid = _amount;
+            auction.highestBidder = msg.sender;
+        } else {
+            entry.refunded = true;
+            (bool success, ) = payable(msg.sender).call{value: _amount}("");
+            require(success, "Refund failed");
+        }
+
+        emit SealedBidRevealed(_auctionId, msg.sender, _amount);
+    }
+
+    function endSealedBidAuction(uint256 _auctionId) external nonReentrant {
+        Auction storage auction = auctions[_auctionId];
+        require(auction.auctionType == AuctionType.SealedBid, "Not sealed-bid");
+        require(auction.state == AuctionState.Active, "Not active");
+        require(block.timestamp >= sealedBidRevealEnd[_auctionId], "Reveal not ended");
+
+        auction.state = AuctionState.Ended;
+
+        if (auction.highestBidder == address(0)) {
+            IERC721(auction.nftContract).transferFrom(address(this), auction.seller, auction.tokenId);
+        } else {
+            _settlePayment(auction.nftContract, auction.tokenId, auction.seller, auction.highestBid);
+            IERC721(auction.nftContract).transferFrom(address(this), auction.highestBidder, auction.tokenId);
+        }
+
+        emit AuctionEnded(_auctionId, auction.highestBidder, auction.highestBid);
+    }
+
+    // ========================
+    // Batch Auction
+    // ========================
+
+    function createBatchAuction(
+        address[] calldata _nftContracts,
+        uint256[] calldata _tokenIds,
+        uint256 _reservePrice,
+        uint256 _duration,
+        uint256 _antiSnipeExtension,
+        uint256 _antiSnipeThreshold
+    ) external returns (uint256) {
+        require(_nftContracts.length == _tokenIds.length, "Length mismatch");
+        require(_nftContracts.length > 0, "Empty batch");
+        require(_duration > 0, "Invalid duration");
+
+        uint256 batchId = nextBatchAuctionId++;
+        BatchAuction storage batch = batchAuctions[batchId];
+        batch.seller = msg.sender;
+        batch.state = AuctionState.Active;
+        batch.startTime = block.timestamp;
+        batch.endTime = block.timestamp + _duration;
+        batch.reservePrice = _reservePrice;
+        batch.antiSnipeExtension = _antiSnipeExtension;
+        batch.antiSnipeThreshold = _antiSnipeThreshold > 0 ? _antiSnipeThreshold : 5 minutes;
+
+        for (uint256 i = 0; i < _nftContracts.length; i++) {
+            IERC721(_nftContracts[i]).transferFrom(msg.sender, address(this), _tokenIds[i]);
+            batch.items.push(BatchItem({
+                nftContract: _nftContracts[i],
+                tokenId: _tokenIds[i]
+            }));
+        }
+
+        emit BatchAuctionCreated(batchId, msg.sender, _nftContracts.length);
+        return batchId;
+    }
+
+    function placeBatchBid(uint256 _batchId) external payable nonReentrant {
+        BatchAuction storage batch = batchAuctions[_batchId];
+        require(batch.state == AuctionState.Active, "Not active");
+        require(block.timestamp < batch.endTime, "Auction ended");
+        require(msg.value > batch.highestBid, "Bid too low");
+        require(msg.value >= batch.reservePrice, "Below reserve");
+
+        if (batch.highestBidder != address(0)) {
+            batchBids[_batchId][batch.highestBidder] += batch.highestBid;
+        }
+
+        batch.highestBid = msg.value;
+        batch.highestBidder = msg.sender;
+
+        if (batch.endTime - block.timestamp < batch.antiSnipeThreshold) {
+            batch.endTime += batch.antiSnipeExtension;
+            emit AntiSnipeExtended(_batchId, batch.endTime);
+        }
+
+        emit BidPlaced(_batchId, msg.sender, msg.value);
+    }
+
+    function withdrawBatchBid(uint256 _batchId) external nonReentrant {
+        uint256 amount = batchBids[_batchId][msg.sender];
+        require(amount > 0, "Nothing to withdraw");
+        batchBids[_batchId][msg.sender] = 0;
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        require(success, "Transfer failed");
+    }
+
+    function endBatchAuction(uint256 _batchId) external nonReentrant {
+        BatchAuction storage batch = batchAuctions[_batchId];
+        require(batch.state == AuctionState.Active, "Not active");
+        require(block.timestamp >= batch.endTime, "Not ended yet");
+
+        batch.state = AuctionState.Ended;
+
+        if (batch.highestBidder == address(0)) {
+            for (uint256 i = 0; i < batch.items.length; i++) {
+                IERC721(batch.items[i].nftContract).transferFrom(
+                    address(this), batch.seller, batch.items[i].tokenId
+                );
+            }
+        } else {
+            uint256 perItemAmount = batch.highestBid / batch.items.length;
+            uint256 remainder = batch.highestBid - (perItemAmount * batch.items.length);
+
+            for (uint256 i = 0; i < batch.items.length; i++) {
+                uint256 itemPayment = perItemAmount;
+                if (i == 0) itemPayment += remainder;
+                _settlePayment(batch.items[i].nftContract, batch.items[i].tokenId, batch.seller, itemPayment);
+                IERC721(batch.items[i].nftContract).transferFrom(
+                    address(this), batch.highestBidder, batch.items[i].tokenId
+                );
+            }
+        }
+
+        emit BatchAuctionEnded(_batchId, batch.highestBidder, batch.highestBid);
+    }
+
+    // ========================
+    // Cancel
+    // ========================
+
+    function cancelAuction(uint256 _auctionId) external nonReentrant {
+        Auction storage auction = auctions[_auctionId];
+        require(msg.sender == auction.seller, "Not seller");
+        require(auction.state == AuctionState.Active, "Not active");
+        require(auction.highestBidder == address(0), "Has bids");
+
+        auction.state = AuctionState.Cancelled;
+        IERC721(auction.nftContract).transferFrom(address(this), auction.seller, auction.tokenId);
+
+        emit AuctionCancelled(_auctionId);
+    }
+
+    function cancelBatchAuction(uint256 _batchId) external nonReentrant {
+        BatchAuction storage batch = batchAuctions[_batchId];
+        require(msg.sender == batch.seller, "Not seller");
+        require(batch.state == AuctionState.Active, "Not active");
+        require(batch.highestBidder == address(0), "Has bids");
+
+        batch.state = AuctionState.Cancelled;
+        for (uint256 i = 0; i < batch.items.length; i++) {
+            IERC721(batch.items[i].nftContract).transferFrom(
+                address(this), batch.seller, batch.items[i].tokenId
+            );
+        }
+    }
+
+    // ========================
+    // Internal & Admin
+    // ========================
+
+    function _settlePayment(
+        address _nftContract,
+        uint256 _tokenId,
+        address _seller,
+        uint256 _amount
+    ) internal {
+        uint256 platformFee = (_amount * platformFeeBps) / 10000;
+        uint256 royaltyAmount = 0;
+        address royaltyRecipient = address(0);
+
+        // Check ERC-2981 royalty
+        try IERC2981(_nftContract).royaltyInfo(_tokenId, _amount) returns (
+            address receiver, uint256 amount
+        ) {
+            royaltyRecipient = receiver;
+            royaltyAmount = amount;
+        } catch {}
+
+        uint256 sellerProceeds = _amount - platformFee - royaltyAmount;
+
+        if (royaltyAmount > 0 && royaltyRecipient != address(0)) {
+            (bool royaltySuccess, ) = payable(royaltyRecipient).call{value: royaltyAmount}("");
+            require(royaltySuccess, "Royalty transfer failed");
+        }
+
+        (bool sellerSuccess, ) = payable(_seller).call{value: sellerProceeds}("");
+        require(sellerSuccess, "Seller transfer failed");
+
+        (bool feeSuccess, ) = payable(owner()).call{value: platformFee}("");
+        require(feeSuccess, "Fee transfer failed");
+    }
+
+    function setPlatformFeeBps(uint256 _feeBps) external onlyOwner {
+        require(_feeBps <= 1000, "Fee too high");
+        platformFeeBps = _feeBps;
+    }
+
+    function getBatchItems(uint256 _batchId) external view returns (BatchItem[] memory) {
+        return batchAuctions[_batchId].items;
+    }
+
+    function getSealedBidders(uint256 _auctionId) external view returns (address[] memory) {
+        return sealedBidders[_auctionId];
+    }
+}
+```

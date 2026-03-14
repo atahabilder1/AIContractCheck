@@ -1,0 +1,103 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract Timelock {
+    address public owner;
+    uint256 public delay;
+    uint256 public constant MIN_DELAY = 1 hours;
+    uint256 public constant MAX_DELAY = 30 days;
+    uint256 public constant GRACE_PERIOD = 14 days;
+
+    mapping(bytes32 => bool) public queued;
+
+    event Queue(bytes32 indexed txId, address indexed target, uint256 value, string func, bytes data, uint256 timestamp);
+    event Execute(bytes32 indexed txId, address indexed target, uint256 value, string func, bytes data, uint256 timestamp);
+    event Cancel(bytes32 indexed txId);
+
+    error NotOwner();
+    error InvalidDelay();
+    error TxNotQueued();
+    error TxAlreadyQueued();
+    error TimestampNotInRange();
+    error TimestampNotPassed();
+    error TimestampExpired();
+    error TxFailed();
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert NotOwner();
+        _;
+    }
+
+    constructor(uint256 _delay) {
+        if (_delay < MIN_DELAY || _delay > MAX_DELAY) revert InvalidDelay();
+        owner = msg.sender;
+        delay = _delay;
+    }
+
+    function getTxId(
+        address _target,
+        uint256 _value,
+        string calldata _func,
+        bytes calldata _data,
+        uint256 _timestamp
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encode(_target, _value, _func, _data, _timestamp));
+    }
+
+    function queue(
+        address _target,
+        uint256 _value,
+        string calldata _func,
+        bytes calldata _data,
+        uint256 _timestamp
+    ) external onlyOwner returns (bytes32 txId) {
+        txId = getTxId(_target, _value, _func, _data, _timestamp);
+
+        if (queued[txId]) revert TxAlreadyQueued();
+        if (_timestamp < block.timestamp + delay || _timestamp > block.timestamp + MAX_DELAY) {
+            revert TimestampNotInRange();
+        }
+
+        queued[txId] = true;
+        emit Queue(txId, _target, _value, _func, _data, _timestamp);
+    }
+
+    function execute(
+        address _target,
+        uint256 _value,
+        string calldata _func,
+        bytes calldata _data,
+        uint256 _timestamp
+    ) external payable onlyOwner returns (bytes memory) {
+        bytes32 txId = getTxId(_target, _value, _func, _data, _timestamp);
+
+        if (!queued[txId]) revert TxNotQueued();
+        if (block.timestamp < _timestamp) revert TimestampNotPassed();
+        if (block.timestamp > _timestamp + GRACE_PERIOD) revert TimestampExpired();
+
+        queued[txId] = false;
+
+        bytes memory data;
+        if (bytes(_func).length > 0) {
+            data = abi.encodePacked(bytes4(keccak256(bytes(_func))), _data);
+        } else {
+            data = _data;
+        }
+
+        (bool ok, bytes memory res) = _target.call{value: _value}(data);
+        if (!ok) revert TxFailed();
+
+        emit Execute(txId, _target, _value, _func, _data, _timestamp);
+        return res;
+    }
+
+    function cancel(bytes32 _txId) external onlyOwner {
+        if (!queued[_txId]) revert TxNotQueued();
+        queued[_txId] = false;
+        emit Cancel(_txId);
+    }
+
+    receive() external payable {}
+}
+```

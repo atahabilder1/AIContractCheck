@@ -1,0 +1,40 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+contract Escrow {
+    address public immutable arbiter;
+    address public immutable depositor;
+    address public immutable beneficiary;
+
+    bool public isApproved;
+
+    event Approved(uint256 amount);
+
+    constructor(address _arbiter, address _beneficiary) payable {
+        arbiter = _arbiter;
+        depositor = msg.sender;
+        beneficiary = _beneficiary;
+    }
+
+    function approve() external {
+        require(msg.sender == arbiter, "Not arbiter");
+        require(!isApproved, "Already approved");
+
+        isApproved = true;
+        uint256 bal = address(this).balance;
+        emit Approved(bal);
+
+        (bool ok,) = beneficiary.call{value: bal}("");
+        require(ok, "Transfer failed");
+    }
+
+    function refund() external {
+        require(msg.sender == arbiter, "Not arbiter");
+        require(!isApproved, "Already approved");
+
+        (bool ok,) = depositor.call{value: address(this).balance}("");
+        require(ok, "Transfer failed");
+    }
+}
+```

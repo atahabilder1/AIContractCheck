@@ -1,0 +1,113 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Governance {
+  // Governance data structure
+  struct Proposal {
+    uint id;
+    address proposer;
+    uint votesFor;
+    uint votesAgainst;
+    bool executed;
+    bool canceled;
+    mapping(address => bool) votes;
+  }
+
+  // Governance variables
+  address public owner;
+  uint public numProposals;
+  mapping(uint => Proposal) public proposals;
+
+  // Modifiers
+  modifier onlyOwner() {
+    require(msg.sender == owner, "Only the owner can perform this action");
+    _;
+  }
+
+  // Constructor
+  constructor() public {
+    owner = msg.sender;
+  }
+
+  // Propose a new proposal
+  function propose(string memory _description, address _targetContract, bytes memory _data) public {
+    require(msg.sender == owner, "Only the owner can propose a new proposal");
+    Proposal memory newProposal = Proposal({
+      id: numProposals,
+      proposer: msg.sender,
+      votesFor: 0,
+      votesAgainst: 0,
+      executed: false,
+      canceled: false,
+      votes: new mapping(address => bool)
+    });
+    proposals[numProposals] = newProposal;
+    numProposals++;
+  }
+
+  // Vote on a proposal
+  function vote(uint _proposalId, bool _vote) public {
+    require(msg.sender == owner, "Only the owner can vote on a proposal");
+    Proposal storage proposal = proposals[_proposalId];
+    require(proposal.executed == false, "Proposal has already been executed");
+    require(proposal.canceled == false, "Proposal has been canceled");
+    if (_vote == true) {
+      proposal.votesFor++;
+    } else {
+      proposal.votesAgainst++;
+    }
+    proposal.votes[msg.sender] = _vote;
+  }
+
+  // Execute a proposal
+  function execute(uint _proposalId) public {
+    require(msg.sender == owner, "Only the owner can execute a proposal");
+    Proposal storage proposal = proposals[_proposalId];
+    require(proposal.executed == false, "Proposal has already been executed");
+    require(proposal.canceled == false, "Proposal has been canceled");
+    proposal.executed = true;
+    // Execute the proposal
+    _targetContract.call(proposal.data);
+  }
+
+  // Cancel a proposal
+  function cancel(uint _proposalId) public {
+    require(msg.sender == owner, "Only the owner can cancel a proposal");
+    Proposal storage proposal = proposals[_proposalId];
+    require(proposal.executed == false, "Proposal has already been executed");
+    require(proposal.canceled == false, "Proposal has been canceled");
+    proposal.canceled = true;
+  }
+
+  // Get the number of proposals
+  function getNumProposals() public view returns (uint) {
+    return numProposals;
+  }
+
+  // Get a proposal by ID
+  function getProposal(uint _proposalId) public view returns (Proposal memory) {
+    return proposals[_proposalId];
+  }
+
+  // Get the number of votes for a proposal
+  function getNumVotes(uint _proposalId) public view returns (uint) {
+    Proposal storage proposal = proposals[_proposalId];
+    return proposal.votesFor + proposal.votesAgainst;
+  }
+
+  // Get the number of votes for a proposal by address
+  function getNumVotesByAddress(uint _proposalId, address _address) public view returns (uint) {
+    Proposal storage proposal = proposals[_proposalId];
+    return proposal.votes[_address];
+  }
+
+  // Get the number of votes for a proposal by address and vote type
+  function getNumVotesByAddressAndVoteType(uint _proposalId, address _address, bool _vote) public view returns (uint) {
+    Proposal storage proposal = proposals[_proposalId];
+    if (_vote == true) {
+      return proposal.votesFor[_address];
+    } else {
+      return proposal.votesAgainst[_address];
+    }
+  }
+}

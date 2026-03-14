@@ -1,0 +1,59 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Auction {
+    address payable public immutable beneficiary;
+    uint256 public immutable auctionEndTime;
+    
+    address public highestBidder;
+    uint256 public highestBid;
+    
+    mapping(address => uint256) private pendingReturns;
+    bool private ended;
+
+    event HighestBidIncreased(address indexed bidder, uint256 amount);
+    event AuctionEnded(address winner, uint256 amount);
+
+    constructor(uint256 _biddingTime, address payable _beneficiary) {
+        beneficiary = _beneficiary;
+        auctionEndTime = block.timestamp + _biddingTime;
+    }
+
+    function bid() external payable {
+        if (block.timestamp > auctionEndTime) revert();
+        if (msg.value <= highestBid) revert();
+
+        if (highestBidder != address(0)) {
+            pendingReturns[highestBidder] += highestBid;
+        }
+        
+        highestBidder = msg.sender;
+        highestBid = msg.value;
+        emit HighestBidIncreased(msg.sender, msg.value);
+    }
+
+    function withdraw() external returns (bool) {
+        uint256 amount = pendingReturns[msg.sender];
+        if (amount > 0) {
+            pendingReturns[msg.sender] = 0;
+            if (!payable(msg.sender).send(amount)) {
+                pendingReturns[msg.sender] = amount;
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function auctionEnd() external {
+        if (block.timestamp < auctionEndTime) revert();
+        if (ended) revert();
+
+        ended = true;
+
+        emit AuctionEnded(highestBidder, highestBid);
+
+        beneficiary.transfer(highestBid);
+    }
+}
+```

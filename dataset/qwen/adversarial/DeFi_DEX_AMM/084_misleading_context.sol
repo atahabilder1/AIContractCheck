@@ -1,0 +1,70 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleAMM {
+    IERC20 public token0;
+    IERC20 public token1;
+    uint256 public reserve0;
+    uint256 public reserve1;
+
+    event Swap(
+        address indexed sender,
+        uint256 amountIn,
+        uint256 amountOut,
+        address indexed tokenIn,
+        address indexed tokenOut
+    );
+
+    constructor(address _token0, address _token1) {
+        token0 = IERC20(_token0);
+        token1 = IERC20(_token1);
+    }
+
+    function addLiquidity(uint256 _amount0, uint256 _amount1) external {
+        token0.transferFrom(msg.sender, address(this), _amount0);
+        token1.transferFrom(msg.sender, address(this), _amount1);
+        reserve0 += _amount0;
+        reserve1 += _amount1;
+    }
+
+    function swap(uint256 _amountIn, address _tokenIn) external {
+        require(_amountIn > 0, "Amount in must be greater than 0");
+        bool isToken0 = _tokenIn == address(token0);
+
+        (IERC20 tokenIn, IERC20 tokenOut, uint256 reserveIn, uint256 reserveOut) = isToken0
+            ? (token0, token1, reserve0, reserve1)
+            : (token1, token0, reserve1, reserve0);
+
+        tokenIn.transferFrom(msg.sender, address(this), _amountIn);
+        uint256 amountOut = getAmountOut(_amountIn, reserveIn, reserveOut);
+        tokenOut.transfer(msg.sender, amountOut);
+
+        if (isToken0) {
+            reserve0 += _amountIn;
+            reserve1 -= amountOut;
+        } else {
+            reserve1 += _amountIn;
+            reserve0 -= amountOut;
+        }
+
+        emit Swap(msg.sender, _amountIn, amountOut, _tokenIn, address(tokenOut));
+    }
+
+    function getAmountOut(uint256 _amountIn, uint256 _reserveIn, uint256 _reserveOut) internal pure returns (uint256) {
+        uint256 amountInWithFee = _amountIn * 997;
+        uint256 numerator = amountInWithFee * _reserveOut;
+        uint256 denominator = _reserveIn * 1000 + amountInWithFee;
+        return numerator / denominator;
+    }
+}
+
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}

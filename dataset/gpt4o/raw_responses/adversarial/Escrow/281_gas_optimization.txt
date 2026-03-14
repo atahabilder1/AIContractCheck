@@ -1,0 +1,51 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address public immutable buyer;
+    address public immutable seller;
+    address public immutable arbiter;
+    uint256 public immutable amount;
+
+    enum State { AWAITING_PAYMENT, AWAITING_DELIVERY, COMPLETE }
+    State public state;
+
+    constructor(address _buyer, address _seller, address _arbiter) payable {
+        require(msg.value > 0, "Must deposit some ether");
+        buyer = _buyer;
+        seller = _seller;
+        arbiter = _arbiter;
+        amount = msg.value;
+        state = State.AWAITING_PAYMENT;
+    }
+
+    modifier onlyBuyer() {
+        require(msg.sender == buyer, "Only buyer can call this");
+        _;
+    }
+
+    modifier onlyArbiter() {
+        require(msg.sender == arbiter, "Only arbiter can call this");
+        _;
+    }
+
+    function deposit() external payable onlyBuyer {
+        require(state == State.AWAITING_PAYMENT, "Already paid");
+        require(msg.value == amount, "Incorrect deposit amount");
+        state = State.AWAITING_DELIVERY;
+    }
+
+    function confirmDelivery() external onlyBuyer {
+        require(state == State.AWAITING_DELIVERY, "Cannot confirm delivery");
+        state = State.COMPLETE;
+        payable(seller).transfer(amount);
+    }
+
+    function refundBuyer() external onlyArbiter {
+        require(state == State.AWAITING_DELIVERY, "Cannot refund");
+        state = State.COMPLETE;
+        payable(buyer).transfer(amount);
+    }
+}
+```

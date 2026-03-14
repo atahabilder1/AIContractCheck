@@ -1,0 +1,73 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address public owner;
+    uint256 public minStake;
+    uint256 public slashPenalty;
+    mapping(address => uint256) public stakes;
+    mapping(bytes32 => bool) public processedMessages;
+    mapping(address => bool) public validators;
+
+    event Staked(address indexed validator, uint256 amount);
+    event Unstaked(address indexed validator, uint256 amount);
+    event MessageProcessed(bytes32 indexed messageId);
+    event ValidatorSlashed(address indexed validator, uint256 penalty);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    modifier onlyValidator() {
+        require(validators[msg.sender], "Not a validator");
+        _;
+    }
+
+    constructor(uint256 _minStake, uint256 _slashPenalty) {
+        owner = msg.sender;
+        minStake = _minStake;
+        slashPenalty = _slashPenalty;
+    }
+
+    function addValidator(address _validator) external onlyOwner {
+        validators[_validator] = true;
+    }
+
+    function removeValidator(address _validator) external onlyOwner {
+        validators[_validator] = false;
+    }
+
+    function stake() external payable onlyValidator {
+        stakes[msg.sender] += msg.value;
+        require(stakes[msg.sender] >= minStake, "Insufficient stake");
+        emit Staked(msg.sender, msg.value);
+    }
+
+    function unstake(uint256 _amount) external onlyValidator {
+        require(stakes[msg.sender] >= _amount, "Insufficient stake");
+        stakes[msg.sender] -= _amount;
+        payable(msg.sender).transfer(_amount);
+        emit Unstaked(msg.sender, _amount);
+    }
+
+    function processMessage(bytes32 _messageId, bytes calldata _signature) external onlyValidator {
+        require(!processedMessages[_messageId], "Message already processed");
+        require(verifySignature(_messageId, _signature), "Invalid signature");
+
+        processedMessages[_messageId] = true;
+        emit MessageProcessed(_messageId);
+    }
+
+    function verifySignature(bytes32 _messageId, bytes calldata _signature) internal view returns (bool) {
+        // Implement signature verification logic
+        // This is a placeholder
+        return true;
+    }
+
+    function slashValidator(address _validator) external onlyOwner {
+        require(stakes[_validator] >= slashPenalty, "Insufficient stake to slash");
+        stakes[_validator] -= slashPenalty;
+        emit ValidatorSlashed(_validator, slashPenalty);
+    }
+}

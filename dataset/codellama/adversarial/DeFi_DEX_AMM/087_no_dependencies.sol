@@ -1,0 +1,29 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiDEX {
+    address public owner;
+    mapping(address => uint) public balances;
+
+    constructor() public {
+        owner = msg.sender;
+    }
+
+    function deposit(uint amount) public {
+        require(msg.value == amount, "Invalid amount");
+        balances[msg.sender] += amount;
+    }
+
+    function withdraw(uint amount) public {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        balances[msg.sender] -= amount;
+        msg.sender.transfer(amount);
+    }
+
+    function swap(uint amount, address recipient) public {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        require(recipient != address(0), "Invalid recipient");
+        balances[msg.sender] -= amount;
+        balances[recipient] += amount;
+    }
+}

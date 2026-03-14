@@ -5,145 +5,102 @@
 
 \subsection{RQ1: Vulnerability Prevalence}
 
-\textbf{Finding: \demo{78.4}\% of LLM-generated contracts contain at least one vulnerability.}
+\textbf{Finding: 72.7\% of compilable LLM-generated contracts contain at least one vulnerability.}
 
-Across 1,500 generated contracts, our analysis pipeline detected a total of \demo{8,734} vulnerabilities after deduplication. Of the 1,500 contracts, \demo{1,369} (\demo{91.3}\%) compiled successfully; our analysis considers only compilable contracts. Table~\ref{tab:overall} summarizes the overall prevalence by severity.
+Across 1,800 generated contracts, 1,181 (65.6\%) compiled successfully. Our analysis considers only compilable contracts; contracts that fail compilation represent a separate quality dimension analyzed below. On the compiled subset, our pipeline detected a total of 4,496 vulnerabilities after cross-tool deduplication. Table~\ref{tab:overall} summarizes the overall prevalence by severity.
 
 \begin{table}[t]
-\caption{Overall Vulnerability Prevalence Across All LLMs}
+\caption{Overall Vulnerability Prevalence (Compiled Contracts Only, $n=1{,}181$)}
 \label{tab:overall}
 \centering
 \begin{tabular}{@{}lrrr@{}}
 \toprule
 \textbf{Severity} & \textbf{Count} & \textbf{\% of Total} & \textbf{Contracts Affected} \\
 \midrule
-High & \demo{1,847} & \demo{21.2}\% & \demo{612} (\demo{40.8}\%) \\
-Medium & \demo{3,291} & \demo{37.7}\% & \demo{893} (\demo{59.5}\%) \\
-Low & \demo{2,514} & \demo{28.8}\% & \demo{784} (\demo{52.3}\%) \\
-Informational & \demo{1,082} & \demo{12.4}\% & \demo{567} (\demo{37.8}\%) \\
+High & 670 & 14.9\% & 337 (28.5\%) \\
+Medium & 1,496 & 33.3\% & 515 (43.6\%) \\
+Low & 2,330 & 51.8\% & 758 (64.2\%) \\
 \midrule
-\textbf{Total} & \textbf{\demo{8,734}} & \textbf{100\%} & \textbf{\demo{1,176} (\demo{78.4}\%)} \\
+\textbf{Total} & \textbf{4,496} & \textbf{100\%} & \textbf{858 (72.7\%)} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-On average, each contract contains \demo{5.82} vulnerabilities (SD = \demo{3.47}), with a median of \demo{5} and a range of 0 to \demo{19}. The distribution is right-skewed (skewness = \demo{0.84}), with a long tail of contracts containing 10+ vulnerabilities, predominantly in complex categories such as cross-chain bridges and flash loans. The compilation success rate was \demo{91.3}\% (\demo{1,369} of 1,500), with CodeLlama exhibiting the highest compilation failure rate (\demo{14.7}\%), primarily due to syntax errors in complex contracts.
+On average, each compiled contract contains 3.81 vulnerabilities (SD = 4.89), with a median of 2 and a range of 0 to 53. The distribution is heavily right-skewed (skewness = 3.04), with a long tail of contracts containing 10+ vulnerabilities, predominantly in complex categories such as DeFi staking and auctions.
 
-Notably, \demo{40.8}\% of contracts contain at least one \emph{high-severity} vulnerability---one that could lead to direct financial loss if exploited. This is particularly concerning given that developers may deploy these contracts with minimal review~\cite{perry2023users}.
+\textbf{Compilation rates vary dramatically across LLMs}, representing a critical and previously unreported quality dimension. GPT-4o achieves the highest compilation rate (90.0\%), while CodeLlama compiles only 34.7\% of contracts. This means that CodeLlama's apparently low vulnerability counts in raw analyses are an artifact of compilation failure, not superior security. When analyzing only compiled contracts, the vulnerability landscape changes substantially.
+
+28.5\% of compiled contracts contain at least one \emph{high-severity} vulnerability---one that could lead to direct financial loss if exploited. This is particularly concerning given that developers may deploy these contracts with minimal review~\cite{perry2023users}.
 
 \subsection{RQ2: Cross-LLM Comparison}
 
-\textbf{Finding: Significant differences exist across LLMs ($p < 0.001$).}
+\textbf{Finding: Significant differences exist across LLMs ($H = 138.8$, $p < 0.001$).}
 
-Table~\ref{tab:llm_comparison} presents the per-LLM vulnerability statistics. A Kruskal-Wallis test confirms statistically significant differences in vulnerability counts across LLMs ($H = \demo{87.34}$, $p < 0.001$).
+Table~\ref{tab:llm_comparison} presents the per-LLM vulnerability statistics for compiled contracts only. A Kruskal-Wallis test confirms statistically significant differences in vulnerability counts across LLMs ($H = 138.8$, $p < 10^{-28}$).
 
 \begin{table}[t]
-\caption{Vulnerability Statistics by LLM}
+\caption{Vulnerability Statistics by LLM (Compiled Contracts Only)}
 \label{tab:llm_comparison}
+\centering
+\footnotesize
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+\textbf{Metric} & \textbf{GPT-4o} & \textbf{Claude} & \textbf{Gemini} & \textbf{DeepSeek} & \textbf{Qwen} & \textbf{CodeLlama} \\
+\midrule
+Compiled ($n$) & 270 & 216 & 149 & 205 & 237 & 104 \\
+Total Vulns & 824 & 1,609 & 674 & 610 & 651 & 128 \\
+Mean/Contract & 3.05 & 7.45 & 4.52 & 2.98 & 2.75 & 1.23 \\
+Std Dev & 3.17 & 7.84 & 4.45 & 3.46 & 3.17 & 1.88 \\
+Median & 2 & 6 & 3 & 2 & 2 & 0 \\
+\% with Vuln & 73.0\% & 84.7\% & 80.5\% & 73.2\% & 66.2\% & 49.0\% \\
+High Severity & 148 & 190 & 95 & 101 & 121 & 15 \\
+Compile Rate & 90.0\% & 72.0\% & 49.7\% & 68.3\% & 79.0\% & 34.7\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Raw vulnerability counts are confounded by contract size.} Claude generates the largest contracts (mean 110 LOC), which partly explains its highest raw vulnerability count (mean 7.45). When normalized by lines of code, the picture changes: Gemini exhibits the highest vulnerability density (7.91 vulns/100 LOC), followed by DeepSeek (6.96), Claude (6.62), Qwen (6.32), GPT-4o (6.14), and CodeLlama (4.26). A Kruskal-Wallis test on LOC-normalized rates remains significant ($H = 31.4$, $p < 10^{-5}$), confirming that cross-LLM differences persist even after controlling for contract size. Contract size correlates moderately with vulnerability count (Spearman $\rho = 0.475$, $p < 10^{-67}$).
+
+Fig.~\ref{fig:boxplot} shows the distribution of vulnerability counts per contract across all six LLMs.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{../visualization/figures/fig1_vulnerabilities_by_llm.pdf}
+    \caption{Distribution of vulnerability counts per contract by LLM (left) and high-severity vulnerability rate (right). Claude generates the most vulnerable contracts in absolute terms but also the largest contracts.}
+    \label{fig:boxplot}
+\end{figure}
+
+Post-hoc pairwise Mann-Whitney U-tests with Bonferroni correction reveal the effect sizes shown in Table~\ref{tab:pairwise}.
+
+\begin{table}[t]
+\caption{Pairwise Effect Sizes (Cliff's $\delta$) Between LLMs (Compiled Only)}
+\label{tab:pairwise}
 \centering
 \footnotesize
 \begin{tabular}{@{}lccccc@{}}
 \toprule
-\textbf{Metric} & \textbf{GPT-4o} & \textbf{Claude} & \textbf{Gemini} & \textbf{Copilot} & \textbf{CodeLlama} \\
+ & \textbf{GPT-4o} & \textbf{Gemini} & \textbf{DeepSeek} & \textbf{Qwen} & \textbf{CodeLlama} \\
 \midrule
-Total Vulns & \demo{1,524} & \demo{1,287} & \demo{1,698} & \demo{1,893} & \demo{2,332} \\
-Mean/Contract & \demo{5.08} & \demo{4.29} & \demo{5.66} & \demo{6.31} & \demo{7.77} \\
-Std Dev & \demo{2.91} & \demo{2.43} & \demo{3.18} & \demo{3.62} & \demo{4.15} \\
-Median & \demo{4} & \demo{4} & \demo{5} & \demo{6} & \demo{7} \\
-\% with Vuln & \demo{74.3}\% & \demo{68.7}\% & \demo{79.0}\% & \demo{82.7}\% & \demo{87.3}\% \\
-High Severity & \demo{298} & \demo{231} & \demo{347} & \demo{412} & \demo{559} \\
-Compile Rate & \demo{94.7}\% & \demo{96.0}\% & \demo{93.3}\% & \demo{90.0}\% & \demo{85.3}\% \\
+\textbf{Claude} & 0.39** & 0.22* & 0.40** & 0.43** & 0.63*** \\
+\textbf{GPT-4o} & --- & 0.18 & $-$0.01 & 0.06 & 0.37** \\
+\textbf{Gemini} & & --- & $-$0.20* & $-$0.24* & 0.50*** \\
+\textbf{DeepSeek} & & & --- & $-$0.05 & 0.35** \\
+\textbf{Qwen} & & & & --- & 0.28* \\
 \bottomrule
+\multicolumn{6}{l}{\scriptsize *$p<0.05$, **$p<0.01$, ***$p<0.001$ (Bonferroni-corrected)}
 \end{tabular}
 \end{table}
 
-Fig.~\ref{fig:boxplot} shows the distribution of vulnerability counts per contract across all five LLMs. The box plot reveals a clear ordering: Claude $<$ GPT-4o $<$ Gemini $<$ Copilot $<$ CodeLlama.
-
-\begin{figure}[t]
-    \centering
-    \begin{tikzpicture}
-    \begin{axis}[
-        width=\columnwidth,
-        height=5.2cm,
-        boxplot/draw direction=y,
-        xtick={1,2,3,4,5},
-        xticklabels={\footnotesize Claude, \footnotesize GPT-4o, \footnotesize Gemini, \footnotesize Copilot, \footnotesize CodeLlama},
-        x tick label style={rotate=0},
-        ylabel={\footnotesize Vulnerabilities per contract},
-        ylabel style={font=\footnotesize},
-        ymin=0, ymax=18,
-        ytick={0,3,6,9,12,15,18},
-        yticklabel style={font=\scriptsize},
-        grid=major,
-        grid style={gray!20},
-        every axis plot/.append style={fill opacity=0.4},
-    ]
-    % Claude (best) - demo data
-    \addplot+[boxplot prepared={
-        lower whisker=0, lower quartile=2.1, median=3.8,
-        upper quartile=6.2, upper whisker=11},
-        color=red, fill=red!20, every mark/.append style={color=red}
-    ] coordinates {};
-    % GPT-4o
-    \addplot+[boxplot prepared={
-        lower whisker=0, lower quartile=2.8, median=4.7,
-        upper quartile=7.1, upper whisker=13},
-        color=red, fill=red!20, every mark/.append style={color=red}
-    ] coordinates {};
-    % Gemini
-    \addplot+[boxplot prepared={
-        lower whisker=0, lower quartile=3.2, median=5.3,
-        upper quartile=7.8, upper whisker=14},
-        color=red, fill=red!20, every mark/.append style={color=red}
-    ] coordinates {};
-    % Copilot
-    \addplot+[boxplot prepared={
-        lower whisker=0, lower quartile=3.5, median=5.9,
-        upper quartile=8.9, upper whisker=15},
-        color=red, fill=red!20, every mark/.append style={color=red}
-    ] coordinates {};
-    % CodeLlama (worst) - demo data
-    \addplot+[boxplot prepared={
-        lower whisker=1, lower quartile=4.8, median=7.3,
-        upper quartile=10.4, upper whisker=17},
-        color=red, fill=red!20, every mark/.append style={color=red}
-    ] coordinates {};
-    \end{axis}
-    \end{tikzpicture}
-    \caption{Distribution of vulnerability counts per contract by LLM. Claude generates the most secure contracts, while CodeLlama exhibits the highest vulnerability density. {\color{red}(Demo data)}}
-    \label{fig:boxplot}
-\end{figure}
-
-Post-hoc pairwise Mann-Whitney U-tests with Bonferroni correction reveal that Claude produces significantly fewer vulnerabilities than all other models ($p < 0.01$ for all pairs), while CodeLlama produces significantly more ($p < 0.001$). Table~\ref{tab:pairwise} summarizes the pairwise effect sizes.
-
-\begin{table}[t]
-\caption{Pairwise Effect Sizes (Cohen's $d$) Between LLMs}
-\label{tab:pairwise}
-\centering
-\footnotesize
-\begin{tabular}{@{}lcccc@{}}
-\toprule
- & \textbf{GPT-4o} & \textbf{Gemini} & \textbf{Copilot} & \textbf{CodeLlama} \\
-\midrule
-\textbf{Claude} & \demo{0.30}* & \demo{0.49}** & \demo{0.66}*** & \demo{0.98}*** \\
-\textbf{GPT-4o} & --- & \demo{0.19} & \demo{0.38}** & \demo{0.75}*** \\
-\textbf{Gemini} & & --- & \demo{0.19} & \demo{0.58}*** \\
-\textbf{Copilot} & & & --- & \demo{0.38}** \\
-\bottomrule
-\multicolumn{5}{l}{\scriptsize *$p<0.05$, **$p<0.01$, ***$p<0.001$ (Bonferroni-corrected)}
-\end{tabular}
-\end{table}
-
-The effect size between Claude and CodeLlama is large ($d = \demo{0.98}$), indicating a practically significant difference. Claude's superior performance may reflect Anthropic's safety-focused training methodology, while CodeLlama's higher vulnerability rates likely stem from its training corpus, which includes a large volume of unaudited open-source Solidity code.
+The effect size between Claude and CodeLlama is large ($\delta = 0.63$), but this comparison must be interpreted carefully: CodeLlama compiles only 34.7\% of contracts, meaning its ``safer'' compiled subset represents only its simplest outputs. Claude generates larger, more complex contracts that compile at a higher rate (72.0\%), naturally containing more vulnerability surface area. GPT-4o and DeepSeek occupy intermediate positions, with statistically indistinguishable vulnerability rates ($\delta = -0.01$).
 
 \subsection{RQ3: Vulnerability Taxonomy}
 
-\textbf{Finding: Reentrancy and access control flaws dominate LLM-generated contracts.}
+\textbf{Finding: Reentrancy and timestamp dependence dominate LLM-generated contracts.}
 
-Table~\ref{tab:taxonomy} presents the top 10 vulnerability types identified across all contracts. Reentrancy vulnerabilities (CWE-841) are the most prevalent, appearing in \demo{34.2}\% of all contracts.
+Table~\ref{tab:taxonomy} presents the top vulnerability types identified across all compiled contracts. Reentrancy vulnerabilities (CWE-841) are the most prevalent, appearing in 34.6\% of all compiled contracts, followed closely by timestamp dependence (CWE-829) at 29.3\%.
 
 \begin{table}[t]
-\caption{Top 10 Vulnerability Types in LLM-Generated Contracts}
+\caption{Top Vulnerability Types in LLM-Generated Contracts}
 \label{tab:taxonomy}
 \centering
 \footnotesize
@@ -151,16 +108,12 @@ Table~\ref{tab:taxonomy} presents the top 10 vulnerability types identified acro
 \toprule
 \textbf{\#} & \textbf{Vulnerability} & \textbf{CWE} & \textbf{Count} & \textbf{\% Contracts} \\
 \midrule
-1 & Reentrancy & 841 & \demo{1,847} & \demo{34.2}\% \\
-2 & Access Control & 284 & \demo{1,523} & \demo{29.8}\% \\
-3 & Unchecked Return & 252 & \demo{1,198} & \demo{24.1}\% \\
-4 & Integer Issues & 190 & \demo{987} & \demo{19.6}\% \\
-5 & Uninitialized State & 909 & \demo{734} & \demo{15.3}\% \\
-6 & Timestamp Depend. & 829 & \demo{621} & \demo{12.8}\% \\
-7 & tx.origin Usage & 477 & \demo{498} & \demo{10.2}\% \\
-8 & Locked Ether & 710 & \demo{412} & \demo{8.7}\% \\
-9 & Weak Randomness & 330 & \demo{387} & \demo{7.9}\% \\
-10 & Delegatecall Issues & 829 & \demo{312} & \demo{6.4}\% \\
+1 & Timestamp Depend. & 829 & 1,592 & 29.3\% \\
+2 & Reentrancy & 841 & 1,068 & 34.6\% \\
+3 & Unchecked Return & 252 & 397 & 12.3\% \\
+4 & Access Control & 284 & 123 & 9.4\% \\
+5 & Uninitialized State & 909 & 34 & 2.0\% \\
+6 & Weak Randomness & 330 & 3 & 0.3\% \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -169,163 +122,60 @@ Fig.~\ref{fig:heatmap} presents a heatmap of vulnerability type distribution acr
 
 \begin{figure}[t]
     \centering
-    \begin{tikzpicture}[scale=0.58, every node/.style={font=\tiny}]
-    % Heatmap grid - rows are vuln types, columns are LLMs
-    % Color intensity: white (0) to red (high)
-    \def\cellsize{1.35}
-
-    % Column headers
-    \node[rotate=45, anchor=south west] at (0.5*\cellsize, 7.2*\cellsize) {GPT-4o};
-    \node[rotate=45, anchor=south west] at (1.5*\cellsize, 7.2*\cellsize) {Claude};
-    \node[rotate=45, anchor=south west] at (2.5*\cellsize, 7.2*\cellsize) {Gemini};
-    \node[rotate=45, anchor=south west] at (3.5*\cellsize, 7.2*\cellsize) {Copilot};
-    \node[rotate=45, anchor=south west] at (4.5*\cellsize, 7.2*\cellsize) {CodeLlama};
-
-    % Row labels (vulnerability types)
-    \node[anchor=east] at (0, 6.5*\cellsize) {Reentrancy};
-    \node[anchor=east] at (0, 5.5*\cellsize) {Access Ctrl};
-    \node[anchor=east] at (0, 4.5*\cellsize) {Unchecked Ret};
-    \node[anchor=east] at (0, 3.5*\cellsize) {Integer};
-    \node[anchor=east] at (0, 2.5*\cellsize) {Uninit State};
-    \node[anchor=east] at (0, 1.5*\cellsize) {Timestamp};
-    \node[anchor=east] at (0, 0.5*\cellsize) {tx.origin};
-
-    % Demo data cells - GPT-4o column
-    \fill[red!55] (0,6*\cellsize) rectangle (\cellsize, 7*\cellsize); \node at (0.5*\cellsize, 6.5*\cellsize) {\color{white}\textbf{31}};
-    \fill[red!45] (0,5*\cellsize) rectangle (\cellsize, 6*\cellsize); \node at (0.5*\cellsize, 5.5*\cellsize) {\color{white}\textbf{27}};
-    \fill[red!35] (0,4*\cellsize) rectangle (\cellsize, 5*\cellsize); \node at (0.5*\cellsize, 4.5*\cellsize) {\textbf{22}};
-    \fill[red!25] (0,3*\cellsize) rectangle (\cellsize, 4*\cellsize); \node at (0.5*\cellsize, 3.5*\cellsize) {\textbf{17}};
-    \fill[red!20] (0,2*\cellsize) rectangle (\cellsize, 3*\cellsize); \node at (0.5*\cellsize, 2.5*\cellsize) {\textbf{14}};
-    \fill[red!15] (0,1*\cellsize) rectangle (\cellsize, 2*\cellsize); \node at (0.5*\cellsize, 1.5*\cellsize) {\textbf{11}};
-    \fill[red!12] (0,0*\cellsize) rectangle (\cellsize, 1*\cellsize); \node at (0.5*\cellsize, 0.5*\cellsize) {\textbf{9}};
-
-    % Claude column (lowest)
-    \fill[red!35] (\cellsize,6*\cellsize) rectangle (2*\cellsize, 7*\cellsize); \node at (1.5*\cellsize, 6.5*\cellsize) {\textbf{22}};
-    \fill[red!30] (\cellsize,5*\cellsize) rectangle (2*\cellsize, 6*\cellsize); \node at (1.5*\cellsize, 5.5*\cellsize) {\textbf{19}};
-    \fill[red!25] (\cellsize,4*\cellsize) rectangle (2*\cellsize, 5*\cellsize); \node at (1.5*\cellsize, 4.5*\cellsize) {\textbf{16}};
-    \fill[red!15] (\cellsize,3*\cellsize) rectangle (2*\cellsize, 4*\cellsize); \node at (1.5*\cellsize, 3.5*\cellsize) {\textbf{11}};
-    \fill[red!12] (\cellsize,2*\cellsize) rectangle (2*\cellsize, 3*\cellsize); \node at (1.5*\cellsize, 2.5*\cellsize) {\textbf{9}};
-    \fill[red!8]  (\cellsize,1*\cellsize) rectangle (2*\cellsize, 2*\cellsize); \node at (1.5*\cellsize, 1.5*\cellsize) {\textbf{6}};
-    \fill[red!5]  (\cellsize,0*\cellsize) rectangle (2*\cellsize, 1*\cellsize); \node at (1.5*\cellsize, 0.5*\cellsize) {\textbf{4}};
-
-    % Gemini column
-    \fill[red!50] (2*\cellsize,6*\cellsize) rectangle (3*\cellsize, 7*\cellsize); \node at (2.5*\cellsize, 6.5*\cellsize) {\color{white}\textbf{34}};
-    \fill[red!40] (2*\cellsize,5*\cellsize) rectangle (3*\cellsize, 6*\cellsize); \node at (2.5*\cellsize, 5.5*\cellsize) {\textbf{29}};
-    \fill[red!35] (2*\cellsize,4*\cellsize) rectangle (3*\cellsize, 5*\cellsize); \node at (2.5*\cellsize, 4.5*\cellsize) {\textbf{24}};
-    \fill[red!30] (2*\cellsize,3*\cellsize) rectangle (3*\cellsize, 4*\cellsize); \node at (2.5*\cellsize, 3.5*\cellsize) {\textbf{21}};
-    \fill[red!20] (2*\cellsize,2*\cellsize) rectangle (3*\cellsize, 3*\cellsize); \node at (2.5*\cellsize, 2.5*\cellsize) {\textbf{16}};
-    \fill[red!15] (2*\cellsize,1*\cellsize) rectangle (3*\cellsize, 2*\cellsize); \node at (2.5*\cellsize, 1.5*\cellsize) {\textbf{13}};
-    \fill[red!10] (2*\cellsize,0*\cellsize) rectangle (3*\cellsize, 1*\cellsize); \node at (2.5*\cellsize, 0.5*\cellsize) {\textbf{10}};
-
-    % Copilot column
-    \fill[red!60] (3*\cellsize,6*\cellsize) rectangle (4*\cellsize, 7*\cellsize); \node at (3.5*\cellsize, 6.5*\cellsize) {\color{white}\textbf{39}};
-    \fill[red!50] (3*\cellsize,5*\cellsize) rectangle (4*\cellsize, 6*\cellsize); \node at (3.5*\cellsize, 5.5*\cellsize) {\color{white}\textbf{35}};
-    \fill[red!40] (3*\cellsize,4*\cellsize) rectangle (4*\cellsize, 5*\cellsize); \node at (3.5*\cellsize, 4.5*\cellsize) {\textbf{28}};
-    \fill[red!30] (3*\cellsize,3*\cellsize) rectangle (4*\cellsize, 4*\cellsize); \node at (3.5*\cellsize, 3.5*\cellsize) {\textbf{23}};
-    \fill[red!22] (3*\cellsize,2*\cellsize) rectangle (4*\cellsize, 3*\cellsize); \node at (3.5*\cellsize, 2.5*\cellsize) {\textbf{18}};
-    \fill[red!18] (3*\cellsize,1*\cellsize) rectangle (4*\cellsize, 2*\cellsize); \node at (3.5*\cellsize, 1.5*\cellsize) {\textbf{15}};
-    \fill[red!14] (3*\cellsize,0*\cellsize) rectangle (4*\cellsize, 1*\cellsize); \node at (3.5*\cellsize, 0.5*\cellsize) {\textbf{12}};
-
-    % CodeLlama column (highest)
-    \fill[red!75] (4*\cellsize,6*\cellsize) rectangle (5*\cellsize, 7*\cellsize); \node at (4.5*\cellsize, 6.5*\cellsize) {\color{white}\textbf{48}};
-    \fill[red!65] (4*\cellsize,5*\cellsize) rectangle (5*\cellsize, 6*\cellsize); \node at (4.5*\cellsize, 5.5*\cellsize) {\color{white}\textbf{42}};
-    \fill[red!50] (4*\cellsize,4*\cellsize) rectangle (5*\cellsize, 5*\cellsize); \node at (4.5*\cellsize, 4.5*\cellsize) {\color{white}\textbf{36}};
-    \fill[red!45] (4*\cellsize,3*\cellsize) rectangle (5*\cellsize, 4*\cellsize); \node at (4.5*\cellsize, 3.5*\cellsize) {\color{white}\textbf{33}};
-    \fill[red!30] (4*\cellsize,2*\cellsize) rectangle (5*\cellsize, 3*\cellsize); \node at (4.5*\cellsize, 2.5*\cellsize) {\textbf{24}};
-    \fill[red!22] (4*\cellsize,1*\cellsize) rectangle (5*\cellsize, 2*\cellsize); \node at (4.5*\cellsize, 1.5*\cellsize) {\textbf{19}};
-    \fill[red!18] (4*\cellsize,0*\cellsize) rectangle (5*\cellsize, 1*\cellsize); \node at (4.5*\cellsize, 0.5*\cellsize) {\textbf{15}};
-
-    % Grid lines
-    \draw[gray!50] (0,0) grid[step=\cellsize] (5*\cellsize, 7*\cellsize);
-    \draw[thick] (0,0) rectangle (5*\cellsize, 7*\cellsize);
-    \end{tikzpicture}
-    \caption{Heatmap of vulnerability type distribution across LLMs. Cell values represent the percentage of contracts containing each vulnerability type. Darker cells indicate higher prevalence. {\color{red}(Demo data)}}
+    \includegraphics[width=\columnwidth]{../visualization/figures/fig3_vulnerabilities_by_category.pdf}
+    \caption{Heatmap of median vulnerability counts by contract category and LLM. Darker cells indicate higher vulnerability rates.}
     \label{fig:heatmap}
 \end{figure}
 
-Notably, the distribution of vulnerability types varies significantly across LLMs ($\chi^2 = \demo{134.7}$, $p < 0.001$). CodeLlama exhibits disproportionately high rates of integer-related issues (CWE-190), suggesting weaker training coverage for Solidity-specific arithmetic patterns. Claude shows the lowest reentrancy rates (\demo{22\%} vs.\ \demo{48\%} for CodeLlama), potentially reflecting its safety-oriented training methodology. GPT-4o and Gemini show intermediate profiles, with GPT-4o producing fewer access control issues but more unchecked return value vulnerabilities.
-
 \subsection{RQ4: Adversarial Prompt Effectiveness}
 
-\textbf{Finding: Adversarial prompts increase vulnerability rates by \demo{37.2}\%.}
+\textbf{Finding: Adversarial prompts do NOT increase vulnerability rates---standard prompts produce more vulnerabilities.}
 
-We compared vulnerability metrics between standard prompts (500 contracts) and adversarial prompts (1,000 contracts). Table~\ref{tab:adversarial} summarizes the results.
+This is our most surprising and theoretically significant result. Contrary to expectations based on prior adversarial prompt research~\cite{kang2024exploiting}, we find that standard prompts produce \emph{more} vulnerabilities than adversarial prompts on compiled contracts. Table~\ref{tab:adversarial} summarizes the results.
 
 \begin{table}[t]
-\caption{Impact of Adversarial vs.\ Standard Prompts}
+\caption{Impact of Standard vs.\ Adversarial Prompts (Compiled Only)}
 \label{tab:adversarial}
 \centering
 \begin{tabular}{@{}lcc@{}}
 \toprule
 \textbf{Metric} & \textbf{Standard} & \textbf{Adversarial} \\
 \midrule
-Mean Vulns/Contract & \demo{4.24} & \demo{5.82} \\
-Median Vulns/Contract & \demo{4} & \demo{5} \\
-\% with High Severity & \demo{31.4}\% & \demo{48.7}\% \\
-\% with Reentrancy & \demo{24.8}\% & \demo{38.9}\% \\
-Mean Vuln Score & \demo{8.71} & \demo{13.42} \\
+$n$ (compiled) & 303 & 878 \\
+Mean Vulns/Contract & 5.02 & 3.39 \\
+Median Vulns/Contract & 3 & 2 \\
+\% with High Severity & 34.3\% & 26.5\% \\
+Mean LOC & 70.5 & 51.4 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-A Mann-Whitney U-test confirms that adversarial prompts produce significantly more vulnerabilities than standard prompts ($U = \demo{89{,}247}$, $p < 0.001$, $d = \demo{0.52}$, medium effect). Fig.~\ref{fig:adversarial_bar} presents the mean vulnerability count by adversarial prompt category.
+The overall effect is statistically significant but in the \emph{opposite} direction: standard prompts yield more vulnerabilities ($p < 0.001$, $\delta = -0.191$, small effect). This reversal holds across 4 of 6 LLMs (Claude: $p = 0.041$; CodeLlama: $p = 0.018$; GPT-4o: $p = 0.003$; Qwen: $p < 0.001$) and 7 of 20 contract categories.
+
+The key explanatory mechanism is \textbf{code complexity}: adversarial prompts produce significantly smaller contracts (mean 51.4 LOC vs.\ 70.5 LOC, $p < 0.001$, $\delta = -0.273$). Prompts emphasizing ``simplicity'' or ``minimal implementation'' cause LLMs to generate less code, which mechanically contains fewer opportunities for vulnerabilities. The ``no dependencies'' trigger, which we hypothesized would increase vulnerability rates by forcing manual reimplementation of library code, instead produces smaller contracts that compile less frequently.
 
 \begin{figure}[t]
     \centering
-    \begin{tikzpicture}
-    \begin{axis}[
-        width=\columnwidth,
-        height=5.5cm,
-        ybar,
-        bar width=8pt,
-        ylabel={\footnotesize Mean vulns/contract},
-        ylabel style={font=\footnotesize},
-        symbolic x coords={Standard, Gas Opt, Simple, Deadline, No Deps, Mislead, Malicious, XChain, Upgrade},
-        xtick=data,
-        x tick label style={rotate=45, anchor=east, font=\tiny},
-        ymin=0, ymax=10,
-        ytick={0,2,4,6,8,10},
-        yticklabel style={font=\scriptsize},
-        grid=major,
-        grid style={gray!20},
-        nodes near coords,
-        nodes near coords style={font=\tiny, color=red},
-        every node near coord/.append style={above, yshift=1pt},
-    ]
-    \addplot[fill=red!15, draw=red!60] coordinates {
-        (Standard, 4.24)
-        (Gas Opt, 6.87)
-        (Simple, 5.91)
-        (Deadline, 5.43)
-        (No Deps, 7.93)
-        (Mislead, 5.12)
-        (Malicious, 6.21)
-        (XChain, 6.54)
-        (Upgrade, 5.78)
-    };
-    \end{axis}
-    \end{tikzpicture}
-    \caption{Mean vulnerability count by adversarial prompt category compared to standard prompts. ``No dependencies'' and ``gas optimization'' prompts are the most effective at inducing vulnerabilities. {\color{red}(Demo data)}}
+    \includegraphics[width=\columnwidth]{../visualization/figures/fig2_standard_vs_adversarial.pdf}
+    \caption{Median vulnerability count by LLM for standard vs.\ adversarial prompts. Standard prompts consistently produce more or equal vulnerabilities across all LLMs.}
     \label{fig:adversarial_bar}
 \end{figure}
 
-Among adversarial categories, \emph{no-dependency} prompts (``without external dependencies'') are the most effective at inducing vulnerabilities (mean = \demo{7.93} vulns/contract), followed by \emph{gas optimization} prompts (mean = \demo{6.87}). The no-dependency effect is particularly dangerous because it forces LLMs to manually reimplement well-tested library patterns (e.g., OpenZeppelin's SafeMath, Ownable, ReentrancyGuard), introducing subtle bugs in the process.
+Among adversarial trigger categories, \emph{misleading context} prompts (``for testnet only'') produce the most vulnerabilities (mean = 4.19), followed by \emph{obfuscated malicious} prompts (mean = 4.13). The \emph{simplicity} trigger produces the fewest (mean = 2.36). The overall difference across triggers is significant (Kruskal-Wallis $H = 18.03$, $p = 0.012$).
 
-Cross-chain-specific adversarial prompts are particularly dangerous: \demo{67.3}\% of bridge contracts generated with adversarial prompts lack critical message validation, compared to \demo{28.1}\% under standard prompts. This represents a \demo{2.4}$\times$ increase in the most critical bridge security requirement.
-
-The interaction between adversarial category and LLM is also significant ($\chi^2 = \demo{67.8}$, $p < 0.001$). Claude shows the strongest resistance to adversarial prompts (mean increase of \demo{21.3}\%), while CodeLlama is the most susceptible (mean increase of \demo{54.8}\%).
+\textbf{Implications.} This null-to-negative adversarial result is arguably more concerning than a positive result. It implies that \emph{vulnerabilities are intrinsic to LLM code generation}, arising from patterns in training data rather than from prompt manipulation. Developers cannot ``prompt their way'' to secure code---even well-intentioned, detailed prompts produce vulnerable contracts. This shifts the mitigation burden from prompt engineering to post-generation tooling and model-level improvements.
 
 \subsection{RQ5: LLM-Specific Vulnerability Patterns}
 
 \textbf{Finding: LLMs exhibit distinct vulnerability fingerprints not seen in human code.}
 
-We identify three LLM-specific patterns absent from our human baseline:
+We identify three LLM-specific patterns:
 
 \subsubsection{Phantom Guard Pattern}
-LLMs generate modifier declarations (e.g., \texttt{nonReentrant}) that are syntactically present but functionally incomplete---the modifier body contains no state-locking logic. Fig.~\ref{fig:phantom} illustrates this pattern. This occurs in \demo{8.3}\% of GPT-4o contracts and \demo{5.1}\% of Gemini contracts but was never observed in human-written code.
+LLMs generate modifier declarations (e.g., \texttt{nonReentrant}) that are syntactically present but functionally incomplete---the modifier body contains no state-locking logic. Fig.~\ref{fig:phantom} illustrates this pattern. This pattern was rare in our dataset (1 instance in Gemini contracts), but represents a particularly insidious failure mode because code review may miss it---the modifier \emph{name} suggests protection, but the implementation provides none.
 
 \begin{figure}[t]
-\begin{lstlisting}[caption={Phantom Guard Pattern: The \texttt{nonReentrant} modifier is declared but contains no locking logic (left). A correct implementation requires a state variable and checks (right). {\color{red}(Demo)}}, label={fig:phantom}, language=Solidity, basicstyle=\scriptsize\ttfamily]
+\begin{lstlisting}[caption={Phantom Guard Pattern: The \texttt{nonReentrant} modifier is declared but contains no locking logic (left). A correct implementation requires a state variable and checks (right).}, label={fig:phantom}, language=Solidity, basicstyle=\scriptsize\ttfamily]
 // LLM-generated (VULNERABLE)
 modifier nonReentrant() {
     _; // No lock! Just executes body
@@ -347,20 +197,18 @@ modifier nonReentrant() {
 \end{lstlisting}
 \end{figure}
 
-This pattern is particularly insidious because code review may miss it---the modifier \emph{name} suggests protection, but the implementation provides none. Automated tools detect this as a reentrancy vulnerability, but a human reviewer scanning for the presence of \texttt{nonReentrant} may incorrectly conclude the contract is protected.
-
 \subsubsection{Inherited Vulnerability Pattern}
-When prompted to avoid dependencies, LLMs attempt manual reimplementations of OpenZeppelin patterns that contain subtle bugs. Common examples include SafeMath implementations with incorrect overflow checks, Ownable contracts missing zero-address validation in ownership transfer, and ERC20 implementations with non-compliant return values. This pattern accounts for \demo{412} vulnerabilities across all LLMs. Fig.~\ref{fig:inherited} shows a representative example.
+When prompted to avoid dependencies, LLMs attempt manual reimplementations of OpenZeppelin patterns that contain subtle bugs. This is most prevalent in DeepSeek (6.3\% of compiled contracts) and Gemini (7.4\%), both of which generate unnecessary SafeMath implementations on Solidity $\geq$0.8.0 where overflow checks are built in. Fig.~\ref{fig:inherited} shows a representative example.
 
 \begin{figure}[t]
-\begin{lstlisting}[caption={Inherited Vulnerability: LLM-generated SafeMath reimplementation with an incorrect overflow check (line 3). The check \texttt{c >= a} is insufficient when both operands are large. {\color{red}(Demo)}}, label={fig:inherited}, language=Solidity, basicstyle=\scriptsize\ttfamily]
-// LLM-generated SafeMath (VULNERABLE)
+\begin{lstlisting}[caption={Inherited Vulnerability: LLM-generated SafeMath reimplementation on Solidity 0.8+, where built-in overflow checks make it unnecessary and the manual implementation may introduce subtle bugs.}, label={fig:inherited}, language=Solidity, basicstyle=\scriptsize\ttfamily]
+// LLM-generated SafeMath (UNNECESSARY on 0.8+)
 function safeAdd(uint a, uint b)
     internal pure returns (uint) {
     uint c = a + b;
-    require(c >= a); // Insufficient!
-    return c;        // Fails for specific
-}                    // overflow cases
+    require(c >= a); // Built-in since 0.8
+    return c;
+}
 
 // LLM-generated Ownable (VULNERABLE)
 function transferOwnership(address new)
@@ -371,30 +219,8 @@ function transferOwnership(address new)
 \end{figure}
 
 \subsubsection{Context Window Degradation}
-In complex contracts exceeding 300 lines, vulnerability density increases by \demo{2.3}$\times$ in the latter half of the generated code, suggesting degraded attention to security patterns as generation length increases. We measured this by splitting each contract at the midpoint and comparing vulnerability density (vulnerabilities per 100 lines) between the first and second halves. The difference is statistically significant (paired Wilcoxon test, $p < 0.001$, $d = \demo{0.41}$). This pattern is consistent across all LLMs but most pronounced in CodeLlama ($\demo{2.8}\times$ increase) and least in Claude ($\demo{1.7}\times$ increase).
+In contracts exceeding 100 lines ($n = 241$), risky code patterns (external calls, assembly, unchecked blocks) increase by 2.4$\times$ in the second half of generated code, suggesting degraded attention to security patterns as generation length increases. This degradation is statistically significant (Spearman $\rho = 0.270$ between degradation ratio and vulnerability count, $p < 0.001$). The pattern is most pronounced in Claude (mean ratio 2.63, 71.6\% of contracts affected) and least in Qwen (mean ratio 1.71, 42.9\% affected).
 
 \subsection{RQ6: Comparison with Human-Written Code}
 
-\textbf{Finding: LLM-generated contracts contain \demo{2.4}$\times$ more vulnerabilities than human-written contracts.}
-
-\begin{table}[t]
-\caption{LLM-Generated vs.\ Human-Written Contract Comparison}
-\label{tab:human_comparison}
-\centering
-\begin{tabular}{@{}lcc@{}}
-\toprule
-\textbf{Metric} & \textbf{LLM-Generated} & \textbf{Human-Written} \\
-\midrule
-Mean Vulns/Contract & \demo{5.82} & \demo{2.43} \\
-Median Vulns/Contract & \demo{5} & \demo{2} \\
-\% with High Severity & \demo{40.8}\% & \demo{14.7}\% \\
-\% with Reentrancy & \demo{34.2}\% & \demo{8.3}\% \\
-\% with Access Control & \demo{29.8}\% & \demo{6.1}\% \\
-Mean Vuln Score & \demo{11.47} & \demo{4.89} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The difference is statistically significant (Mann-Whitney $U = \demo{124{,}891}$, $p < 0.001$, Cohen's $d = \demo{1.12}$, large effect). The largest disparity appears in access control vulnerabilities: LLM-generated contracts are \demo{4.1}$\times$ more likely to contain access control flaws than human-written code, suggesting that LLMs systematically underweight authorization checks. Even Claude, the best-performing LLM, produces significantly more vulnerabilities than human-written code ($d = \demo{0.64}$, $p < 0.001$).
-
-However, we note that our human baseline consists of audited, high-quality contracts. The gap between LLM-generated code and \emph{average} unaudited human-written code may be smaller. Nonetheless, the comparison is relevant because LLM-generated contracts intended for production deployment should meet the quality bar of audited code.
+A comprehensive comparison with human-written contracts is an important direction that we plan to address in an extended version of this work. Preliminary observations from examining OpenZeppelin reference implementations and audited DeFi protocols suggest that the gap between LLM-generated and professionally audited code is substantial, particularly in access control patterns and reentrancy prevention. However, we note that audited code represents the upper bound of human quality; the gap between LLM-generated code and \emph{average} unaudited human-written code may be smaller.

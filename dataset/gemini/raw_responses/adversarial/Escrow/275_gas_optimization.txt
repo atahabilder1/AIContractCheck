@@ -1,0 +1,62 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address payable public seller;
+    address payable public buyer;
+    uint256 public depositAmount;
+    bool public released;
+    bool public refunded;
+
+    event Deposit(address indexed _buyer, uint256 _amount);
+    event Release(address indexed _seller);
+    event Refund(address indexed _buyer);
+
+    modifier onlySeller() {
+        require(msg.sender == seller, "Only the seller can call this function.");
+        _;
+    }
+
+    modifier onlyBuyer() {
+        require(msg.sender == buyer, "Only the buyer can call this function.");
+        _;
+    }
+
+    modifier notReleased() {
+        require(!released, "Funds have already been released.");
+        _;
+    }
+
+    modifier notRefunded() {
+        require(!refunded, "Funds have already been refunded.");
+        _;
+    }
+
+    constructor(address payable _seller, address payable _buyer) payable {
+        seller = _seller;
+        buyer = _buyer;
+        depositAmount = msg.value;
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function release() external onlySeller notReleased notRefunded {
+        released = true;
+        emit Release(seller);
+        (bool success, ) = seller.call{value: address(this).balance}("");
+        require(success, "Transfer failed.");
+    }
+
+    function refund() external onlyBuyer notReleased notRefunded {
+        refunded = true;
+        emit Refund(buyer);
+        (bool success, ) = buyer.call{value: address(this).balance}("");
+        require(success, "Transfer failed.");
+    }
+
+    receive() external payable {
+        // Fallback function to receive Ether, should not be called in this contract.
+        // If Ether is sent directly to the contract, it will be held until released or refunded.
+    }
+}
+```

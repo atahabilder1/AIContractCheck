@@ -1,0 +1,60 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address[] public validators;
+    uint256 public consensusThreshold;
+    mapping(address => bool) public isValidator;
+    mapping(address => uint256) public lastMessageTimestamp;
+    mapping(address => uint256) public messageCount;
+    mapping(bytes32 => bool) public messageExists;
+    mapping(bytes32 => uint256) public messageTimestamp;
+
+    event MessageReceived(address indexed sender, bytes32 indexed message);
+
+    constructor(address[] memory _validators, uint256 _consensusThreshold) {
+        validators = _validators;
+        consensusThreshold = _consensusThreshold;
+        for (uint256 i = 0; i < _validators.length; i++) {
+            isValidator[_validators[i]] = true;
+        }
+    }
+
+    function receiveMessage(bytes32 _message) external {
+        require(isValidator[msg.sender], "Only validators can send messages");
+        require(block.timestamp > lastMessageTimestamp[msg.sender], "Messages must be received in order");
+        require(messageCount[msg.sender] < consensusThreshold, "Validator has already reached consensus");
+        require(!messageExists[_message], "Message has already been received");
+
+        messageExists[_message] = true;
+        messageTimestamp[_message] = block.timestamp;
+        messageCount[msg.sender]++;
+
+        emit MessageReceived(msg.sender, _message);
+    }
+
+    function getMessageCount(bytes32 _message) external view returns (uint256) {
+        return messageCount[_message];
+    }
+
+    function getLastMessageTimestamp(bytes32 _message) external view returns (uint256) {
+        return messageTimestamp[_message];
+    }
+
+    function getValidators() external view returns (address[] memory) {
+        return validators;
+    }
+
+    function getConsensusThreshold() external view returns (uint256) {
+        return consensusThreshold;
+    }
+}
+```
+This contract uses a mapping to keep track of the messages that have been received, as well as the number of messages that have been received from each validator. It also uses a mapping to keep track of the last timestamp at which a message was received from each validator.
+
+The `receiveMessage` function is used to receive a message from a validator. It checks that the message has not already been received, and that the validator has not already reached consensus. It also checks that the message is received in order, and that the timestamp is greater than the last timestamp received from the same validator.
+
+The `getMessageCount` and `getLastMessageTimestamp` functions are used to query the number of messages received from a particular validator, and the timestamp of the last message received from that validator, respectively.
+
+The `getValidators` and `getConsensusThreshold` functions are used to query the list of validators and the consensus threshold, respectively.

@@ -1,0 +1,140 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract Staking is Ownable {
+    using SafeMath for uint256;
+
+    struct Stake {
+        uint256 amount;
+        uint256 startTime;
+        uint256 lastClaimTime;
+        uint256 rewardDebt;
+    }
+
+    struct Reward {
+        uint256 lastUpdateTime;
+        uint256 rewardPerTokenStored;
+        mapping(address => uint256) userRewardPerTokenPaid;
+        mapping(address => uint256) rewards;
+    }
+
+    IERC20 public stakingToken;
+    IERC20[] public rewardTokens;
+    IERC721 public nft;
+    uint256 public constant PRECISION = 1e18;
+    uint256 public totalStaked;
+    uint256 public totalSupply;
+    uint256 public rewardRate;
+    uint256 public boostMultiplier;
+    uint256 public rewardPerTokenStored;
+    uint256 public boostMultiplierUpdateTime;
+    uint256 public lastUpdateTime;
+    uint256 public rewardPerTokenPrecision;
+    uint256 public epochDuration;
+    uint256 public boostMultiplierDuration;
+
+    mapping(address => Stake) public stakes;
+    mapping(IERC20 => Reward) public rewards;
+    mapping(address => uint256) public userRewardPerTokenPaid;
+    mapping(address => uint256) public rewardsEarned;
+    mapping(address => uint256) public boostMultipliers;
+
+    event Staked(address indexed user, uint256 amount);
+    event Unstaked(address indexed user, uint256 amount);
+    event RewardPaid(address indexed user, uint256 reward);
+    event BoostMultiplierUpdated(uint256 multiplier);
+
+    constructor(
+        address _stakingToken,
+        IERC20[] memory _rewardTokens,
+        address _nft,
+        uint256 _epochDuration,
+        uint256 _boostMultiplierDuration
+    ) {
+        stakingToken = IERC20(_stakingToken);
+        rewardTokens = _rewardTokens;
+        nft = IERC721(_nft);
+        epochDuration = _epochDuration;
+        boostMultiplierDuration = _boostMultiplierDuration;
+        rewardPerTokenPrecision = 10**18;
+    }
+
+    function stake(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        stakingToken.transferFrom(msg.sender, address(this), amount);
+        if (stakes[msg.sender].amount == 0) {
+            stakes[msg.sender].startTime = block.timestamp;
+        }
+        stakes[msg.sender].amount += amount;
+        totalStaked += amount;
+        emit Staked(msg.sender, amount);
+    }
+
+    function unstake(uint256 amount) external {
+        require(stakes[msg.sender].amount >= amount, "Insufficient balance");
+        require(amount > 0, "Amount must be greater than zero");
+        stakingToken.transfer(msg.sender, amount);
+        stakes[msg.sender].amount -= amount;
+        totalStaked -= amount;
+        emit Unstaked(msg.sender, amount);
+    }
+
+    function claimReward() external {
+        updateReward(msg.sender);
+        uint256 reward = rewardsEarned[msg.sender];
+        if (reward > 0) {
+            rewardsEarned[msg.sender] = 0;
+            stakingToken.transfer(msg.sender, reward);
+            emit RewardPaid(msg.sender, reward);
+        }
+    }
+
+    function updateReward(address user) public {
+        Reward storage reward = rewards[stakingToken];
+        reward.rewardPerTokenStored = rewardPerToken();
+        reward.lastUpdateTime = lastTimeRewardApplicable();
+        uint256 userReward = (stakes[user].amount.mul(reward.rewardPerTokenStored - reward.userRewardPerTokenPaid[user])).div(PRECISION);
+        if (userReward > 0) {
+            rewardsEarned[user] += userReward;
+            reward.userRewardPerTokenPaid[user] = reward.rewardPerTokenStored;
+        }
+    }
+
+    function rewardPerToken() public view returns (uint256) {
+        if (totalStaked == 0) {
+            return rewardPerTokenStored;
+        }
+        return rewardPerTokenStored.add((block.timestamp - lastUpdateTime).mul(rewardRate).mul(PRECISION).div(totalStaked));
+    }
+
+    function lastTimeRewardApplicable() public view returns (uint256) {
+        return block.timestamp < epochDuration ? block.timestamp : epochDuration;
+    }
+
+    function setBoostMultiplier(uint256 multiplier) external onlyOwner {
+        boostMultiplier = multiplier;
+        boostMultiplierUpdateTime = block.timestamp;
+        emit BoostMultiplierUpdated(multiplier);
+    }
+
+    function updateBoostMultiplier(address user) external {
+        if (block.timestamp >= boostMultiplierUpdateTime + boostMultiplierDuration) {
+            boostMultiplier = 1;
+        }
+        boostMultipliers[user] = boostMultiplier;
+    }
+
+    function getBoostMultiplier(address user) external view returns (uint256) {
+        if (block.timestamp >= boostMultiplierUpdateTime + boostMultiplierDuration) {
+            return 1;
+        }
+        return boostMultipliers[user];
+    }
+}
+```

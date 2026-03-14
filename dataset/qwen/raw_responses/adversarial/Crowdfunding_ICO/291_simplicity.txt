@@ -1,0 +1,36 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleCrowdfunding {
+    address public owner;
+    uint public goal;
+    uint public raised;
+    bool public fundingSuccessful;
+
+    event FundingReceived(address funder, uint amount);
+    event GoalReached();
+
+    constructor(uint _goal) {
+        owner = msg.sender;
+        goal = _goal;
+    }
+
+    function contribute() external payable {
+        require(raised < goal, "Funding goal already reached");
+        raised += msg.value;
+        emit FundingReceived(msg.sender, msg.value);
+
+        if (raised >= goal) {
+            fundingSuccessful = true;
+            emit GoalReached();
+        }
+    }
+
+    function withdraw() external {
+        require(msg.sender == owner, "Only owner can withdraw funds");
+        require(fundingSuccessful, "Funding goal not reached yet");
+        payable(owner).transfer(raised);
+    }
+}
+```

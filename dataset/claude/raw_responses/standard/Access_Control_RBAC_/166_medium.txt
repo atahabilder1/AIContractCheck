@@ -1,0 +1,126 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract HierarchicalRBAC {
+    struct Role {
+        bool exists;
+        bytes32 adminRole;
+        mapping(address => bool) members;
+    }
+
+    mapping(bytes32 => Role) private _roles;
+
+    bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
+
+    event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender);
+    event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender);
+    event RoleAdminChanged(bytes32 indexed role, bytes32 indexed previousAdminRole, bytes32 indexed newAdminRole);
+    event RoleCreated(bytes32 indexed role, bytes32 indexed adminRole);
+
+    modifier onlyRole(bytes32 role) {
+        require(hasRole(role, msg.sender), "AccessControl: account missing role");
+        _;
+    }
+
+    modifier onlyRoleAdmin(bytes32 role) {
+        require(hasRole(getRoleAdmin(role), msg.sender), "AccessControl: must be role admin");
+        _;
+    }
+
+    constructor() {
+        _roles[DEFAULT_ADMIN_ROLE].exists = true;
+        _roles[DEFAULT_ADMIN_ROLE].members[msg.sender] = true;
+        emit RoleGranted(DEFAULT_ADMIN_ROLE, msg.sender, msg.sender);
+
+        _setupRole(ADMIN_ROLE, DEFAULT_ADMIN_ROLE);
+        _setupRole(MANAGER_ROLE, ADMIN_ROLE);
+        _setupRole(OPERATOR_ROLE, MANAGER_ROLE);
+
+        _grantRole(ADMIN_ROLE, msg.sender);
+    }
+
+    function hasRole(bytes32 role, address account) public view returns (bool) {
+        return _roles[role].members[account];
+    }
+
+    function getRoleAdmin(bytes32 role) public view returns (bytes32) {
+        return _roles[role].adminRole;
+    }
+
+    function roleExists(bytes32 role) public view returns (bool) {
+        return _roles[role].exists;
+    }
+
+    function grantRole(bytes32 role, address account) external onlyRoleAdmin(role) {
+        _grantRole(role, account);
+    }
+
+    function revokeRole(bytes32 role, address account) external onlyRoleAdmin(role) {
+        _revokeRole(role, account);
+    }
+
+    function renounceRole(bytes32 role) external {
+        _revokeRole(role, msg.sender);
+    }
+
+    function createRole(bytes32 role, bytes32 adminRole) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(!_roles[role].exists, "Role already exists");
+        require(_roles[adminRole].exists, "Admin role does not exist");
+        _setupRole(role, adminRole);
+    }
+
+    function setRoleAdmin(bytes32 role, bytes32 newAdminRole) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_roles[role].exists, "Role does not exist");
+        require(_roles[newAdminRole].exists, "Admin role does not exist");
+        bytes32 previous = _roles[role].adminRole;
+        _roles[role].adminRole = newAdminRole;
+        emit RoleAdminChanged(role, previous, newAdminRole);
+    }
+
+    function hasHierarchicalRole(bytes32 requiredRole, address account) public view returns (bool) {
+        if (hasRole(requiredRole, account)) return true;
+        bytes32 adminRole = getRoleAdmin(requiredRole);
+        if (adminRole == requiredRole) return false;
+        return hasHierarchicalRole(adminRole, account);
+    }
+
+    // Example protected functions
+    function adminFunction() external onlyRole(ADMIN_ROLE) returns (string memory) {
+        return "admin action";
+    }
+
+    function managerFunction() external onlyRole(MANAGER_ROLE) returns (string memory) {
+        return "manager action";
+    }
+
+    function operatorFunction() external onlyRole(OPERATOR_ROLE) returns (string memory) {
+        return "operator action";
+    }
+
+    function _setupRole(bytes32 role, bytes32 adminRole) private {
+        _roles[role].exists = true;
+        _roles[role].adminRole = adminRole;
+        emit RoleCreated(role, adminRole);
+    }
+
+    function _grantRole(bytes32 role, address account) private {
+        require(_roles[role].exists, "Role does not exist");
+        if (!_roles[role].members[account]) {
+            _roles[role].members[account] = true;
+            emit RoleGranted(role, account, msg.sender);
+        }
+    }
+
+    function _revokeRole(bytes32 role, address account) private {
+        require(_roles[role].exists, "Role does not exist");
+        if (_roles[role].members[account]) {
+            _roles[role].members[account] = false;
+            emit RoleRevoked(role, account, msg.sender);
+        }
+    }
+}
+```

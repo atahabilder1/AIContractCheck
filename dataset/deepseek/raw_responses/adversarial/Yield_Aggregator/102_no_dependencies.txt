@@ -1,0 +1,55 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transfer(address to, uint256 value) external returns (bool);
+    function approve(address spender, uint256 value) external returns (bool);
+    function transferFrom(address from, address to, uint256 value) external returns (bool);
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address who) external view returns (uint256);
+    function allowance(address owner, address spender) external view returns (uint256);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
+interface IUniswapV2Router {
+    function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts);
+    function getAmountsOut(uint amountIn, address[] memory path) external view returns (uint[] memory amounts);
+}
+
+interface IUniswapV2Factory {
+    function getPair(address token0, address token1) external view returns (address);
+}
+
+contract YieldAggregator {
+    IUniswapV2Router public router;
+    IUniswapV2Factory public factory;
+
+    constructor(address _router, address _factory) {
+        router = IUniswapV2Router(_router);
+        factory = IUniswapV2Factory(_factory);
+    }
+
+    function getBestYield(address tokenIn, address tokenOut, uint amountIn) public view returns (uint amountOut) {
+        address[] memory path = new address[](2);
+        path[0] = tokenIn;
+        path[1] = tokenOut;
+
+        uint[] memory amounts = router.getAmountsOut(amountIn, path);
+        return amounts[1];
+    }
+
+    function swapTokens(address tokenIn, address tokenOut, uint amountIn) public {
+        IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
+        IERC20(tokenIn).approve(address(router), amountIn);
+
+        address[] memory path = new address[](2);
+        path[0] = tokenIn;
+        path[1] = tokenOut;
+
+        uint deadline = block.timestamp + 1 days;
+        router.swapExactTokensForTokens(amountIn, 1, path, msg.sender, deadline);
+    }
+}
+```

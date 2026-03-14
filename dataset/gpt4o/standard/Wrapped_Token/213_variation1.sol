@@ -1,0 +1,106 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IRebasingToken {
+    function balanceOf(address account) external view returns (uint256);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+}
+
+contract WrappedToken {
+    string public name = "Wrapped Rebasing Token";
+    string public symbol = "wRT";
+    uint8 public decimals = 18;
+
+    IRebasingToken public immutable underlying;
+    uint256 public totalSupply;
+    mapping(address => uint256) private _balances;
+    mapping(address => mapping(address => uint256)) private _allowances;
+
+    constructor(IRebasingToken _underlying) {
+        underlying = _underlying;
+    }
+
+    function balanceOf(address account) external view returns (uint256) {
+        return _balances[account];
+    }
+
+    function allowance(address owner, address spender) external view returns (uint256) {
+        return _allowances[owner][spender];
+    }
+
+    function approve(address spender, uint256 amount) external returns (bool) {
+        _allowances[msg.sender][spender] = amount;
+        emit Approval(msg.sender, spender, amount);
+        return true;
+    }
+
+    function transfer(address recipient, uint256 amount) external returns (bool) {
+        _transfer(msg.sender, recipient, amount);
+        return true;
+    }
+
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool) {
+        uint256 currentAllowance = _allowances[sender][msg.sender];
+        require(currentAllowance >= amount, "Transfer amount exceeds allowance");
+        _allowances[sender][msg.sender] -= amount;
+        _transfer(sender, recipient, amount);
+        return true;
+    }
+
+    function deposit(uint256 amount) external {
+        require(underlying.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        uint256 normalizedAmount = _toNormalizedAmount(amount);
+        _mint(msg.sender, normalizedAmount);
+    }
+
+    function withdraw(uint256 normalizedAmount) external {
+        uint256 underlyingAmount = _toUnderlyingAmount(normalizedAmount);
+        require(underlying.transfer(msg.sender, underlyingAmount), "Transfer failed");
+        _burn(msg.sender, normalizedAmount);
+    }
+
+    function _transfer(address sender, address recipient, uint256 amount) private {
+        require(sender != address(0), "Transfer from the zero address");
+        require(recipient != address(0), "Transfer to the zero address");
+
+        _balances[sender] -= amount;
+        _balances[recipient] += amount;
+        emit Transfer(sender, recipient, amount);
+    }
+
+    function _mint(address account, uint256 amount) private {
+        require(account != address(0), "Mint to the zero address");
+
+        totalSupply += amount;
+        _balances[account] += amount;
+        emit Transfer(address(0), account, amount);
+    }
+
+    function _burn(address account, uint256 amount) private {
+        require(account != address(0), "Burn from the zero address");
+
+        _balances[account] -= amount;
+        totalSupply -= amount;
+        emit Transfer(account, address(0), amount);
+    }
+
+    function _toNormalizedAmount(uint256 underlyingAmount) private view returns (uint256) {
+        uint256 totalUnderlying = underlying.balanceOf(address(this));
+        if (totalSupply == 0 || totalUnderlying == 0) {
+            return underlyingAmount;
+        }
+        return (underlyingAmount * totalSupply) / totalUnderlying;
+    }
+
+    function _toUnderlyingAmount(uint256 normalizedAmount) private view returns (uint256) {
+        uint256 totalUnderlying = underlying.balanceOf(address(this));
+        if (totalSupply == 0 || totalUnderlying == 0) {
+            return normalizedAmount;
+        }
+        return (normalizedAmount * totalUnderlying) / totalSupply;
+    }
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}

@@ -1,0 +1,112 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
+
+contract EmergencyNFT is ERC721Enumerable, Ownable, Pausable {
+    using Counters for Counters.Counter;
+
+    Counters.Counter private _tokenIdCounter;
+
+    uint256 public mintPrice = 0.05 ether;
+    uint256 public maxSupply = 10000;
+    string private _baseTokenURI;
+
+    mapping(address => bool) public admins;
+
+    event AdminAdded(address indexed admin);
+    event AdminRemoved(address indexed admin);
+    event EmergencyWithdraw(address indexed admin, uint256 amount);
+
+    modifier onlyAdmin() {
+        require(admins[msg.sender] || msg.sender == owner(), "Not an admin");
+        _;
+    }
+
+    constructor(string memory name, string memory symbol, string memory baseTokenURI) ERC721(name, symbol) {
+        _baseTokenURI = baseTokenURI;
+        admins[msg.sender] = true;
+    }
+
+    function mint(uint256 quantity) external payable whenNotPaused {
+        require(quantity > 0, "Quantity must be greater than 0");
+        require(msg.value >= mintPrice * quantity, "Insufficient payment");
+        require(_tokenIdCounter.current() + quantity <= maxSupply, "Exceeds max supply");
+
+        for (uint256 i = 0; i < quantity; i++) {
+            _tokenIdCounter.increment();
+            _safeMint(msg.sender, _tokenIdCounter.current());
+        }
+    }
+
+    function addAdmin(address admin) external onlyOwner {
+        admins[admin] = true;
+        emit AdminAdded(admin);
+    }
+
+    function removeAdmin(address admin) external onlyOwner {
+        admins[admin] = false;
+        emit AdminRemoved(admin);
+    }
+
+    function emergencyPause() external onlyAdmin {
+        _pause();
+    }
+
+    function emergencyUnpause() external onlyAdmin {
+        _unpause();
+    }
+
+    function emergencyWithdraw() external onlyAdmin {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No funds to withdraw");
+
+        (bool success, ) = msg.sender.call{value: balance}("");
+        require(success, "Withdraw failed");
+
+        emit EmergencyWithdraw(msg.sender, balance);
+    }
+
+    function emergencyWithdrawTo(address payable to) external onlyAdmin {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No funds to withdraw");
+
+        (bool success, ) = to.call{value: balance}("");
+        require(success, "Withdraw failed");
+
+        emit EmergencyWithdraw(msg.sender, balance);
+    }
+
+    function setMintPrice(uint256 newPrice) external onlyAdmin {
+        mintPrice = newPrice;
+    }
+
+    function setMaxSupply(uint256 newMaxSupply) external onlyAdmin {
+        maxSupply = newMaxSupply;
+    }
+
+    function setBaseURI(string memory baseTokenURI) external onlyAdmin {
+        _baseTokenURI = baseTokenURI;
+    }
+
+    function _baseURI() internal view override returns (string memory) {
+        return _baseTokenURI;
+    }
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId,
+        uint256 batchSize
+    ) internal override whenNotPaused {
+        super._beforeTokenTransfer(from, to, tokenId, batchSize);
+    }
+
+    receive() external payable {}
+}
+```

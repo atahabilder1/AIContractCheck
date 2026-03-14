@@ -1,0 +1,61 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MinimalAMM {
+    uint public reserveA;
+    uint public reserveB;
+
+    event Swap(address indexed sender, uint amountAIn, uint amountBIn, uint amountAOut, uint amountBOut);
+
+    function addLiquidity(uint _amountA, uint _amountB) public {
+        require(_amountA > 0 && _amountB > 0, "Amounts must be greater than zero");
+        reserveA += _amountA;
+        reserveB += _amountB;
+        (bool successA, ) = payable(address(this)).call{value: _amountA}("");
+        require(successA, "Transfer failed for token A");
+        (bool successB, ) = payable(address(this)).call{value: _amountB}("");
+        require(successB, "Transfer failed for token B");
+    }
+
+    function removeLiquidity(uint _amountA, uint _amountB) public {
+        require(_amountA > 0 && _amountB > 0, "Amounts must be greater than zero");
+        require(reserveA >= _amountA && reserveB >= _amountB, "Not enough reserves");
+        reserveA -= _amountA;
+        reserveB -= _amountB;
+        payable(msg.sender).transfer(_amountA);
+        payable(msg.sender).transfer(_amountB);
+    }
+
+    function swapAForB(uint _amountA) public {
+        require(_amountA > 0, "Amount must be greater than zero");
+        require(reserveA >= _amountA, "Not enough reserves");
+        uint amountBOut = getAmountOut(_amountA, reserveA, reserveB);
+        reserveA += _amountA;
+        reserveB -= amountBOut;
+        payable(msg.sender).transfer(amountBOut);
+        emit Swap(msg.sender, _amountA, 0, 0, amountBOut);
+    }
+
+    function swapBForA(uint _amountB) public {
+        require(_amountB > 0, "Amount must be greater than zero");
+        require(reserveB >= _amountB, "Not enough reserves");
+        uint amountAOut = getAmountOut(_amountB, reserveB, reserveA);
+        reserveB += _amountB;
+        reserveA -= amountAOut;
+        payable(msg.sender).transfer(amountAOut);
+        emit Swap(msg.sender, 0, _amountB, amountAOut, 0);
+    }
+
+    function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) internal pure returns (uint) {
+        require(amountIn > 0, "Amount in must be greater than zero");
+        require(reserveIn > 0 && reserveOut > 0, "Reserves must be greater than zero");
+        uint amountInWithFee = amountIn * 997;
+        uint numerator = amountInWithFee * reserveOut;
+        uint denominator = (reserveIn * 1000) + amountInWithFee;
+        return numerator / denominator;
+    }
+
+    receive() external payable {}
+}
+```

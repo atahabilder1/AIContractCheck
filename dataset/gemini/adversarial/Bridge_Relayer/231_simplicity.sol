@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleBridgeRelayer {
+    address public owner;
+    address public remoteChainContractAddress;
+
+    event MessageSent(address indexed to, bytes data);
+
+    constructor(address _remoteChainContractAddress) {
+        owner = msg.sender;
+        remoteChainContractAddress = _remoteChainContractAddress;
+    }
+
+    function sendMessage(bytes memory _data) public onlyOwner {
+        (bool success, ) = remoteChainContractAddress.call(_data);
+        require(success, "Message sending failed");
+        emit MessageSent(remoteChainContractAddress, _data);
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can perform this action");
+        _;
+    }
+}

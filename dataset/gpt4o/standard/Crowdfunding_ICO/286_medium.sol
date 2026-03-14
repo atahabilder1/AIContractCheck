@@ -1,0 +1,105 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Crowdfunding {
+    struct Campaign {
+        address payable creator;
+        uint256 goal;
+        uint256 stretchGoal;
+        uint256 deadline;
+        uint256 fundsRaised;
+        mapping(address => uint256) contributions;
+        bool fundsClaimed;
+        bool stretchGoalReached;
+    }
+
+    uint256 public campaignCount;
+    mapping(uint256 => Campaign) public campaigns;
+    IERC20 public token;
+
+    event CampaignCreated(uint256 id, address creator, uint256 goal, uint256 stretchGoal, uint256 deadline);
+    event ContributionReceived(uint256 id, address contributor, uint256 amount);
+    event FundsClaimed(uint256 id, uint256 amount);
+    event StretchGoalReached(uint256 id);
+
+    modifier isCampaignActive(uint256 _id) {
+        require(block.timestamp < campaigns[_id].deadline, "Campaign has ended");
+        _;
+    }
+
+    modifier isCampaignExpired(uint256 _id) {
+        require(block.timestamp >= campaigns[_id].deadline, "Campaign is still active");
+        _;
+    }
+
+    constructor(address _tokenAddress) {
+        token = IERC20(_tokenAddress);
+    }
+
+    function createCampaign(uint256 _goal, uint256 _stretchGoal, uint256 _duration) external {
+        require(_stretchGoal >= _goal, "Stretch goal must be greater than or equal to goal");
+        uint256 deadline = block.timestamp + _duration;
+
+        campaigns[campaignCount] = Campaign({
+            creator: payable(msg.sender),
+            goal: _goal,
+            stretchGoal: _stretchGoal,
+            deadline: deadline,
+            fundsRaised: 0,
+            fundsClaimed: false,
+            stretchGoalReached: false
+        });
+
+        emit CampaignCreated(campaignCount, msg.sender, _goal, _stretchGoal, deadline);
+        campaignCount++;
+    }
+
+    function contribute(uint256 _id) external payable isCampaignActive(_id) {
+        Campaign storage campaign = campaigns[_id];
+        campaign.contributions[msg.sender] += msg.value;
+        campaign.fundsRaised += msg.value;
+
+        emit ContributionReceived(_id, msg.sender, msg.value);
+
+        if (campaign.fundsRaised >= campaign.stretchGoal && !campaign.stretchGoalReached) {
+            campaign.stretchGoalReached = true;
+            emit StretchGoalReached(_id);
+        }
+    }
+
+    function claimFunds(uint256 _id) external isCampaignExpired(_id) {
+        Campaign storage campaign = campaigns[_id];
+        require(msg.sender == campaign.creator, "Only the creator can claim funds");
+        require(!campaign.fundsClaimed, "Funds already claimed");
+        require(campaign.fundsRaised >= campaign.goal, "Funding goal not reached");
+
+        uint256 amount = campaign.fundsRaised;
+        campaign.fundsClaimed = true;
+        campaign.creator.transfer(amount);
+
+        // Automatic token distribution
+        distributeTokens(_id);
+
+        emit FundsClaimed(_id, amount);
+    }
+
+    function distributeTokens(uint256 _id) internal {
+        Campaign storage campaign = campaigns[_id];
+        for (uint256 i = 0; i < campaignCount; i++) {
+            address contributor = msg.sender;
+            uint256 contribution = campaign.contributions[contributor];
+            if (contribution > 0) {
+                uint256 tokenAmount = (contribution * 1000) / campaign.fundsRaised; // Arbitrary token distribution logic
+                token.transfer(contributor, tokenAmount);
+            }
+        }
+    }
+
+    function getContribution(uint256 _id, address _contributor) external view returns (uint256) {
+        return campaigns[_id].contributions[_contributor];
+    }
+}
+
+interface IERC20 {
+    function transfer(address recipient, uint256 amount) external returns (bool);
+}

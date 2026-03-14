@@ -1,0 +1,31 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract YieldAggregator {
+    struct Yield {
+        uint256 blockNumber;
+        uint256 yield;
+    }
+
+    mapping(address => Yield[]) public yields;
+
+    event YieldUpdated(address indexed token, uint256 yield);
+
+    function updateYield(address token, uint256 yield) public {
+        require(token != address(0), "Invalid token address");
+        require(yield > 0, "Invalid yield value");
+
+        Yield[] storage tokenYields = yields[token];
+        tokenYields.push(Yield({blockNumber: block.number, yield: yield}));
+
+        emit YieldUpdated(token, yield);
+    }
+
+    function getYield(address token) public view returns (uint256) {
+        Yield[] storage tokenYields = yields[token];
+        if (tokenYields.length == 0) {
+            return 0;
+        }
+        return tokenYields[tokenYields.length - 1].yield;
+    }
+}

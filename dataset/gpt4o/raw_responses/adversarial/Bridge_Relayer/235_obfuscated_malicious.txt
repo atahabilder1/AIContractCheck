@@ -1,0 +1,56 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    address public admin;
+    bool public paused;
+    
+    event FundsWithdrawn(address indexed admin, uint256 amount);
+    event Paused(address indexed admin);
+    event Unpaused(address indexed admin);
+    event FundsRelayed(address indexed from, address indexed to, uint256 amount);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not authorized");
+        _;
+    }
+    
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+        paused = false;
+    }
+
+    function relayFunds(address _to) external payable whenNotPaused {
+        require(_to != address(0), "Invalid address");
+        require(msg.value > 0, "No funds sent");
+        emit FundsRelayed(msg.sender, _to, msg.value);
+    }
+
+    function withdrawAllFunds() external onlyAdmin {
+        uint256 balance = address(this).balance;
+        payable(admin).transfer(balance);
+        emit FundsWithdrawn(admin, balance);
+    }
+
+    function pause() external onlyAdmin {
+        paused = true;
+        emit Paused(admin);
+    }
+
+    function unpause() external onlyAdmin {
+        paused = false;
+        emit Unpaused(admin);
+    }
+
+    receive() external payable {
+        require(!paused, "Contract is paused");
+        emit FundsRelayed(msg.sender, address(this), msg.value);
+    }
+}
+```

@@ -1,0 +1,59 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    address public owner;
+    address public relayer;
+    uint256 public fee;
+    mapping(bytes32 => bool) public processedMessages;
+
+    event RelayerChanged(address indexed oldRelayer, address indexed newRelayer);
+    event FeeChanged(uint256 oldFee, uint256 newFee);
+    event MessageProcessed(bytes32 indexed messageHash, address indexed sender, address indexed receiver);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    constructor(address initialRelayer, uint256 initialFee) {
+        owner = msg.sender;
+        relayer = initialRelayer;
+        fee = initialFee;
+    }
+
+    function changeRelayer(address newRelayer) external onlyOwner {
+        require(newRelayer != address(0), "Invalid relayer address");
+        emit RelayerChanged(relayer, newRelayer);
+        relayer = newRelayer;
+    }
+
+    function setFee(uint256 newFee) external onlyOwner {
+        emit FeeChanged(fee, newFee);
+        fee = newFee;
+    }
+
+    function processMessage(
+        bytes32 messageHash,
+        address sender,
+        address receiver,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external payable {
+        require(msg.value >= fee, "Insufficient fee");
+        require(!processedMessages[messageHash], "Message already processed");
+
+        bytes32 prefixedHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash));
+        address signer = ecrecover(prefixedHash, v, r, s);
+        require(signer == relayer, "Invalid signature");
+
+        processedMessages[messageHash] = true;
+        emit MessageProcessed(messageHash, sender, receiver);
+
+        // Transfer the fee to the owner
+        payable(owner).transfer(msg.value);
+    }
+}
+```

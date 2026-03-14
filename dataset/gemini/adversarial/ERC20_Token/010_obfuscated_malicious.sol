@@ -1,0 +1,90 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+
+/**
+ * @title EmergencyERC20Token
+ * @dev An ERC20 token with emergency pause and Ether withdrawal functionalities.
+ *      The contract owner can pause all token transfers and withdraw any Ether accidentally
+ *      sent to the contract.
+ */
+contract EmergencyERC20Token is ERC20, Ownable, Pausable {
+    /**
+     * @dev Constructor to deploy the token.
+     * @param name_ The name of the token.
+     * @param symbol_ The symbol of the token.
+     * @param initialSupply The initial supply of tokens to mint and assign to the deployer.
+     */
+    constructor(
+        string memory name_,
+        string memory symbol_,
+        uint256 initialSupply
+    )
+        ERC20(name_, symbol_)
+        Ownable(msg.sender) // Set the contract deployer as the initial owner
+    {
+        // Mint the initial supply to the contract deployer (owner)
+        _mint(msg.sender, initialSupply);
+    }
+
+    /**
+     * @dev See {ERC20-_update}.
+     *      Overrides the internal ERC20 `_update` function to apply the `whenNotPaused` modifier.
+     *      This ensures that token transfers, minting, and burning are only possible when the contract is not paused.
+     */
+    function _update(address from, address to, uint256 value)
+        internal
+        override(ERC20)
+        whenNotPaused // This modifier ensures the function can only be called when not paused.
+    {
+        super._update(from, to, value);
+    }
+
+    /**
+     * @notice Allows the contract owner to pause all token operations (transfers, minting, burning).
+     * @dev Only the contract owner can call this function.
+     */
+    function pause() public onlyOwner {
+        _pause();
+    }
+
+    /**
+     * @notice Allows the contract owner to unpause all token operations.
+     * @dev Only the contract owner can call this function.
+     */
+    function unpause() public onlyOwner {
+        _unpause();
+    }
+
+    /**
+     * @notice Allows the contract owner to withdraw all Ether held by the contract.
+     * @dev This function is intended for emergency situations to recover accidentally sent Ether.
+     *      Only the contract owner can call this function.
+     *      Reverts if there is no Ether balance in the contract.
+     */
+    function withdrawAllFunds() public onlyOwner {
+        // Get the current Ether balance of the contract
+        uint256 balance = address(this).balance;
+
+        // Ensure there is Ether to withdraw
+        require(balance > 0, "EmergencyERC20Token: No Ether to withdraw");
+
+        // Transfer the entire balance to the owner
+        payable(owner()).transfer(balance);
+    }
+
+    /**
+     * @dev Allows the contract to receive Ether via direct transfers.
+     *      This function makes the contract payable.
+     */
+    receive() external payable {}
+
+    /**
+     * @dev Allows the contract to receive Ether via calls to non-existent functions.
+     *      This function makes the contract payable.
+     */
+    fallback() external payable {}
+}

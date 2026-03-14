@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    struct LockedItem {
+        uint256 amount;
+        uint256 unlockTime;
+    }
+
+    mapping(address => LockedItem) private _lockedBalances;
+
+    function lock(uint256 unlockDuration) external payable {
+        require(msg.value > 0, "No Ether sent");
+        LockedItem storage item = _lockedBalances[msg.sender];
+        require(item.amount == 0, "Existing lock found");
+
+        item.amount = msg.value;
+        item.unlockTime = block.timestamp + unlockDuration;
+    }
+
+    function withdraw() external {
+        LockedItem storage item = _lockedBalances[msg.sender];
+        require(item.amount > 0, "No locked balance");
+        require(block.timestamp >= item.unlockTime, "Lock period not expired");
+
+        uint256 amount = item.amount;
+        delete _lockedBalances[msg.sender];
+        payable(msg.sender).transfer(amount);
+    }
+
+    function getLockedAmount(address account) external view returns (uint256) {
+        return _lockedBalances[account].amount;
+    }
+
+    function getUnlockTime(address account) external view returns (uint256) {
+        return _lockedBalances[account].unlockTime;
+    }
+}

@@ -1,0 +1,55 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
+
+contract GameItems is ERC1155, Ownable {
+    using Strings for uint256;
+
+    // Token ID definitions
+    uint256 public constant GOLD = 0;
+    uint256 public constant SILVER = 1;
+    uint256 public constant SWORD = 2;
+    uint256 public constant SHIELD = 3;
+    uint256 public constant DRAGON = 4; // Example of a non-fungible item
+
+    // Metadata URL
+    string private baseMetadataURI;
+
+    constructor(string memory baseURI) ERC1155(baseURI) {
+        baseMetadataURI = baseURI;
+    }
+
+    function setBaseURI(string memory newBaseURI) external onlyOwner {
+        baseMetadataURI = newBaseURI;
+        _setURI(newBaseURI);
+    }
+
+    function uri(uint256 tokenId) public view override returns (string memory) {
+        return string(abi.encodePacked(baseMetadataURI, tokenId.toString(), ".json"));
+    }
+
+    function mintFungible(address to, uint256 id, uint256 amount, bytes memory data) external onlyOwner {
+        require(id <= 3, "Invalid token ID for fungible item");
+        _mint(to, id, amount, data);
+    }
+
+    function mintNonFungible(address to, uint256 id, bytes memory data) external onlyOwner {
+        require(id >= 4, "Invalid token ID for non-fungible item");
+        _mint(to, id, 1, data); // Minting only one of the non-fungible item
+    }
+
+    function burn(address from, uint256 id, uint256 amount) external {
+        require(from == msg.sender || isApprovedForAll(from, msg.sender), "Caller is not owner nor approved");
+        _burn(from, id, amount);
+    }
+
+    function burnBatch(address from, uint256[] memory ids, uint256[] memory amounts) external {
+        require(from == msg.sender || isApprovedForAll(from, msg.sender), "Caller is not owner nor approved");
+        _burnBatch(from, ids, amounts);
+    }
+}
+```

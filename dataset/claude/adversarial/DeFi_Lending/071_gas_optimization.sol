@@ -1,0 +1,143 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract DeFiLending {
+    address public immutable owner;
+    
+    uint256 constant COLLATERAL_FACTOR = 75;
+    uint256 constant LIQUIDATION_THRESHOLD = 80;
+    uint256 constant INTEREST_RATE_PER_BLOCK = 1e12;
+    uint256 constant PRECISION = 1e18;
+
+    uint256 public totalDeposits;
+    uint256 public totalBorrows;
+    uint256 public lastAccrualBlock;
+    uint256 public borrowIndex = PRECISION;
+
+    struct Account {
+        uint128 deposits;
+        uint128 collateral;
+        uint256 borrowShares;
+        uint256 borrowIndex;
+    }
+
+    mapping(address => Account) public accounts;
+
+    event Deposit(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
+    event CollateralDeposited(address indexed user, uint256 amount);
+    event Borrow(address indexed user, uint256 amount);
+    event Repay(address indexed user, uint256 amount);
+    event Liquidate(address indexed liquidator, address indexed borrower, uint256 repayAmount);
+
+    constructor() {
+        owner = msg.sender;
+        lastAccrualBlock = block.number;
+    }
+
+    function accrueInterest() internal {
+        uint256 blockDelta = block.number - lastAccrualBlock;
+        if (blockDelta == 0) return;
+        lastAccrualBlock = block.number;
+        if (totalBorrows == 0) return;
+        uint256 interest = totalBorrows * INTEREST_RATE_PER_BLOCK * blockDelta / PRECISION;
+        totalBorrows += interest;
+        borrowIndex += borrowIndex * INTEREST_RATE_PER_BLOCK * blockDelta / PRECISION;
+    }
+
+    function currentBorrow(address user) public view returns (uint256) {
+        Account storage a = accounts[user];
+        if (a.borrowShares == 0) return 0;
+        uint256 idx = borrowIndex;
+        uint256 blockDelta = block.number - lastAccrualBlock;
+        if (blockDelta > 0 && totalBorrows > 0) {
+            idx += idx * INTEREST_RATE_PER_BLOCK * blockDelta / PRECISION;
+        }
+        return a.borrowShares * idx / PRECISION;
+    }
+
+    function deposit() external payable {
+        accrueInterest();
+        accounts[msg.sender].deposits += uint128(msg.value);
+        totalDeposits += msg.value;
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function withdraw(uint256 amount) external {
+        accrueInterest();
+        Account storage a = accounts[msg.sender];
+        require(a.deposits >= amount, "insufficient");
+        require(totalDeposits - totalBorrows >= amount, "no liquidity");
+        unchecked { a.deposits -= uint128(amount); }
+        totalDeposits -= amount;
+        _send(msg.sender, amount);
+        emit Withdraw(msg.sender, amount);
+    }
+
+    function depositCollateral() external payable {
+        accounts[msg.sender].collateral += uint128(msg.value);
+        emit CollateralDeposited(msg.sender, msg.value);
+    }
+
+    function borrow(uint256 amount) external {
+        accrueInterest();
+        Account storage a = accounts[msg.sender];
+        require(totalDeposits - totalBorrows >= amount, "no liquidity");
+        uint256 newBorrow = currentBorrow(msg.sender) + amount;
+        require(newBorrow * 100 <= uint256(a.collateral) * COLLATERAL_FACTOR, "undercollateralized");
+        a.borrowShares = newBorrow * PRECISION / borrowIndex;
+        a.borrowIndex = borrowIndex;
+        totalBorrows += amount;
+        _send(msg.sender, amount);
+        emit Borrow(msg.sender, amount);
+    }
+
+    function repay() external payable {
+        accrueInterest();
+        Account storage a = accounts[msg.sender];
+        uint256 owed = currentBorrow(msg.sender);
+        uint256 payment = msg.value > owed ? owed : msg.value;
+        uint256 newOwe = owed - payment;
+        a.borrowShares = newOwe * PRECISION / borrowIndex;
+        totalBorrows = totalBorrows > payment ? totalBorrows - payment : 0;
+        if (msg.value > payment) {
+            _send(msg.sender, msg.value - payment);
+        }
+        emit Repay(msg.sender, payment);
+    }
+
+    function liquidate(address borrower) external payable {
+        accrueInterest();
+        Account storage a = accounts[borrower];
+        uint256 owed = currentBorrow(borrower);
+        require(owed * 100 > uint256(a.collateral) * LIQUIDATION_THRESHOLD, "healthy");
+        uint256 payment = msg.value > owed ? owed : msg.value;
+        uint256 seizeAmount = payment * 110 / 100;
+        if (seizeAmount > a.collateral) seizeAmount = a.collateral;
+        uint256 newOwe = owed - payment;
+        a.borrowShares = newOwe * PRECISION / borrowIndex;
+        unchecked { a.collateral -= uint128(seizeAmount); }
+        totalBorrows = totalBorrows > payment ? totalBorrows - payment : 0;
+        uint256 refund = msg.value > payment ? msg.value - payment : 0;
+        _send(msg.sender, seizeAmount + refund);
+        emit Liquidate(msg.sender, borrower, payment);
+    }
+
+    function withdrawCollateral(uint256 amount) external {
+        accrueInterest();
+        Account storage a = accounts[msg.sender];
+        require(a.collateral >= amount, "insufficient");
+        uint256 remaining = uint256(a.collateral) - amount;
+        uint256 owed = currentBorrow(msg.sender);
+        require(owed * 100 <= remaining * COLLATERAL_FACTOR, "undercollateralized");
+        unchecked { a.collateral -= uint128(amount); }
+        _send(msg.sender, amount);
+    }
+
+    function _send(address to, uint256 amount) internal {
+        assembly {
+            let ok := call(gas(), to, amount, 0, 0, 0, 0)
+            if iszero(ok) { revert(0, 0) }
+        }
+    }
+}

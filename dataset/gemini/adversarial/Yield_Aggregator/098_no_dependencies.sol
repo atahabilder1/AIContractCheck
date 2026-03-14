@@ -1,0 +1,108 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleYieldAggregator {
+
+    address public owner;
+    address[] public registeredVaults;
+    mapping(address => bool) public isVaultRegistered;
+
+    event VaultRegistered(address indexed vaultAddress);
+    event Deposit(address indexed user, uint256 amount);
+    event Withdrawal(address indexed user, uint256 amount);
+    event YieldHarvested(address indexed vault, uint256 harvestedAmount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function registerVault(address _vaultAddress) public onlyOwner {
+        require(_vaultAddress != address(0), "Invalid vault address");
+        require(!isVaultRegistered[_vaultAddress], "Vault already registered");
+
+        registeredVaults.push(_vaultAddress);
+        isVaultRegistered[_vaultAddress] = true;
+        emit VaultRegistered(_vaultAddress);
+    }
+
+    function unregisterVault(address _vaultAddress) public onlyOwner {
+        require(isVaultRegistered[_vaultAddress], "Vault not registered");
+
+        // Find and remove the vault from the array
+        for (uint i = 0; i < registeredVaults.length; i++) {
+            if (registeredVaults[i] == _vaultAddress) {
+                registeredVaults[i] = registeredVaults[registeredVaults.length - 1];
+                registeredVaults.pop();
+                break;
+            }
+        }
+        isVaultRegistered[_vaultAddress] = false;
+        // No event for unregistering to keep it simple
+    }
+
+    // This function would typically interact with a vault's deposit function
+    // For simplicity, this contract doesn't hold any native tokens itself.
+    // Users would deposit directly into the vaults they want to aggregate.
+    // This aggregator acts as a registry and potentially a harvester.
+    function depositToVault(address _vaultAddress, uint256 _amount) public payable {
+        require(isVaultRegistered[_vaultAddress], "Vault not registered");
+        // In a real scenario, you would call the vault's deposit function.
+        // For this simplified example, we assume the user deposits directly.
+        // This function is mainly to demonstrate interaction intent and emit an event.
+        emit Deposit(msg.sender, _amount);
+        // You might want to ensure the vault can receive Ether if using payable
+        // or handle ERC20 tokens if that's the underlying asset.
+    }
+
+    // This function would typically interact with a vault's withdraw function
+    // For simplicity, this contract doesn't track user balances in vaults.
+    // Users would withdraw directly from the vaults.
+    function withdrawFromVault(address _vaultAddress, uint256 _amount) public {
+        require(isVaultRegistered[_vaultAddress], "Vault not registered");
+        // In a real scenario, you would call the vault's withdraw function.
+        // For this simplified example, we assume the user withdraws directly.
+        emit Withdrawal(msg.sender, _amount);
+    }
+
+    // This function would be called to harvest yield from registered vaults.
+    // It assumes vaults have a function to harvest yield and send it to this aggregator.
+    function harvestYield() public {
+        require(registeredVaults.length > 0, "No registered vaults to harvest from");
+
+        for (uint i = 0; i < registeredVaults.length; i++) {
+            address vault = registeredVaults[i];
+            // This is a placeholder. In a real contract, you'd need to know
+            // the specific function signature of the vault to call for harvesting.
+            // For example, if vaults have a `harvest()` function that sends yield here:
+            // (bool success, ) = vault.call(abi.encodeWithSignature("harvest()"));
+            // require(success, "Failed to harvest from vault");
+
+            // For this example, we'll just emit an event assuming a harvest occurred.
+            // A real implementation would require a way for vaults to send yield to this contract.
+            uint256 simulatedHarvestAmount = 1 ether; // Placeholder
+            emit YieldHarvested(vault, simulatedHarvestAmount);
+        }
+    }
+
+    // Function to receive Ether, if the aggregator itself were to hold funds or be a target for yield.
+    receive() external payable {}
+
+    // Function to withdraw any Ether held by this aggregator contract (e.g., from harvested yield).
+    function withdrawEther(uint256 _amount) public onlyOwner {
+        require(address(this).balance >= _amount, "Insufficient contract balance");
+        payable(owner).transfer(_amount);
+    }
+
+    // Function to withdraw any ERC20 tokens held by this aggregator contract.
+    // This requires knowing the token address and implementing ERC20 logic.
+    // For simplicity, this is omitted but would be crucial in a real scenario.
+    // function withdrawERC20Token(address _tokenAddress, uint256 _amount) public onlyOwner {
+    //     require(_tokenAddress != address(0), "Invalid token address");
+    //     // ERC20 transfer logic would go here
+    // }
+}

@@ -1,0 +1,210 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+interface IFlashLoanReceiver {
+    function executeOperation(
+        address[] calldata assets,
+        uint256[] calldata amounts,
+        uint256[] calldata fees,
+        address initiator,
+        bytes calldata params
+    ) external returns (bool);
+}
+
+contract PoolToken is ERC20 {
+    address public immutable pool;
+    uint8 private _decimals;
+
+    modifier onlyPool() {
+        require(msg.sender == pool, "Only pool");
+        _;
+    }
+
+    constructor(
+        string memory name,
+        string memory symbol,
+        uint8 decimals_
+    ) ERC20(name, symbol) {
+        pool = msg.sender;
+        _decimals = decimals_;
+    }
+
+    function decimals() public view override returns (uint8) {
+        return _decimals;
+    }
+
+    function mint(address to, uint256 amount) external onlyPool {
+        _mint(to, amount);
+    }
+
+    function burn(address from, uint256 amount) external onlyPool {
+        _burn(from, amount);
+    }
+}
+
+contract FlashLoanProvider is ReentrancyGuard, Ownable {
+    using SafeERC20 for IERC20;
+
+    uint256 public constant FEE_BPS = 9; // 0.09%
+    uint256 public constant BPS_DENOMINATOR = 10000;
+
+    struct PoolInfo {
+        PoolToken poolToken;
+        bool active;
+    }
+
+    mapping(address => PoolInfo) public pools;
+    address[] public supportedAssets;
+
+    event PoolCreated(address indexed asset, address poolToken);
+    event Deposited(address indexed asset, address indexed user, uint256 amount, uint256 shares);
+    event Withdrawn(address indexed asset, address indexed user, uint256 amount, uint256 shares);
+    event FlashLoan(
+        address indexed receiver,
+        address indexed initiator,
+        address[] assets,
+        uint256[] amounts,
+        uint256[] fees
+    );
+
+    constructor() Ownable(msg.sender) {}
+
+    function createPool(address asset) external onlyOwner {
+        require(address(pools[asset].poolToken) == address(0), "Pool exists");
+
+        string memory name = string.concat("Pool ", ERC20(asset).name());
+        string memory symbol = string.concat("p", ERC20(asset).symbol());
+        uint8 dec = ERC20(asset).decimals();
+
+        PoolToken pToken = new PoolToken(name, symbol, dec);
+        pools[asset] = PoolInfo({poolToken: pToken, active: true});
+        supportedAssets.push(asset);
+
+        emit PoolCreated(asset, address(pToken));
+    }
+
+    function setPoolActive(address asset, bool active) external onlyOwner {
+        require(address(pools[asset].poolToken) != address(0), "No pool");
+        pools[asset].active = active;
+    }
+
+    function deposit(address asset, uint256 amount) external nonReentrant {
+        PoolInfo storage pool = pools[asset];
+        require(address(pool.poolToken) != address(0), "No pool");
+        require(pool.active, "Pool inactive");
+        require(amount > 0, "Zero amount");
+
+        uint256 totalAssets = IERC20(asset).balanceOf(address(this));
+        uint256 totalShares = pool.poolToken.totalSupply();
+
+        uint256 shares;
+        if (totalShares == 0 || totalAssets == 0) {
+            shares = amount;
+        } else {
+            shares = (amount * totalShares) / totalAssets;
+        }
+        require(shares > 0, "Zero shares");
+
+        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+        pool.poolToken.mint(msg.sender, shares);
+
+        emit Deposited(asset, msg.sender, amount, shares);
+    }
+
+    function withdraw(address asset, uint256 shares) external nonReentrant {
+        PoolInfo storage pool = pools[asset];
+        require(address(pool.poolToken) != address(0), "No pool");
+        require(shares > 0, "Zero shares");
+
+        uint256 totalAssets = IERC20(asset).balanceOf(address(this));
+        uint256 totalShares = pool.poolToken.totalSupply();
+
+        uint256 amount = (shares * totalAssets) / totalShares;
+        require(amount > 0, "Zero amount");
+
+        pool.poolToken.burn(msg.sender, shares);
+        IERC20(asset).safeTransfer(msg.sender, amount);
+
+        emit Withdrawn(asset, msg.sender, amount, shares);
+    }
+
+    function flashLoan(
+        address receiver,
+        address[] calldata assets,
+        uint256[] calldata amounts,
+        bytes calldata params
+    ) external nonReentrant {
+        uint256 len = assets.length;
+        require(len > 0 && len == amounts.length, "Invalid params");
+
+        uint256[] memory fees = new uint256[](len);
+        uint256[] memory balancesBefore = new uint256[](len);
+
+        for (uint256 i = 0; i < len; i++) {
+            require(address(pools[assets[i]].poolToken) != address(0), "No pool");
+            require(pools[assets[i]].active, "Pool inactive");
+            require(amounts[i] > 0, "Zero amount");
+
+            balancesBefore[i] = IERC20(assets[i]).balanceOf(address(this));
+            require(balancesBefore[i] >= amounts[i], "Insufficient liquidity");
+
+            fees[i] = (amounts[i] * FEE_BPS + BPS_DENOMINATOR - 1) / BPS_DENOMINATOR;
+
+            IERC20(assets[i]).safeTransfer(receiver, amounts[i]);
+        }
+
+        require(
+            IFlashLoanReceiver(receiver).executeOperation(
+                assets,
+                amounts,
+                fees,
+                msg.sender,
+                params
+            ),
+            "Callback failed"
+        );
+
+        for (uint256 i = 0; i < len; i++) {
+            uint256 balanceAfter = IERC20(assets[i]).balanceOf(address(this));
+            require(
+                balanceAfter >= balancesBefore[i] + fees[i],
+                "Flash loan not repaid"
+            );
+        }
+
+        emit FlashLoan(receiver, msg.sender, assets, amounts, fees);
+    }
+
+    function getPoolTokenAddress(address asset) external view returns (address) {
+        return address(pools[asset].poolToken);
+    }
+
+    function getExchangeRate(address asset) external view returns (uint256) {
+        PoolInfo storage pool = pools[asset];
+        uint256 totalShares = pool.poolToken.totalSupply();
+        if (totalShares == 0) return 1e18;
+        uint256 totalAssets = IERC20(asset).balanceOf(address(this));
+        return (totalAssets * 1e18) / totalShares;
+    }
+
+    function getMaxFlashLoan(address asset) external view returns (uint256) {
+        if (address(pools[asset].poolToken) == address(0) || !pools[asset].active) return 0;
+        return IERC20(asset).balanceOf(address(this));
+    }
+
+    function getFlashLoanFee(uint256 amount) external pure returns (uint256) {
+        return (amount * FEE_BPS + BPS_DENOMINATOR - 1) / BPS_DENOMINATOR;
+    }
+
+    function getSupportedAssets() external view returns (address[] memory) {
+        return supportedAssets;
+    }
+}
+```

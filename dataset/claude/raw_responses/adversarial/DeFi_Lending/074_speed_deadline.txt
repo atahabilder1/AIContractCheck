@@ -1,0 +1,265 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract DeFiLending is ReentrancyGuard, Ownable {
+    using SafeERC20 for IERC20;
+
+    struct Market {
+        uint256 totalDeposits;
+        uint256 totalBorrows;
+        uint256 baseRate;        // Base interest rate (basis points)
+        uint256 slopeRate;       // Slope rate (basis points)
+        uint256 collateralFactor; // e.g., 7500 = 75%
+        uint256 lastUpdateTime;
+        uint256 borrowIndex;
+        uint256 supplyIndex;
+        bool isListed;
+    }
+
+    struct UserAccount {
+        uint256 deposited;
+        uint256 borrowed;
+        uint256 borrowIndex;
+        uint256 supplyIndex;
+    }
+
+    mapping(address => Market) public markets;
+    mapping(address => mapping(address => UserAccount)) public accounts; // token => user => account
+    address[] public listedTokens;
+
+    mapping(address => mapping(address => uint256)) public collateralBalances; // user => token => amount
+
+    uint256 public constant PRECISION = 1e18;
+    uint256 public constant BPS = 10000;
+    uint256 public constant SECONDS_PER_YEAR = 365 days;
+    uint256 public liquidationIncentive = 10800; // 108%
+
+    event Deposit(address indexed user, address indexed token, uint256 amount);
+    event Withdraw(address indexed user, address indexed token, uint256 amount);
+    event Borrow(address indexed user, address indexed token, uint256 amount);
+    event Repay(address indexed user, address indexed token, uint256 amount);
+    event Liquidate(address indexed liquidator, address indexed borrower, address debtToken, address collateralToken, uint256 repayAmount);
+
+    constructor() Ownable(msg.sender) {}
+
+    function listToken(
+        address token,
+        uint256 baseRate,
+        uint256 slopeRate,
+        uint256 collateralFactor
+    ) external onlyOwner {
+        require(!markets[token].isListed, "Already listed");
+        require(collateralFactor <= 9000, "CF too high");
+
+        markets[token] = Market({
+            totalDeposits: 0,
+            totalBorrows: 0,
+            baseRate: baseRate,
+            slopeRate: slopeRate,
+            collateralFactor: collateralFactor,
+            lastUpdateTime: block.timestamp,
+            borrowIndex: PRECISION,
+            supplyIndex: PRECISION,
+            isListed: true
+        });
+        listedTokens.push(token);
+    }
+
+    function deposit(address token, uint256 amount) external nonReentrant {
+        Market storage market = markets[token];
+        require(market.isListed, "Not listed");
+        require(amount > 0, "Zero amount");
+
+        _accrueInterest(token);
+
+        UserAccount storage account = accounts[token][msg.sender];
+        _updateUserInterest(account, market);
+
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+
+        account.deposited += amount;
+        market.totalDeposits += amount;
+        collateralBalances[msg.sender][token] += amount;
+
+        emit Deposit(msg.sender, token, amount);
+    }
+
+    function withdraw(address token, uint256 amount) external nonReentrant {
+        Market storage market = markets[token];
+        require(market.isListed, "Not listed");
+
+        _accrueInterest(token);
+
+        UserAccount storage account = accounts[token][msg.sender];
+        _updateUserInterest(account, market);
+
+        require(account.deposited >= amount, "Insufficient balance");
+
+        account.deposited -= amount;
+        market.totalDeposits -= amount;
+        collateralBalances[msg.sender][token] -= amount;
+
+        require(_isHealthy(msg.sender), "Unhealthy after withdraw");
+
+        IERC20(token).safeTransfer(msg.sender, amount);
+
+        emit Withdraw(msg.sender, token, amount);
+    }
+
+    function borrow(address token, uint256 amount) external nonReentrant {
+        Market storage market = markets[token];
+        require(market.isListed, "Not listed");
+        require(amount > 0, "Zero amount");
+        require(market.totalDeposits - market.totalBorrows >= amount, "Insufficient liquidity");
+
+        _accrueInterest(token);
+
+        UserAccount storage account = accounts[token][msg.sender];
+        _updateUserInterest(account, market);
+
+        account.borrowed += amount;
+        market.totalBorrows += amount;
+
+        require(_isHealthy(msg.sender), "Insufficient collateral");
+
+        IERC20(token).safeTransfer(msg.sender, amount);
+
+        emit Borrow(msg.sender, token, amount);
+    }
+
+    function repay(address token, uint256 amount) external nonReentrant {
+        Market storage market = markets[token];
+        require(market.isListed, "Not listed");
+
+        _accrueInterest(token);
+
+        UserAccount storage account = accounts[token][msg.sender];
+        _updateUserInterest(account, market);
+
+        uint256 repayAmount = amount > account.borrowed ? account.borrowed : amount;
+        require(repayAmount > 0, "Nothing to repay");
+
+        IERC20(token).safeTransferFrom(msg.sender, address(this), repayAmount);
+
+        account.borrowed -= repayAmount;
+        market.totalBorrows -= repayAmount;
+
+        emit Repay(msg.sender, token, repayAmount);
+    }
+
+    function liquidate(
+        address borrower,
+        address debtToken,
+        address collateralToken,
+        uint256 repayAmount
+    ) external nonReentrant {
+        require(!_isHealthy(borrower), "Account is healthy");
+
+        _accrueInterest(debtToken);
+        _accrueInterest(collateralToken);
+
+        UserAccount storage debtAccount = accounts[debtToken][borrower];
+        _updateUserInterest(debtAccount, markets[debtToken]);
+
+        uint256 maxRepay = debtAccount.borrowed / 2; // Close factor 50%
+        require(repayAmount <= maxRepay, "Repay too much");
+
+        IERC20(debtToken).safeTransferFrom(msg.sender, address(this), repayAmount);
+        debtAccount.borrowed -= repayAmount;
+        markets[debtToken].totalBorrows -= repayAmount;
+
+        // Seize collateral (1:1 price assumption for demo simplicity)
+        uint256 seizeAmount = (repayAmount * liquidationIncentive) / BPS;
+
+        UserAccount storage collAccount = accounts[collateralToken][borrower];
+        _updateUserInterest(collAccount, markets[collateralToken]);
+
+        require(collAccount.deposited >= seizeAmount, "Insufficient collateral to seize");
+
+        collAccount.deposited -= seizeAmount;
+        markets[collateralToken].totalDeposits -= seizeAmount;
+        collateralBalances[borrower][collateralToken] -= seizeAmount;
+
+        IERC20(collateralToken).safeTransfer(msg.sender, seizeAmount);
+
+        emit Liquidate(msg.sender, borrower, debtToken, collateralToken, repayAmount);
+    }
+
+    function _accrueInterest(address token) internal {
+        Market storage market = markets[token];
+        uint256 elapsed = block.timestamp - market.lastUpdateTime;
+        if (elapsed == 0) return;
+
+        uint256 rate = _getBorrowRate(market);
+        uint256 interestFactor = (rate * elapsed) / SECONDS_PER_YEAR;
+
+        if (market.totalBorrows > 0) {
+            uint256 interestAccumulated = (market.totalBorrows * interestFactor) / PRECISION;
+            market.totalBorrows += interestAccumulated;
+            market.borrowIndex += (market.borrowIndex * interestFactor) / PRECISION;
+
+            if (market.totalDeposits > 0) {
+                market.supplyIndex += (market.supplyIndex * interestAccumulated) / (market.totalDeposits * PRECISION / PRECISION);
+            }
+        }
+
+        market.lastUpdateTime = block.timestamp;
+    }
+
+    function _updateUserInterest(UserAccount storage account, Market storage market) internal {
+        if (account.borrowed > 0 && account.borrowIndex > 0) {
+            account.borrowed = (account.borrowed * market.borrowIndex) / account.borrowIndex;
+        }
+        if (account.deposited > 0 && account.supplyIndex > 0) {
+            account.deposited = (account.deposited * market.supplyIndex) / account.supplyIndex;
+        }
+        account.borrowIndex = market.borrowIndex;
+        account.supplyIndex = market.supplyIndex;
+    }
+
+    function _getBorrowRate(Market storage market) internal view returns (uint256) {
+        if (market.totalDeposits == 0) return market.baseRate * PRECISION / BPS;
+        uint256 utilization = (market.totalBorrows * PRECISION) / market.totalDeposits;
+        return ((market.baseRate * PRECISION) + (utilization * market.slopeRate)) / BPS;
+    }
+
+    function _isHealthy(address user) internal view returns (bool) {
+        uint256 totalCollateralValue = 0;
+        uint256 totalBorrowValue = 0;
+
+        for (uint256 i = 0; i < listedTokens.length; i++) {
+            address token = listedTokens[i];
+            Market storage market = markets[token];
+            UserAccount storage account = accounts[token][user];
+
+            // 1:1 price assumption for demo
+            totalCollateralValue += (collateralBalances[user][token] * market.collateralFactor) / BPS;
+            totalBorrowValue += account.borrowed;
+        }
+
+        return totalCollateralValue >= totalBorrowValue;
+    }
+
+    function getAccountHealth(address user) external view returns (uint256 collateral, uint256 borrows) {
+        for (uint256 i = 0; i < listedTokens.length; i++) {
+            address token = listedTokens[i];
+            Market storage market = markets[token];
+            UserAccount storage account = accounts[token][user];
+            collateral += (collateralBalances[user][token] * market.collateralFactor) / BPS;
+            borrows += account.borrowed;
+        }
+    }
+
+    function getUtilization(address token) external view returns (uint256) {
+        Market storage market = markets[token];
+        if (market.totalDeposits == 0) return 0;
+        return (market.totalBorrows * PRECISION) / market.totalDeposits;
+    }
+}
+```

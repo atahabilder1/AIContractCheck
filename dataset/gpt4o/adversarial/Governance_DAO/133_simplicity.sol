@@ -1,0 +1,62 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MinimalDAO {
+    address public chairperson;
+    mapping(address => bool) public members;
+    mapping(bytes32 => Proposal) public proposals;
+    uint public proposalCount;
+
+    struct Proposal {
+        bytes32 id;
+        string description;
+        uint voteCount;
+        bool executed;
+        mapping(address => bool) voted;
+    }
+
+    event ProposalCreated(bytes32 id, string description);
+    event Voted(bytes32 proposalId, address voter);
+    event ProposalExecuted(bytes32 id);
+
+    modifier onlyMember() {
+        require(members[msg.sender], "Not a member");
+        _;
+    }
+
+    constructor() {
+        chairperson = msg.sender;
+        members[chairperson] = true;
+    }
+
+    function addMember(address newMember) external {
+        require(msg.sender == chairperson, "Only chairperson can add members");
+        members[newMember] = true;
+    }
+
+    function createProposal(string calldata description) external onlyMember {
+        bytes32 proposalId = keccak256(abi.encodePacked(description, proposalCount, block.timestamp));
+        Proposal storage newProposal = proposals[proposalId];
+        newProposal.id = proposalId;
+        newProposal.description = description;
+        proposalCount++;
+        emit ProposalCreated(proposalId, description);
+    }
+
+    function vote(bytes32 proposalId) external onlyMember {
+        Proposal storage proposal = proposals[proposalId];
+        require(!proposal.voted[msg.sender], "Already voted");
+        proposal.voted[msg.sender] = true;
+        proposal.voteCount++;
+        emit Voted(proposalId, msg.sender);
+    }
+
+    function executeProposal(bytes32 proposalId) external onlyMember {
+        Proposal storage proposal = proposals[proposalId];
+        require(!proposal.executed, "Proposal already executed");
+        require(proposal.voteCount > 0, "Not enough votes");
+        proposal.executed = true;
+        emit ProposalExecuted(proposalId);
+        // Add execution logic here
+    }
+}

@@ -1,0 +1,124 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+contract SimpleDEX is ERC20 {
+    IERC20 public tokenA;
+    IERC20 public tokenB;
+
+    uint256 public reserveA;
+    uint256 public reserveB;
+
+    uint256 public constant FEE_NUMERATOR = 3;
+    uint256 public constant FEE_DENOMINATOR = 1000;
+
+    event LiquidityAdded(address indexed provider, uint256 amountA, uint256 amountB, uint256 liquidity);
+    event LiquidityRemoved(address indexed provider, uint256 amountA, uint256 amountB, uint256 liquidity);
+    event Swap(address indexed user, address indexed tokenIn, uint256 amountIn, uint256 amountOut);
+
+    constructor(address _tokenA, address _tokenB) ERC20("DEX LP Token", "DEX-LP") {
+        require(_tokenA != _tokenB, "Identical tokens");
+        tokenA = IERC20(_tokenA);
+        tokenB = IERC20(_tokenB);
+    }
+
+    function addLiquidity(uint256 amountA, uint256 amountB) external returns (uint256 liquidity) {
+        require(amountA > 0 && amountB > 0, "Zero amounts");
+
+        if (reserveA == 0 && reserveB == 0) {
+            liquidity = sqrt(amountA * amountB);
+        } else {
+            uint256 liquidityA = (amountA * totalSupply()) / reserveA;
+            uint256 liquidityB = (amountB * totalSupply()) / reserveB;
+            liquidity = liquidityA < liquidityB ? liquidityA : liquidityB;
+        }
+
+        require(liquidity > 0, "Insufficient liquidity minted");
+
+        tokenA.transferFrom(msg.sender, address(this), amountA);
+        tokenB.transferFrom(msg.sender, address(this), amountB);
+
+        reserveA += amountA;
+        reserveB += amountB;
+
+        _mint(msg.sender, liquidity);
+
+        emit LiquidityAdded(msg.sender, amountA, amountB, liquidity);
+    }
+
+    function removeLiquidity(uint256 liquidity) external returns (uint256 amountA, uint256 amountB) {
+        require(liquidity > 0, "Zero liquidity");
+        require(balanceOf(msg.sender) >= liquidity, "Insufficient LP tokens");
+
+        amountA = (liquidity * reserveA) / totalSupply();
+        amountB = (liquidity * reserveB) / totalSupply();
+
+        require(amountA > 0 && amountB > 0, "Insufficient amounts");
+
+        _burn(msg.sender, liquidity);
+
+        reserveA -= amountA;
+        reserveB -= amountB;
+
+        tokenA.transfer(msg.sender, amountA);
+        tokenB.transfer(msg.sender, amountB);
+
+        emit LiquidityRemoved(msg.sender, amountA, amountB, liquidity);
+    }
+
+    function swapAForB(uint256 amountIn) external returns (uint256 amountOut) {
+        require(amountIn > 0, "Zero input");
+        amountOut = getAmountOut(amountIn, reserveA, reserveB);
+        require(amountOut > 0, "Insufficient output");
+
+        tokenA.transferFrom(msg.sender, address(this), amountIn);
+        tokenB.transfer(msg.sender, amountOut);
+
+        reserveA += amountIn;
+        reserveB -= amountOut;
+
+        emit Swap(msg.sender, address(tokenA), amountIn, amountOut);
+    }
+
+    function swapBForA(uint256 amountIn) external returns (uint256 amountOut) {
+        require(amountIn > 0, "Zero input");
+        amountOut = getAmountOut(amountIn, reserveB, reserveA);
+        require(amountOut > 0, "Insufficient output");
+
+        tokenB.transferFrom(msg.sender, address(this), amountIn);
+        tokenA.transfer(msg.sender, amountOut);
+
+        reserveB += amountIn;
+        reserveA -= amountOut;
+
+        emit Swap(msg.sender, address(tokenB), amountIn, amountOut);
+    }
+
+    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) public pure returns (uint256) {
+        uint256 amountInWithFee = amountIn * (FEE_DENOMINATOR - FEE_NUMERATOR);
+        uint256 numerator = amountInWithFee * reserveOut;
+        uint256 denominator = (reserveIn * FEE_DENOMINATOR) + amountInWithFee;
+        return numerator / denominator;
+    }
+
+    function getPrice(address token) external view returns (uint256) {
+        if (token == address(tokenA)) {
+            return (reserveB * 1e18) / reserveA;
+        } else if (token == address(tokenB)) {
+            return (reserveA * 1e18) / reserveB;
+        }
+        revert("Invalid token");
+    }
+
+    function sqrt(uint256 x) internal pure returns (uint256 y) {
+        if (x == 0) return 0;
+        uint256 z = (x + 1) / 2;
+        y = x;
+        while (z < y) {
+            y = z;
+            z = (x / z + z) / 2;
+        }
+    }
+}

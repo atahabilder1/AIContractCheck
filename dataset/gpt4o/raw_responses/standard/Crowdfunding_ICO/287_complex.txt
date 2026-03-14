@@ -1,0 +1,148 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract ICO is Ownable, ReentrancyGuard {
+    IERC20 public token;
+    uint256 public softCap;
+    uint256 public hardCap;
+    uint256 public totalRaised;
+    bool public finalized;
+    bool public kycRequired;
+
+    struct Round {
+        uint256 rate;
+        uint256 startTime;
+        uint256 endTime;
+    }
+
+    struct VestingSchedule {
+        uint256 amount;
+        uint256 released;
+        uint256 start;
+        uint256 cliff;
+        uint256 duration;
+    }
+
+    mapping(address => bool) public whitelistTier1;
+    mapping(address => bool) public whitelistTier2;
+    mapping(address => VestingSchedule) public vestingSchedules;
+    Round[] public rounds;
+
+    event TokensPurchased(address indexed purchaser, uint256 amount);
+    event Finalized();
+
+    constructor(
+        IERC20 _token,
+        uint256 _softCap,
+        uint256 _hardCap,
+        bool _kycRequired
+    ) {
+        require(address(_token) != address(0), "Invalid token address");
+        require(_softCap < _hardCap, "Soft cap must be less than hard cap");
+
+        token = _token;
+        softCap = _softCap;
+        hardCap = _hardCap;
+        kycRequired = _kycRequired;
+    }
+
+    modifier onlyWhitelisted() {
+        require(whitelistTier1[msg.sender] || whitelistTier2[msg.sender], "Not whitelisted");
+        _;
+    }
+
+    modifier kycVerified() {
+        if (kycRequired) {
+            // Implement KYC verification logic
+            require(isKycVerified(msg.sender), "KYC not verified");
+        }
+        _;
+    }
+
+    function addRound(uint256 rate, uint256 startTime, uint256 endTime) external onlyOwner {
+        require(startTime < endTime, "Invalid time range");
+        rounds.push(Round(rate, startTime, endTime));
+    }
+
+    function buyTokens() external payable nonReentrant onlyWhitelisted kycVerified {
+        require(!finalized, "ICO is finalized");
+        require(totalRaised + msg.value <= hardCap, "Exceeds hard cap");
+
+        uint256 tokens = _getTokenAmount(msg.value);
+        require(tokens > 0, "Invalid amount");
+
+        totalRaised += msg.value;
+
+        // Calculate vesting schedule
+        vestingSchedules[msg.sender] = VestingSchedule(
+            tokens,
+            0,
+            block.timestamp,
+            30 days,
+            365 days
+        );
+
+        emit TokensPurchased(msg.sender, tokens);
+    }
+
+    function release() external {
+        VestingSchedule storage vesting = vestingSchedules[msg.sender];
+        require(vesting.amount > 0, "No tokens to release");
+
+        uint256 unreleased = _releasableAmount(vesting);
+        require(unreleased > 0, "No releasable tokens");
+
+        vesting.released += unreleased;
+        token.transfer(msg.sender, unreleased);
+    }
+
+    function finalize() external onlyOwner {
+        require(!finalized, "Already finalized");
+        require(totalRaised >= softCap, "Soft cap not reached");
+
+        finalized = true;
+        emit Finalized();
+    }
+
+    function _getTokenAmount(uint256 weiAmount) internal view returns (uint256) {
+        for (uint256 i = 0; i < rounds.length; i++) {
+            if (block.timestamp >= rounds[i].startTime && block.timestamp <= rounds[i].endTime) {
+                return weiAmount * rounds[i].rate;
+            }
+        }
+        return 0;
+    }
+
+    function _releasableAmount(VestingSchedule memory vesting) internal view returns (uint256) {
+        if (block.timestamp < vesting.start + vesting.cliff) {
+            return 0;
+        } else if (block.timestamp >= vesting.start + vesting.duration) {
+            return vesting.amount - vesting.released;
+        } else {
+            return ((vesting.amount * (block.timestamp - vesting.start)) / vesting.duration) - vesting.released;
+        }
+    }
+
+    function isKycVerified(address user) internal view returns (bool) {
+        // Implement KYC verification logic
+        return true;
+    }
+
+    function addToWhitelistTier1(address[] calldata addresses) external onlyOwner {
+        for (uint256 i = 0; i < addresses.length; i++) {
+            whitelistTier1[addresses[i]] = true;
+        }
+    }
+
+    function addToWhitelistTier2(address[] calldata addresses) external onlyOwner {
+        for (uint256 i = 0; i < addresses.length; i++) {
+            whitelistTier2[addresses[i]] = true;
+        }
+    }
+}
+```

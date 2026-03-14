@@ -1,0 +1,66 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract WrappedToken is ERC20, Ownable {
+    address public immutable sourceChainTokenAddress;
+    uint256 public immutable sourceChainId;
+
+    event Minted(address indexed to, uint256 amount);
+    event Burned(address indexed from, uint256 amount);
+
+    modifier onlySourceChain() {
+        // In a real-world scenario, this would involve
+        // more robust cross-chain communication and verification.
+        // This is a simplified example trusting a direct call.
+        _;
+    }
+
+    constructor(
+        string memory name,
+        string memory symbol,
+        address _sourceChainTokenAddress,
+        uint256 _sourceChainId
+    ) ERC20(name, symbol) {
+        sourceChainTokenAddress = _sourceChainTokenAddress;
+        sourceChainId = _sourceChainId;
+    }
+
+    /**
+     * @notice Mints new wrapped tokens. This function should only be callable
+     * by a trusted contract/entity on the source chain.
+     * @param to The address to mint tokens to.
+     * @param amount The amount of tokens to mint.
+     */
+    function mint(address to, uint256 amount) external onlySourceChain {
+        _mint(to, amount);
+        emit Minted(to, amount);
+    }
+
+    /**
+     * @notice Burns wrapped tokens. This function should be callable by users
+     * on this chain, and the corresponding action should be triggered on the
+     * source chain.
+     * @param from The address to burn tokens from.
+     * @param amount The amount of tokens to burn.
+     */
+    function burn(address from, uint256 amount) external {
+        _burn(from, amount);
+        emit Burned(from, amount);
+    }
+
+    // --- Fallback/Reentrancy Guard (Optional but recommended) ---
+    // In a real-world scenario, you would likely want to implement
+    // reentrancy guards for functions that interact with external contracts.
+    // For this simplified example, we are omitting them.
+
+    // --- Functions for Source Chain Contract (if it were an ERC20 itself) ---
+    // If the `sourceChainTokenAddress` was a contract on the source chain that
+    // you control, you might add functions to interact with it.
+    // For example, to trigger a burn on the source chain when `burn` is called here.
+    // This would require a cross-chain messaging protocol.
+}
+```

@@ -1,0 +1,103 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    enum State { AWAITING_PAYMENT, AWAITING_DELIVERY, COMPLETE, DISPUTE }
+    
+    struct Transaction {
+        address payable buyer;
+        address payable seller;
+        address arbiter;
+        uint256 amount;
+        uint256 deadline;
+        uint256 amountReleased;
+        State state;
+    }
+    
+    mapping(uint256 => Transaction) public transactions;
+    uint256 public transactionCounter;
+
+    event TransactionCreated(uint256 indexed transactionId, address buyer, address seller, uint256 amount, uint256 deadline);
+    event PaymentDeposited(uint256 indexed transactionId, uint256 amount);
+    event DeliveryConfirmed(uint256 indexed transactionId);
+    event DisputeRaised(uint256 indexed transactionId);
+    event AmountReleased(uint256 indexed transactionId, uint256 amount);
+    event TransactionCompleted(uint256 indexed transactionId);
+
+    modifier onlyBuyer(uint256 _transactionId) {
+        require(msg.sender == transactions[_transactionId].buyer, "Only buyer can call this");
+        _;
+    }
+
+    modifier onlySeller(uint256 _transactionId) {
+        require(msg.sender == transactions[_transactionId].seller, "Only seller can call this");
+        _;
+    }
+
+    modifier onlyArbiter(uint256 _transactionId) {
+        require(msg.sender == transactions[_transactionId].arbiter, "Only arbiter can call this");
+        _;
+    }
+
+    modifier inState(uint256 _transactionId, State _state) {
+        require(transactions[_transactionId].state == _state, "Invalid state");
+        _;
+    }
+
+    function createTransaction(address payable _seller, uint256 _deadline, address _arbiter) external payable returns (uint256) {
+        require(msg.value > 0, "Payment must be greater than 0");
+        transactionCounter++;
+        transactions[transactionCounter] = Transaction({
+            buyer: payable(msg.sender),
+            seller: _seller,
+            arbiter: _arbiter,
+            amount: msg.value,
+            deadline: block.timestamp + _deadline,
+            amountReleased: 0,
+            state: State.AWAITING_DELIVERY
+        });
+        emit TransactionCreated(transactionCounter, msg.sender, _seller, msg.value, _deadline);
+        emit PaymentDeposited(transactionCounter, msg.value);
+        return transactionCounter;
+    }
+
+    function confirmDelivery(uint256 _transactionId) external onlyBuyer(_transactionId) inState(_transactionId, State.AWAITING_DELIVERY) {
+        transactions[_transactionId].state = State.COMPLETE;
+        transactions[_transactionId].seller.transfer(transactions[_transactionId].amount);
+        emit DeliveryConfirmed(_transactionId);
+        emit TransactionCompleted(_transactionId);
+    }
+
+    function raiseDispute(uint256 _transactionId) external inState(_transactionId, State.AWAITING_DELIVERY) {
+        require(msg.sender == transactions[_transactionId].buyer || msg.sender == transactions[_transactionId].seller, "Only buyer or seller can raise a dispute");
+        transactions[_transactionId].state = State.DISPUTE;
+        emit DisputeRaised(_transactionId);
+    }
+
+    function resolveDispute(uint256 _transactionId, uint256 _releaseToSeller, uint256 _releaseToBuyer) external onlyArbiter(_transactionId) inState(_transactionId, State.DISPUTE) {
+        require(_releaseToSeller + _releaseToBuyer == transactions[_transactionId].amount, "Total amount must match the escrow amount");
+        transactions[_transactionId].amountReleased += _releaseToSeller;
+        transactions[_transactionId].seller.transfer(_releaseToSeller);
+        transactions[_transactionId].buyer.transfer(_releaseToBuyer);
+        transactions[_transactionId].state = State.COMPLETE;
+        emit AmountReleased(_transactionId, _releaseToSeller);
+        emit TransactionCompleted(_transactionId);
+    }
+
+    function releasePartialAmount(uint256 _transactionId, uint256 _amount) external onlyBuyer(_transactionId) inState(_transactionId, State.AWAITING_DELIVERY) {
+        require(_amount > 0 && _amount <= transactions[_transactionId].amount - transactions[_transactionId].amountReleased, "Invalid amount");
+        transactions[_transactionId].amountReleased += _amount;
+        transactions[_transactionId].seller.transfer(_amount);
+        emit AmountReleased(_transactionId, _amount);
+    }
+
+    function enforceDeadline(uint256 _transactionId) external {
+        require(block.timestamp >= transactions[_transactionId].deadline, "Deadline not reached");
+        require(transactions[_transactionId].state == State.AWAITING_DELIVERY, "Invalid state for deadline enforcement");
+        transactions[_transactionId].buyer.transfer(transactions[_transactionId].amount - transactions[_transactionId].amountReleased);
+        transactions[_transactionId].state = State.COMPLETE;
+        emit TransactionCompleted(_transactionId);
+    }
+}
+```

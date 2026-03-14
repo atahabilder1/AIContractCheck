@@ -1,0 +1,101 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract SimpleDEX is Ownable, Pausable {
+    IERC20 public token1;
+    IERC20 public token2;
+    uint256 public reserve1;
+    uint256 public reserve2;
+
+    event Swap(address indexed user, address indexed tokenIn, uint256 amountIn, address indexed tokenOut, uint256 amountOut);
+    event LiquidityAdded(address indexed user, uint256 amount1, uint256 amount2);
+    event LiquidityRemoved(address indexed user, uint256 amount1, uint256 amount2);
+
+    constructor(address _token1, address _token2) {
+        token1 = IERC20(_token1);
+        token2 = IERC20(_token2);
+    }
+
+    function addLiquidity(uint256 amount1, uint256 amount2) external whenNotPaused {
+        require(amount1 > 0 && amount2 > 0, "Invalid amounts");
+
+        token1.transferFrom(msg.sender, address(this), amount1);
+        token2.transferFrom(msg.sender, address(this), amount2);
+
+        reserve1 += amount1;
+        reserve2 += amount2;
+
+        emit LiquidityAdded(msg.sender, amount1, amount2);
+    }
+
+    function removeLiquidity(uint256 amount1, uint256 amount2) external onlyOwner whenNotPaused {
+        require(amount1 <= reserve1 && amount2 <= reserve2, "Insufficient reserves");
+
+        reserve1 -= amount1;
+        reserve2 -= amount2;
+
+        token1.transfer(msg.sender, amount1);
+        token2.transfer(msg.sender, amount2);
+
+        emit LiquidityRemoved(msg.sender, amount1, amount2);
+    }
+
+    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) public pure returns (uint256) {
+        require(amountIn > 0, "Invalid amount");
+        uint256 amountInWithFee = amountIn * 997;
+        uint256 numerator = amountInWithFee * reserveOut;
+        uint256 denominator = (reserveIn * 1000) + amountInWithFee;
+        return numerator / denominator;
+    }
+
+    function swap(address tokenIn, uint256 amountIn) external whenNotPaused {
+        require(tokenIn == address(token1) || tokenIn == address(token2), "Invalid token");
+
+        bool isToken1 = tokenIn == address(token1);
+        IERC20 inputToken = isToken1 ? token1 : token2;
+        IERC20 outputToken = isToken1 ? token2 : token1;
+        uint256 reserveIn = isToken1 ? reserve1 : reserve2;
+        uint256 reserveOut = isToken1 ? reserve2 : reserve1;
+
+        uint256 amountOut = getAmountOut(amountIn, reserveIn, reserveOut);
+        require(amountOut > 0, "Insufficient output amount");
+
+        inputToken.transferFrom(msg.sender, address(this), amountIn);
+        outputToken.transfer(msg.sender, amountOut);
+
+        if (isToken1) {
+            reserve1 += amountIn;
+            reserve2 -= amountOut;
+        } else {
+            reserve2 += amountIn;
+            reserve1 -= amountOut;
+        }
+
+        emit Swap(msg.sender, tokenIn, amountIn, address(outputToken), amountOut);
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    function emergencyWithdraw() external onlyOwner whenPaused {
+        uint256 balance1 = token1.balanceOf(address(this));
+        uint256 balance2 = token2.balanceOf(address(this));
+
+        if (balance1 > 0) {
+            token1.transfer(owner(), balance1);
+        }
+
+        if (balance2 > 0) {
+            token2.transfer(owner(), balance2);
+        }
+    }
+}

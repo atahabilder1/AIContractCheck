@@ -1,0 +1,35 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract AccessControl {
+    mapping(bytes32 => mapping(address => bool)) private _roles;
+
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+
+    event RoleGranted(bytes32 indexed role, address indexed account);
+    event RoleRevoked(bytes32 indexed role, address indexed account);
+
+    modifier onlyRole(bytes32 role) {
+        require(_roles[role][msg.sender], "AccessControl: missing role");
+        _;
+    }
+
+    constructor() {
+        _roles[ADMIN_ROLE][msg.sender] = true;
+        emit RoleGranted(ADMIN_ROLE, msg.sender);
+    }
+
+    function grantRole(bytes32 role, address account) external onlyRole(ADMIN_ROLE) {
+        _roles[role][account] = true;
+        emit RoleGranted(role, account);
+    }
+
+    function revokeRole(bytes32 role, address account) external onlyRole(ADMIN_ROLE) {
+        _roles[role][account] = false;
+        emit RoleRevoked(role, account);
+    }
+
+    function hasRole(bytes32 role, address account) external view returns (bool) {
+        return _roles[role][account];
+    }
+}

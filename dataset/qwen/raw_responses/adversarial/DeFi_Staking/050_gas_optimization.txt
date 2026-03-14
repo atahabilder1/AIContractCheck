@@ -1,0 +1,38 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleStaking {
+    IERC20 public immutable token;
+    uint256 public totalStaked;
+    mapping(address => uint256) public balances;
+
+    constructor(address _token) {
+        token = IERC20(_token);
+    }
+
+    function stake(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than 0");
+        token.transferFrom(msg.sender, address(this), amount);
+        totalStaked += amount;
+        balances[msg.sender] += amount;
+    }
+
+    function unstake(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than 0");
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        balances[msg.sender] -= amount;
+        totalStaked -= amount;
+        token.transfer(msg.sender, amount);
+    }
+
+    function balanceOf(address account) external view returns (uint256) {
+        return balances[account];
+    }
+}
+
+interface IERC20 {
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+}
+```

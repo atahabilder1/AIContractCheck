@@ -1,0 +1,69 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiLending {
+    // Define variables
+    address public owner;
+    address public borrower;
+    uint public borrowedAmount;
+    uint public interestRate;
+    uint public repaymentAmount;
+    uint public repaymentDeadline;
+
+    // Define events
+    event Lend(address borrower, uint borrowedAmount);
+    event Repay(address borrower, uint repaymentAmount);
+    event Default();
+
+    // Define constructor
+    constructor() public {
+        owner = msg.sender;
+        borrowedAmount = 0;
+        interestRate = 0;
+        repaymentAmount = 0;
+        repaymentDeadline = 0;
+    }
+
+    // Define functions
+    function lend(address borrower, uint borrowedAmount, uint interestRate) public {
+        // Check if the borrower is not the owner
+        require(borrower != owner, "Borrower cannot be the owner");
+
+        // Set the borrower and borrowed amount
+        this.borrower = borrower;
+        this.borrowedAmount = borrowedAmount;
+
+        // Calculate the interest rate and repayment amount
+        interestRate = interestRate / 100;
+        repaymentAmount = borrowedAmount + (borrowedAmount * interestRate);
+
+        // Set the repayment deadline
+        repaymentDeadline = now + 30 days;
+
+        // Emit the Lend event
+        emit Lend(borrower, borrowedAmount);
+    }
+
+    function repay(uint repaymentAmount) public {
+        // Check if the repayment amount is greater than or equal to the borrowed amount
+        require(repaymentAmount >= borrowedAmount, "Repayment amount must be greater than or equal to the borrowed amount");
+
+        // Calculate the interest rate and repayment amount
+        interestRate = interestRate / 100;
+        repaymentAmount = borrowedAmount + (borrowedAmount * interestRate);
+
+        // Set the repayment deadline
+        repaymentDeadline = now + 30 days;
+
+        // Emit the Repay event
+        emit Repay(borrower, repaymentAmount);
+    }
+
+    function default() public {
+        // Set the default status
+        default = true;
+
+        // Emit the Default event
+        emit Default();
+    }
+}

@@ -1,0 +1,36 @@
+
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultisigWallet {
+    address private _owner;
+    mapping (address => uint) private _balances;
+    uint private _threshold;
+
+    event Deposit(address indexed from, uint value);
+    event Withdrawal(address indexed to, uint value);
+
+    constructor(address owner, uint threshold) public {
+        _owner = owner;
+        _threshold = threshold;
+    }
+
+    function deposit() public payable {
+        require(msg.value > 0, "Invalid amount");
+        _balances[msg.sender] += msg.value;
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function withdraw(uint value) public {
+        require(value <= _balances[msg.sender], "Insufficient balance");
+        require(msg.sender == _owner || _threshold >= value, "Insufficient threshold");
+        _balances[msg.sender] -= value;
+        emit Withdrawal(msg.sender, value);
+    }
+
+    function getBalance() public view returns (uint) {
+        return _balances[msg.sender];
+    }
+}
+```

@@ -1,0 +1,136 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IUniswapV2Pair {
+    function initialize(address tokenA, address tokenB) external;
+    function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external;
+    function skim(address to) external;
+    function sync() external;
+    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
+    function price0CumulativeLast() external view returns (uint);
+    function price1CumulativeLast() external view returns (uint);
+}
+
+interface IUniswapV2Factory {
+    function createPair(address tokenA, address tokenB) external returns (address pair);
+    function getPair(address tokenA, address tokenB) external view returns (address pair);
+}
+
+interface IUniswapV2Router01 {
+    function factory() external pure returns (address);
+    function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) external pure returns (uint amountOut);
+    function getAmountIn(uint amountOut, uint reserveIn, uint reserveOut) external pure returns (uint amountIn);
+    function getPairs(address token) external view returns (address[] memory pairs);
+}
+
+interface IUniswapV2Router02 is IUniswapV2Router01 {
+    function swapExactTokensForTokens(
+        uint amountIn,
+        uint amountOutMin,
+        address[] calldata path,
+        address to,
+        uint deadline
+    ) external returns (uint[] memory amounts);
+}
+
+contract UniswapV2Pair is IUniswapV2Pair {
+    address public token0;
+    address public token1;
+    uint112 private reserve0;
+    uint112 private reserve1;
+    uint32 private blockTimestampLast;
+    uint public price0CumulativeLast;
+    uint public price1CumulativeLast;
+
+    function initialize(address tokenA, address tokenB) external {
+        require(token0 == address(0) && token1 == address(0), "Already initialized");
+        token0 = tokenA;
+        token1 = tokenB;
+    }
+
+    function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external {
+        // Implement swap logic
+    }
+
+    function skim(address to) external {
+        // Implement skim logic
+    }
+
+    function sync() external {
+        // Implement sync logic
+    }
+
+    function getReserves() external view returns (uint112, uint112, uint32) {
+        return (reserve0, reserve1, blockTimestampLast);
+    }
+
+    function price0CumulativeLast() external view returns (uint) {
+        return price0CumulativeLast;
+    }
+
+    function price1CumulativeLast() external view returns (uint) {
+        return price1CumulativeLast;
+    }
+}
+
+contract UniswapV2Factory is IUniswapV2Factory {
+    mapping(address => mapping(address => address)) public getPair;
+
+    function createPair(address tokenA, address tokenB) external returns (address pair) {
+        require(tokenA != tokenB, "IDENTICAL_ADDRESSES");
+        require(getPair[tokenA][tokenB] == address(0), "PAIR_EXISTS");
+        bytes memory bytecode = type(UniswapV2Pair).creationCode;
+        bytes32 salt = keccak256(abi.encodePacked(tokenA, tokenB));
+        assembly {
+            pair := create2(0, add(bytecode, 32), mload(bytecode), salt)
+        }
+        UniswapV2Pair(pair).initialize(tokenA, tokenB);
+        getPair[tokenA][tokenB] = pair;
+        getPair[tokenB][tokenA] = pair;
+        return pair;
+    }
+
+    function getPair(address tokenA, address tokenB) external view returns (address pair) {
+        return getPair[tokenA][tokenB];
+    }
+}
+
+contract UniswapV2Router01 is IUniswapV2Router01 {
+    address public factory;
+
+    constructor(address _factory) {
+        factory = _factory;
+    }
+
+    function factory() external pure returns (address) {
+        return address(0);
+    }
+
+    function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) external pure returns (uint amountOut) {
+        // Implement getAmountOut logic
+    }
+
+    function getAmountIn(uint amountOut, uint reserveIn, uint reserveOut) external pure returns (uint amountIn) {
+        // Implement getAmountIn logic
+    }
+
+    function getPairs(address token) external view returns (address[] memory pairs) {
+        // Implement getPairs logic
+    }
+}
+
+contract UniswapV2Router02 is IUniswapV2Router02, UniswapV2Router01 {
+    constructor(address _factory) UniswapV2Router01(_factory) {}
+
+    function swapExactTokensForTokens(
+        uint amountIn,
+        uint amountOutMin,
+        address[] calldata path,
+        address to,
+        uint deadline
+    ) external returns (uint[] memory amounts) {
+        // Implement swap logic
+    }
+}
+```

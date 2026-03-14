@@ -1,0 +1,74 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract YieldAggregatorVault {
+    address private _owner;
+    mapping(address => uint256) private _deposits;
+    mapping(address => uint256) private _withdrawals;
+    mapping(address => uint256) private _balances;
+    mapping(address => uint256) private _fees;
+    mapping(address => uint256) private _strategies;
+
+    event Deposit(address indexed _from, uint256 _amount);
+    event Withdrawal(address indexed _from, uint256 _amount);
+    event Compound(address indexed _from, uint256 _amount);
+
+    constructor() public {
+        _owner = msg.sender;
+    }
+
+    function owner() public view returns (address) {
+        return _owner;
+    }
+
+    function deposit(uint256 _amount) public {
+        require(msg.sender == owner(), "Only the owner can deposit");
+        require(_amount > 0, "Invalid amount");
+
+        uint256 fee = (_amount * 100) / 10000; // 0.1% deposit fee
+        uint256 balance = _balances[msg.sender];
+        _deposits[msg.sender] += _amount;
+        _balances[msg.sender] += _amount - fee;
+
+        emit Deposit(msg.sender, _amount);
+    }
+
+    function withdraw(uint256 _amount) public {
+        require(msg.sender == owner(), "Only the owner can withdraw");
+        require(_amount > 0, "Invalid amount");
+
+        uint256 balance = _balances[msg.sender];
+        uint256 withdrawalFee = (_amount * 100) / 10000; // 0.1% withdrawal fee
+        uint256 amount = _amount - withdrawalFee;
+
+        require(balance >= amount, "Insufficient balance");
+
+        _withdrawals[msg.sender] += _amount;
+        _balances[msg.sender] -= amount;
+
+        emit Withdrawal(msg.sender, amount);
+    }
+
+    function compound() public {
+        require(msg.sender == owner(), "Only the owner can compound");
+
+        uint256 balance = _balances[msg.sender];
+        uint256 strategyFee = _strategies[msg.sender];
+        uint256 compoundFee = (_balance * 100) / 10000; // 0.1% compound fee
+
+        _balances[msg.sender] += balance - strategyFee - compoundFee;
+
+        emit Compound(msg.sender, balance);
+    }
+
+    function setStrategy(address _strategy) public {
+        require(msg.sender == owner(), "Only the owner can set the strategy");
+        require(_strategy != address(0), "Invalid strategy address");
+
+        _strategies[msg.sender] = _strategy;
+    }
+
+    function getBalance() public view returns (uint256) {
+        return _balances[msg.sender];
+    }
+}

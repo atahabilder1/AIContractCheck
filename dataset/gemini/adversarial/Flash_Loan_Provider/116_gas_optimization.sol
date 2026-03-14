@@ -1,0 +1,98 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import {IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20, IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+contract GasOptimizedFlashLoanProvider {
+    using SafeERC20 for IERC20;
+
+    address public immutable owner;
+
+    error CallerNotOwner();
+    error InvalidAmount();
+    error TransferFailed();
+    error ReentrancyGuardViolation();
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert CallerNotOwn<ctrl62>eholder for your flash loan logic.
+        // This function should be called by a separate contract that implements the flash loan logic.
+        // The logic contract will receive the borrowed tokens and must return them (plus fee)
+        // in the same transaction.
+
+        // Example:
+        // FlashLoanReceiver(msg.sender).executeOperation(
+        //     address(token),
+        //     amount,
+        //     amount + fee, // amount to be repaid
+        //     abi.encode(...) // any other data
+        // );
+
+        // This provider simply facilitates the transfer and calls the user's logic.
+        // The user is responsible for repaying the loan.
+
+        // The `msg.sender` is the contract that is requesting the flash loan.
+        // It will be responsible for executing the flash loan logic and repaying the loan.
+        // The `data` parameter can be used to pass arbitrary data to the user's contract.
+
+        // The `onFlashLoan` function is the callback that is invoked after the tokens
+        // have been transferred to the user's contract.
+        // The user's contract must return the borrowed amount plus the fee within this transaction.
+    }
+
+    function requestFlashLoan(
+        address tokenAddress,
+        uint256 amount,
+        address data
+    ) external {
+        if (amount == 0) revert InvalidAmount();
+
+        IERC20 token = IERC20.cast(tokenAddress);
+        uint256 balanceBefore = token.balanceOf(address(this));
+
+        // Transfer tokens to the user's contract
+        if (!token.transfer(msg.sender, amount)) {
+            revert TransferFailed();
+        }
+
+        // Call the user's contract to execute the flash loan logic
+        // The user's contract must implement an `onFlashLoan` function.
+        // The `data` parameter is passed to the user's contract.
+        // This is where the user's contract will perform its operations and repay the loan.
+        // The `onFlashLoan` function should be structured to receive the borrowed tokens
+        // and return them along with the fee.
+
+        // The `data` parameter is a placeholder for the user-defined data.
+        // It's common to pass a function signature or other relevant information.
+        // In this simplified example, we assume `data` is the address of the contract
+        // that will handle the flash loan logic and repayment.
+
+        // We don't need to check the balance after the callback because the user's contract
+        // is responsible for repaying the loan. If they fail to repay, the transaction
+        // will revert due to insufficient balance in this contract.
+
+        // The `onFlashLoan` function in the user's contract should look something like this:
+        // function onFlashLoan(address sender, address tokenAddress, uint256 amount, bytes memory data) external {
+        //     // ... perform operations ...
+        //     IERC20(tokenAddress).transfer(sender, amount + fee);
+        // }
+    }
+
+    // Fallback function to receive Ether if needed (though this is primarily for ERC20)
+    receive() external payable {}
+
+    // Function to withdraw any accidentally sent Ether
+    function withdrawEther(uint256 amount) external onlyOwner {
+        if (amount == 0) revert InvalidAmount();
+        payable(owner).transfer(amount);
+    }
+
+    // Function to withdraw any accidentally sent ERC20 tokens
+    function withdrawERC20(address tokenAddress, uint256 amount) external onlyOwner {
+        if (amount == 0) revert InvalidAmount();
+        IERC20 token = IERC20.cast(tokenAddress);
+        if (!token.transfer(owner, amount)) {
+            revert TransferFailed();
+        }
+    }
+}

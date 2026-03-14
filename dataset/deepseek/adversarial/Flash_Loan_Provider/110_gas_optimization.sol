@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "https://github.com/aave/aave-protocol/blob/master/contracts/flashloan/interfaces/IFlashLoanReceiver.sol";
+import "https://github.com/aave/aave-protocol/blob/master/contracts/flashloan/interfaces/ILendingPool.sol";
+
+contract FlashLoanProvider is IFlashLoanReceiver {
+    address public immutable lenderPoolAddress;
+    address public immutable tokenAddress;
+
+    constructor(address _lenderPoolAddress, address _tokenAddress) {
+        lenderPoolAddress = _lenderPoolAddress;
+        tokenAddress = _tokenAddress;
+    }
+
+    function flashLoan(uint256 amount) external {
+        ILendingPool(lenderPoolAddress).flashLoan(
+            address(this),
+            tokenAddress,
+            amount,
+            ""
+        );
+    }
+
+    function executeOperation(
+        address _asset,
+        uint256 _amount,
+        uint256 _fee,
+        bytes calldata _params
+    ) external override returns (bool) {
+        // Implement the logic for the flash loan here
+        // For example, you can borrow funds, perform trades, and then repay the loan plus the fee
+
+        // Example: Repay the loan
+        uint256 totalAmountToRepay = _amount + _fee;
+        require(address(this).balance >= totalAmountToRepay, "Not enough balance to repay the loan");
+
+        // Transfer the required amount to the lending pool to repay the loan
+        (bool success, ) = payable(lenderPoolAddress).call{value: totalAmountToRepay}("");
+        require(success, "Transfer failed");
+
+        return true;
+    }
+
+    receive() external payable {}
+}

@@ -1,0 +1,14 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract FlashLoanProvider {
+    function flashLoan(uint256 amount) external {
+        require(address(this).balance >= amount, "Insufficient balance");
+        payable(msg.sender).transfer(amount);
+        require(msg.sender.call{value: 0}(""), "Callback failed");
+    }
+
+    receive() external payable {}
+}
+```

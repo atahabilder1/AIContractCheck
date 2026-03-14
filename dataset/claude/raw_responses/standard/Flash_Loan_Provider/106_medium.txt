@@ -1,0 +1,121 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+interface IFlashLoanReceiver {
+    function onFlashLoan(
+        address initiator,
+        address token,
+        uint256 amount,
+        uint256 fee,
+        bytes calldata data
+    ) external returns (bytes32);
+}
+
+contract FlashLoanProvider is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
+    bytes32 public constant CALLBACK_SUCCESS = keccak256("IFlashLoanReceiver.onFlashLoan");
+
+    uint256 public constant MAX_FEE_BPS = 1000; // 10%
+    uint256 public defaultFeeBps = 9; // 0.09%
+
+    mapping(address => uint256) public tokenFeeBps;
+    mapping(address => bool) public supportedTokens;
+
+    event TokenAdded(address indexed token, uint256 feeBps);
+    event TokenRemoved(address indexed token);
+    event FeeUpdated(address indexed token, uint256 feeBps);
+    event DefaultFeeUpdated(uint256 feeBps);
+    event FlashLoan(address indexed receiver, address indexed token, uint256 amount, uint256 fee);
+    event Deposited(address indexed token, uint256 amount);
+    event Withdrawn(address indexed token, uint256 amount);
+
+    constructor() Ownable(msg.sender) {}
+
+    function addToken(address token, uint256 feeBps) external onlyOwner {
+        require(token != address(0), "Invalid token");
+        require(feeBps <= MAX_FEE_BPS, "Fee too high");
+        supportedTokens[token] = true;
+        tokenFeeBps[token] = feeBps;
+        emit TokenAdded(token, feeBps);
+    }
+
+    function removeToken(address token) external onlyOwner {
+        supportedTokens[token] = false;
+        delete tokenFeeBps[token];
+        emit TokenRemoved(token);
+    }
+
+    function setTokenFee(address token, uint256 feeBps) external onlyOwner {
+        require(supportedTokens[token], "Token not supported");
+        require(feeBps <= MAX_FEE_BPS, "Fee too high");
+        tokenFeeBps[token] = feeBps;
+        emit FeeUpdated(token, feeBps);
+    }
+
+    function setDefaultFee(uint256 feeBps) external onlyOwner {
+        require(feeBps <= MAX_FEE_BPS, "Fee too high");
+        defaultFeeBps = feeBps;
+        emit DefaultFeeUpdated(feeBps);
+    }
+
+    function getFeeBps(address token) public view returns (uint256) {
+        if (tokenFeeBps[token] > 0) {
+            return tokenFeeBps[token];
+        }
+        return defaultFeeBps;
+    }
+
+    function flashLoan(
+        address receiver,
+        address token,
+        uint256 amount,
+        bytes calldata data
+    ) external nonReentrant {
+        require(supportedTokens[token], "Token not supported");
+        require(amount > 0, "Amount must be > 0");
+
+        uint256 balanceBefore = IERC20(token).balanceOf(address(this));
+        require(balanceBefore >= amount, "Insufficient liquidity");
+
+        uint256 fee = (amount * getFeeBps(token)) / 10000;
+
+        IERC20(token).safeTransfer(receiver, amount);
+
+        bytes32 result = IFlashLoanReceiver(receiver).onFlashLoan(
+            msg.sender,
+            token,
+            amount,
+            fee,
+            data
+        );
+        require(result == CALLBACK_SUCCESS, "Invalid callback return");
+
+        uint256 balanceAfter = IERC20(token).balanceOf(address(this));
+        require(balanceAfter >= balanceBefore + fee, "Repayment not met");
+
+        emit FlashLoan(receiver, token, amount, fee);
+    }
+
+    function deposit(address token, uint256 amount) external {
+        require(supportedTokens[token], "Token not supported");
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        emit Deposited(token, amount);
+    }
+
+    function withdraw(address token, uint256 amount) external onlyOwner {
+        IERC20(token).safeTransfer(msg.sender, amount);
+        emit Withdrawn(token, amount);
+    }
+
+    function availableLiquidity(address token) external view returns (uint256) {
+        return IERC20(token).balanceOf(address(this));
+    }
+}
+```

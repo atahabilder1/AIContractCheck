@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address private _owner;
+    mapping(address => bool) private _registeredChains;
+
+    constructor() public {
+        _owner = msg.sender;
+    }
+
+    function registerChain(address chain) public {
+        require(msg.sender == _owner, "Only the owner can register chains");
+        _registeredChains[chain] = true;
+    }
+
+    function unregisterChain(address chain) public {
+        require(msg.sender == _owner, "Only the owner can unregister chains");
+        _registeredChains[chain] = false;
+    }
+
+    function isChainRegistered(address chain) public view returns (bool) {
+        return _registeredChains[chain];
+    }
+}

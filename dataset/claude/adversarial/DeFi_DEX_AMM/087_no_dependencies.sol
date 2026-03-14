@@ -1,0 +1,219 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract SimpleDEX {
+    string public constant name = "SimpleDEX LP Token";
+    string public constant symbol = "SDLP";
+    uint8 public constant decimals = 18;
+
+    uint256 public totalSupply;
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+
+    address public tokenA;
+    address public tokenB;
+    uint256 public reserveA;
+    uint256 public reserveB;
+
+    uint256 public constant MINIMUM_LIQUIDITY = 1000;
+    uint256 private constant FEE_NUMERATOR = 997;
+    uint256 private constant FEE_DENOMINATOR = 1000;
+
+    uint256 private unlocked = 1;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+    event Mint(address indexed sender, uint256 amountA, uint256 amountB, uint256 liquidity);
+    event Burn(address indexed sender, uint256 amountA, uint256 amountB, address indexed to);
+    event Swap(address indexed sender, uint256 amountIn, address indexed tokenIn, uint256 amountOut, address indexed tokenOut, address to);
+    event Sync(uint256 reserveA, uint256 reserveB);
+
+    modifier lock() {
+        require(unlocked == 1, "SimpleDEX: LOCKED");
+        unlocked = 0;
+        _;
+        unlocked = 1;
+    }
+
+    constructor(address _tokenA, address _tokenB) {
+        require(_tokenA != _tokenB, "SimpleDEX: IDENTICAL_ADDRESSES");
+        require(_tokenA != address(0) && _tokenB != address(0), "SimpleDEX: ZERO_ADDRESS");
+        tokenA = _tokenA;
+        tokenB = _tokenB;
+    }
+
+    // --- ERC20 LP Token Functions ---
+
+    function approve(address spender, uint256 amount) external returns (bool) {
+        allowance[msg.sender][spender] = amount;
+        emit Approval(msg.sender, spender, amount);
+        return true;
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        _transfer(msg.sender, to, amount);
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+        uint256 currentAllowance = allowance[from][msg.sender];
+        if (currentAllowance != type(uint256).max) {
+            require(currentAllowance >= amount, "SimpleDEX: INSUFFICIENT_ALLOWANCE");
+            allowance[from][msg.sender] = currentAllowance - amount;
+        }
+        _transfer(from, to, amount);
+        return true;
+    }
+
+    function _transfer(address from, address to, uint256 amount) internal {
+        require(to != address(0), "SimpleDEX: TRANSFER_TO_ZERO");
+        balanceOf[from] -= amount;
+        balanceOf[to] += amount;
+        emit Transfer(from, to, amount);
+    }
+
+    function _mint(address to, uint256 amount) internal {
+        totalSupply += amount;
+        balanceOf[to] += amount;
+        emit Transfer(address(0), to, amount);
+    }
+
+    function _burn(address from, uint256 amount) internal {
+        balanceOf[from] -= amount;
+        totalSupply -= amount;
+        emit Transfer(from, address(0), amount);
+    }
+
+    // --- AMM Core Functions ---
+
+    function addLiquidity(uint256 amountA, uint256 amountB, uint256 minLiquidity, address to, uint256 deadline) external lock returns (uint256 liquidity) {
+        require(block.timestamp <= deadline, "SimpleDEX: EXPIRED");
+        require(amountA > 0 && amountB > 0, "SimpleDEX: INSUFFICIENT_AMOUNTS");
+
+        _safeTransferFrom(tokenA, msg.sender, address(this), amountA);
+        _safeTransferFrom(tokenB, msg.sender, address(this), amountB);
+
+        if (totalSupply == 0) {
+            liquidity = _sqrt(amountA * amountB) - MINIMUM_LIQUIDITY;
+            _mint(address(1), MINIMUM_LIQUIDITY);
+        } else {
+            uint256 liquidityA = (amountA * totalSupply) / reserveA;
+            uint256 liquidityB = (amountB * totalSupply) / reserveB;
+            liquidity = liquidityA < liquidityB ? liquidityA : liquidityB;
+        }
+
+        require(liquidity >= minLiquidity, "SimpleDEX: INSUFFICIENT_LIQUIDITY_MINTED");
+        _mint(to, liquidity);
+
+        reserveA += amountA;
+        reserveB += amountB;
+
+        emit Mint(msg.sender, amountA, amountB, liquidity);
+        emit Sync(reserveA, reserveB);
+    }
+
+    function removeLiquidity(uint256 liquidity, uint256 minAmountA, uint256 minAmountB, address to, uint256 deadline) external lock returns (uint256 amountA, uint256 amountB) {
+        require(block.timestamp <= deadline, "SimpleDEX: EXPIRED");
+        require(liquidity > 0, "SimpleDEX: INSUFFICIENT_LIQUIDITY");
+
+        amountA = (liquidity * reserveA) / totalSupply;
+        amountB = (liquidity * reserveB) / totalSupply;
+        require(amountA >= minAmountA, "SimpleDEX: INSUFFICIENT_A_AMOUNT");
+        require(amountB >= minAmountB, "SimpleDEX: INSUFFICIENT_B_AMOUNT");
+
+        _burn(msg.sender, liquidity);
+
+        reserveA -= amountA;
+        reserveB -= amountB;
+
+        _safeTransfer(tokenA, to, amountA);
+        _safeTransfer(tokenB, to, amountB);
+
+        emit Burn(msg.sender, amountA, amountB, to);
+        emit Sync(reserveA, reserveB);
+    }
+
+    function swapExactTokensForTokens(address tokenIn, uint256 amountIn, uint256 minAmountOut, address to, uint256 deadline) external lock returns (uint256 amountOut) {
+        require(block.timestamp <= deadline, "SimpleDEX: EXPIRED");
+        require(tokenIn == tokenA || tokenIn == tokenB, "SimpleDEX: INVALID_TOKEN");
+        require(amountIn > 0, "SimpleDEX: INSUFFICIENT_INPUT");
+
+        bool isTokenA = tokenIn == tokenA;
+        address tokenOut = isTokenA ? tokenB : tokenA;
+        uint256 reserveIn = isTokenA ? reserveA : reserveB;
+        uint256 reserveOut = isTokenA ? reserveB : reserveA;
+
+        _safeTransferFrom(tokenIn, msg.sender, address(this), amountIn);
+
+        uint256 amountInWithFee = amountIn * FEE_NUMERATOR;
+        amountOut = (amountInWithFee * reserveOut) / (reserveIn * FEE_DENOMINATOR + amountInWithFee);
+
+        require(amountOut >= minAmountOut, "SimpleDEX: INSUFFICIENT_OUTPUT");
+        require(amountOut < reserveOut, "SimpleDEX: INSUFFICIENT_LIQUIDITY");
+
+        if (isTokenA) {
+            reserveA += amountIn;
+            reserveB -= amountOut;
+        } else {
+            reserveB += amountIn;
+            reserveA -= amountOut;
+        }
+
+        _safeTransfer(tokenOut, to, amountOut);
+
+        emit Swap(msg.sender, amountIn, tokenIn, amountOut, tokenOut, to);
+        emit Sync(reserveA, reserveB);
+    }
+
+    // --- View Functions ---
+
+    function getAmountOut(address tokenIn, uint256 amountIn) external view returns (uint256 amountOut) {
+        require(tokenIn == tokenA || tokenIn == tokenB, "SimpleDEX: INVALID_TOKEN");
+        require(amountIn > 0, "SimpleDEX: INSUFFICIENT_INPUT");
+
+        bool isTokenA = tokenIn == tokenA;
+        uint256 reserveIn = isTokenA ? reserveA : reserveB;
+        uint256 reserveOut = isTokenA ? reserveB : reserveA;
+
+        uint256 amountInWithFee = amountIn * FEE_NUMERATOR;
+        amountOut = (amountInWithFee * reserveOut) / (reserveIn * FEE_DENOMINATOR + amountInWithFee);
+    }
+
+    function getReserves() external view returns (uint256, uint256) {
+        return (reserveA, reserveB);
+    }
+
+    function getPrice(address token) external view returns (uint256) {
+        require(token == tokenA || token == tokenB, "SimpleDEX: INVALID_TOKEN");
+        require(reserveA > 0 && reserveB > 0, "SimpleDEX: NO_LIQUIDITY");
+        if (token == tokenA) {
+            return (reserveB * 1e18) / reserveA;
+        }
+        return (reserveA * 1e18) / reserveB;
+    }
+
+    // --- Internal Helpers ---
+
+    function _safeTransfer(address token, address to, uint256 amount) internal {
+        (bool success, bytes memory data) = token.call(abi.encodeWithSignature("transfer(address,uint256)", to, amount));
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "SimpleDEX: TRANSFER_FAILED");
+    }
+
+    function _safeTransferFrom(address token, address from, address to, uint256 amount) internal {
+        (bool success, bytes memory data) = token.call(abi.encodeWithSignature("transferFrom(address,address,uint256)", from, to, amount));
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "SimpleDEX: TRANSFER_FROM_FAILED");
+    }
+
+    function _sqrt(uint256 y) internal pure returns (uint256 z) {
+        if (y > 3) {
+            z = y;
+            uint256 x = y / 2 + 1;
+            while (x < z) {
+                z = x;
+                x = (y / x + x) / 2;
+            }
+        } else if (y != 0) {
+            z = 1;
+        }
+    }
+}

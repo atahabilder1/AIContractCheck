@@ -1,0 +1,122 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultiSigWallet {
+    address[] public owners;
+    uint public required;
+    uint public transactionCount;
+
+    struct Transaction {
+        address destination;
+        uint value;
+        bytes data;
+        bool executed;
+        uint confirmations;
+    }
+
+    mapping(uint => Transaction) public transactions;
+    mapping(uint => mapping(address => bool)) public confirmations;
+
+    event Deposit(address indexed sender, uint value);
+    event Confirmation(address indexed sender, uint indexed transactionId);
+    event Execution(uint indexed transactionId);
+    event Submission(uint indexed transactionId);
+    event Revocation(address indexed sender, uint indexed transactionId);
+
+    modifier onlyOwner() {
+        require(isOwner(msg.sender));
+        _;
+    }
+
+    modifier transactionExists(uint transactionId) {
+        require(transactions[transactionId].destination != address(0));
+        _;
+    }
+
+    modifier notExecuted(uint transactionId) {
+        require(!transactions[transactionId].executed);
+        _;
+    }
+
+    modifier notConfirmed(uint transactionId) {
+        require(!confirmations[transactionId][msg.sender]);
+        _;
+    }
+
+    modifier confirmed(uint transactionId) {
+        require(confirmations[transactionId][msg.sender]);
+        _;
+    }
+
+    constructor(address[] memory _owners, uint _required) {
+        require(_owners.length > 0);
+        require(_required > 0 && _required <= _owners.length);
+
+        for (uint i = 0; i < _owners.length; i++) {
+            require(_owners[i] != address(0));
+            require(!isOwner(_owners[i]));
+            owners.push(_owners[i]);
+        }
+        required = _required;
+    }
+
+    function isOwner(address owner) public view returns (bool) {
+        for (uint i = 0; i < owners.length; i++) {
+            if (owners[i] == owner) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function submitTransaction(address destination, uint value, bytes memory data) public onlyOwner {
+        uint transactionId = addTransaction(destination, value, data);
+        confirmTransaction(transactionId);
+    }
+
+    function confirmTransaction(uint transactionId) public onlyOwner transactionExists(transactionId) notConfirmed(transactionId) notExecuted(transactionId) {
+        confirmations[transactionId][msg.sender] = true;
+        transactions[transactionId].confirmations += 1;
+        emit Confirmation(msg.sender, transactionId);
+        executeTransaction(transactionId);
+    }
+
+    function executeTransaction(uint transactionId) public onlyOwner notExecuted(transactionId) transactionExists(transactionId) {
+        if (isConfirmed(transactionId)) {
+            Transaction storage tx = transactions[transactionId];
+            tx.executed = true;
+            (bool success, ) = tx.destination.call{value: tx.value}(tx.data);
+            require(success);
+            emit Execution(transactionId);
+        }
+    }
+
+    function revokeConfirmation(uint transactionId) public onlyOwner confirmed(transactionId) notExecuted(transactionId) {
+        confirmations[transactionId][msg.sender] = false;
+        transactions[transactionId].confirmations -= 1;
+        emit Revocation(msg.sender, transactionId);
+    }
+
+    function addTransaction(address destination, uint value, bytes memory data) internal returns (uint transactionId) {
+        transactionId = transactionCount;
+        transactions[transactionId] = Transaction({
+            destination: destination,
+            value: value,
+            data: data,
+            executed: false,
+            confirmations: 0
+        });
+        transactionCount += 1;
+        emit Submission(transactionId);
+    }
+
+    function isConfirmed(uint transactionId) public view returns (bool) {
+        return transactions[transactionId].confirmations >= required;
+    }
+
+    receive() external payable {
+        emit Deposit(msg.sender, msg.value);
+    }
+}
+```

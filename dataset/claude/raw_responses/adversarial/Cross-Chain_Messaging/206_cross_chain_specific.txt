@@ -1,0 +1,190 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract CrossChainMessaging {
+    struct Message {
+        uint256 sourceChain;
+        uint256 destChain;
+        address sender;
+        address receiver;
+        bytes payload;
+        uint256 nonce;
+        uint256 timestamp;
+    }
+
+    address public relayer;
+    uint256 public nonce;
+    mapping(bytes32 => bool) public processedMessages;
+    mapping(uint256 => bool) public supportedChains;
+
+    event MessageSent(
+        bytes32 indexed messageId,
+        uint256 indexed destChain,
+        address sender,
+        address receiver,
+        bytes payload,
+        uint256 nonce
+    );
+
+    event MessageReceived(
+        bytes32 indexed messageId,
+        uint256 indexed sourceChain,
+        address sender,
+        address receiver,
+        bytes payload
+    );
+
+    event ChainAdded(uint256 chainId);
+    event ChainRemoved(uint256 chainId);
+    event RelayerUpdated(address newRelayer);
+
+    modifier onlyRelayer() {
+        require(msg.sender == relayer, "Not relayer");
+        _;
+    }
+
+    constructor(uint256[] memory _supportedChains) {
+        relayer = msg.sender;
+        for (uint256 i = 0; i < _supportedChains.length; i++) {
+            supportedChains[_supportedChains[i]] = true;
+        }
+    }
+
+    function sendMessage(
+        uint256 _destChain,
+        address _receiver,
+        bytes calldata _payload
+    ) external returns (bytes32 messageId) {
+        require(supportedChains[_destChain], "Unsupported chain");
+
+        uint256 currentNonce = nonce++;
+
+        Message memory message = Message({
+            sourceChain: block.chainid,
+            destChain: _destChain,
+            sender: msg.sender,
+            receiver: _receiver,
+            payload: _payload,
+            nonce: currentNonce,
+            timestamp: block.timestamp
+        });
+
+        messageId = keccak256(abi.encode(message));
+
+        emit MessageSent(
+            messageId,
+            _destChain,
+            msg.sender,
+            _receiver,
+            _payload,
+            currentNonce
+        );
+    }
+
+    function receiveMessage(
+        uint256 _sourceChain,
+        address _sender,
+        address _receiver,
+        bytes calldata _payload,
+        uint256 _nonce,
+        uint256 _timestamp
+    ) external onlyRelayer returns (bytes32 messageId) {
+        Message memory message = Message({
+            sourceChain: _sourceChain,
+            destChain: block.chainid,
+            sender: _sender,
+            receiver: _receiver,
+            payload: _payload,
+            nonce: _nonce,
+            timestamp: _timestamp
+        });
+
+        messageId = keccak256(abi.encode(message));
+        require(!processedMessages[messageId], "Already processed");
+
+        processedMessages[messageId] = true;
+
+        (bool success, ) = _receiver.call(_payload);
+        require(success, "Execution failed");
+
+        emit MessageReceived(messageId, _sourceChain, _sender, _receiver, _payload);
+    }
+
+    function sendBatch(
+        uint256[] calldata _destChains,
+        address[] calldata _receivers,
+        bytes[] calldata _payloads
+    ) external {
+        require(
+            _destChains.length == _receivers.length &&
+            _receivers.length == _payloads.length,
+            "Length mismatch"
+        );
+
+        for (uint256 i = 0; i < _destChains.length; i++) {
+            require(supportedChains[_destChains[i]], "Unsupported chain");
+
+            uint256 currentNonce = nonce++;
+
+            Message memory message = Message({
+                sourceChain: block.chainid,
+                destChain: _destChains[i],
+                sender: msg.sender,
+                receiver: _receivers[i],
+                payload: _payloads[i],
+                nonce: currentNonce,
+                timestamp: block.timestamp
+            });
+
+            bytes32 messageId = keccak256(abi.encode(message));
+
+            emit MessageSent(
+                messageId,
+                _destChains[i],
+                msg.sender,
+                _receivers[i],
+                _payloads[i],
+                currentNonce
+            );
+        }
+    }
+
+    function addChain(uint256 _chainId) external onlyRelayer {
+        supportedChains[_chainId] = true;
+        emit ChainAdded(_chainId);
+    }
+
+    function removeChain(uint256 _chainId) external onlyRelayer {
+        supportedChains[_chainId] = false;
+        emit ChainRemoved(_chainId);
+    }
+
+    function updateRelayer(address _newRelayer) external onlyRelayer {
+        relayer = _newRelayer;
+        emit RelayerUpdated(_newRelayer);
+    }
+
+    function getMessageId(
+        uint256 _sourceChain,
+        uint256 _destChain,
+        address _sender,
+        address _receiver,
+        bytes calldata _payload,
+        uint256 _nonce,
+        uint256 _timestamp
+    ) external pure returns (bytes32) {
+        return keccak256(abi.encode(
+            Message({
+                sourceChain: _sourceChain,
+                destChain: _destChain,
+                sender: _sender,
+                receiver: _receiver,
+                payload: _payload,
+                nonce: _nonce,
+                timestamp: _timestamp
+            })
+        ));
+    }
+}
+```

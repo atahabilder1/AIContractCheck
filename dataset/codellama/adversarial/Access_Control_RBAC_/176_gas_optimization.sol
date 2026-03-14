@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract AccessControl {
+    struct Role {
+        string name;
+        mapping(address => bool) members;
+    }
+
+    mapping(address => Role[]) public roles;
+
+    event RoleAssigned(address indexed member, Role indexed role);
+    event RoleRemoved(address indexed member, Role indexed role);
+
+    function assignRole(address _member, Role _role) public {
+        require(_role.name != "", "Role name must not be empty");
+        require(_role.members[_member] == false, "Member already has role");
+        _role.members[_member] = true;
+        roles[_member].push(_role);
+        emit RoleAssigned(_member, _role);
+    }
+
+    function removeRole(address _member, Role _role) public {
+        require(_role.name != "", "Role name must not be empty");
+        require(_role.members[_member] == true, "Member does not have role");
+        _role.members[_member] = false;
+        roles[_member].pop(_role);
+        emit RoleRemoved(_member, _role);
+    }
+}

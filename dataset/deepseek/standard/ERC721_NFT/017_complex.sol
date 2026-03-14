@@ -1,0 +1,102 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+
+contract MyNFT is ERC721, ERC721Enumerable, ERC721URIStorage, Ownable {
+    using SafeMath for uint256;
+
+    string public baseURI;
+    uint256 public tokenCounter;
+    uint256 public royaltyFraction;
+    address public royaltyRecipient;
+    bytes4 private constant _INTERFACE_ID_ERC2981 = 0x2a55205a;
+
+    mapping(uint256 => address) private _tokenRoyaltyReceivers;
+    mapping(uint256 => uint256) private _tokenRoyalties;
+
+    constructor(string memory name, string memory symbol, string memory baseURI_, uint256 royaltyFraction_, address royaltyRecipient_) ERC721(name, symbol) {
+        baseURI = baseURI_;
+        royaltyFraction = royaltyFraction_;
+        royaltyRecipient = royaltyRecipient_;
+    }
+
+    function mint(address to, uint256 tokenId) public onlyOwner {
+        _safeMint(to, tokenId);
+    }
+
+    function lazyMint(address to, uint256 tokenId, string memory tokenURI) public onlyOwner {
+        _safeMint(to, tokenId);
+        _setTokenURI(tokenId, tokenURI);
+    }
+
+    function batchMint(address[] memory to, uint256[] memory tokenIds, string[] memory tokenURIs) public onlyOwner {
+        require(to.length == tokenIds.length && tokenIds.length == tokenURIs.length, "Input arrays must be of the same length");
+        for (uint256 i = 0; i < to.length; i++) {
+            lazyMint(to[i], tokenIds[i], tokenURIs[i]);
+        }
+    }
+
+    function setTokenURI(uint256 tokenId, string memory tokenURI) public onlyOwner {
+        _setTokenURI(tokenId, tokenURI);
+    }
+
+    function _setTokenURI(uint256 tokenId, string memory tokenURI) internal {
+        require(_exists(tokenId), "ERC721Metadata: URI set of nonexistent token");
+        _tokenURIs[tokenId] = tokenURI;
+    }
+
+    function _baseURI() internal view override returns (string memory) {
+        return baseURI;
+    }
+
+    function setBaseURI(string memory newBaseURI) public onlyOwner {
+        baseURI = newBaseURI;
+    }
+
+    function setRoyaltyInfo(uint256 tokenId, address receiver, uint256 royaltyAmount) public onlyOwner {
+        _tokenRoyaltyReceivers[tokenId] = receiver;
+        _tokenRoyalties[tokenId] = royaltyAmount;
+        emit SetRoyaltyInfo(tokenId, receiver, royaltyAmount);
+    }
+
+    function royaltyInfo(uint256 tokenId, uint256 salePrice) external view returns (address receiver, uint256 royaltyAmount) {
+        receiver = _tokenRoyaltyReceivers[tokenId];
+        if (receiver == address(0)) {
+            receiver = royaltyRecipient;
+        }
+        royaltyAmount = salePrice.mul(royaltyFraction).div(10000);
+    }
+
+    function allowlistMint(uint256 tokenId, address to, bytes32 root, bytes memory proof) public {
+        require(isAllowed(to, root, proof), "Address is not in allowlist");
+        _safeMint(to, tokenId);
+    }
+
+    function isAllowed(address account, bytes32 root, bytes memory proof) internal view returns (bool) {
+        return MerkleProof.verify(proof, root, keccak256(abi.encodePacked(account)));
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721, ERC721Enumerable, ERC721URIStorage) returns (bool) {
+        return super.supportsInterface(interfaceId);
+    }
+
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal override(ERC721, ERC721Enumerable) {
+        super._beforeTokenTransfer(from, to, tokenId);
+    }
+
+    function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
+        super._burn(tokenId);
+    }
+
+    function tokenURI(uint256 tokenId) public view override(ERC721, ERC721URIStorage) returns (string memory) {
+        return super.tokenURI(tokenId);
+    }
+
+    event SetRoyaltyInfo(uint256 indexed tokenId, address indexed receiver, uint256 royaltyAmount);
+}

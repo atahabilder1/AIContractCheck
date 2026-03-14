@@ -1,0 +1,52 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+contract ERC20Token {
+    string public name;
+    string public symbol;
+    uint256 public totalSupply;
+    mapping(address => uint256) public balances;
+    mapping(address => mapping(address => uint256)) public allowances;
+
+    constructor(string memory _name, string memory _symbol) public {
+        name = _name;
+        symbol = _symbol;
+    }
+
+    function totalSupply() public view returns (uint256) {
+        return totalSupply;
+    }
+
+    function balanceOf(address _owner) public view returns (uint256) {
+        return balances[_owner];
+    }
+
+    function transfer(address _to, uint256 _value) public returns (bool) {
+        require(balances[msg.sender] >= _value, "Insufficient balance");
+        balances[msg.sender] -= _value;
+        balances[_to] += _value;
+        emit Transfer(msg.sender, _to, _value);
+        return true;
+    }
+
+    function approve(address _spender, uint256 _value) public returns (bool) {
+        allowances[msg.sender][_spender] = _value;
+        emit Approval(msg.sender, _spender, _value);
+        return true;
+    }
+
+    function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
+        require(allowances[_from][msg.sender] >= _value, "Insufficient allowance");
+        balances[_from] -= _value;
+        balances[_to] += _value;
+        allowances[_from][msg.sender] -= _value;
+        emit Transfer(_from, _to, _value);
+        return true;
+    }
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+```
+This is a basic ERC20 token contract that includes the required functions and events. The `constructor` function sets the token name and symbol, and the `totalSupply` function returns the total supply of the token. The `balanceOf` function returns the balance of a given address, and the `transfer` function allows the owner to transfer the token to another address. The `approve` function allows the owner to approve a spender to spend a certain amount of tokens, and the `transferFrom` function allows the spender to transfer tokens from the owner's account to another address. The `event` functions emit events when the token is transferred or approved.

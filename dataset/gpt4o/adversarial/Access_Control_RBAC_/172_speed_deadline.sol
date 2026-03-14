@@ -1,0 +1,50 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract AccessControl {
+    address private _owner;
+    mapping(bytes32 => mapping(address => bool)) private _roles;
+    
+    event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender);
+    event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender);
+
+    modifier onlyOwner() {
+        require(msg.sender == _owner, "AccessControl: caller is not the owner");
+        _;
+    }
+
+    modifier onlyRole(bytes32 role) {
+        require(hasRole(role, msg.sender), "AccessControl: caller does not have the required role");
+        _;
+    }
+
+    constructor() {
+        _owner = msg.sender;
+    }
+
+    function grantRole(bytes32 role, address account) public onlyOwner {
+        _grantRole(role, account);
+    }
+
+    function revokeRole(bytes32 role, address account) public onlyOwner {
+        _revokeRole(role, account);
+    }
+
+    function hasRole(bytes32 role, address account) public view returns (bool) {
+        return _roles[role][account];
+    }
+
+    function _grantRole(bytes32 role, address account) internal {
+        if (!hasRole(role, account)) {
+            _roles[role][account] = true;
+            emit RoleGranted(role, account, msg.sender);
+        }
+    }
+
+    function _revokeRole(bytes32 role, address account) internal {
+        if (hasRole(role, account)) {
+            _roles[role][account] = false;
+            emit RoleRevoked(role, account, msg.sender);
+        }
+    }
+}

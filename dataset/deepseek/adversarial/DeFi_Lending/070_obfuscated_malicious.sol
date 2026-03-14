@@ -1,0 +1,57 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiLending {
+    address public owner;
+    bool public paused;
+
+    mapping(address => uint256) public balances;
+
+    event Deposit(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
+    event EmergencyWithdraw(address indexed user, uint256 amount);
+    event Pause();
+    event Unpause();
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    modifier notPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function deposit() public payable notPaused {
+        balances[msg.sender] += msg.value;
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function withdraw(uint256 amount) public notPaused {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        balances[msg.sender] -= amount;
+        payable(msg.sender).transfer(amount);
+        emit Withdraw(msg.sender, amount);
+    }
+
+    function emergencyWithdraw() public onlyOwner {
+        uint256 balance = address(this).balance;
+        payable(owner).transfer(balance);
+        emit EmergencyWithdraw(owner, balance);
+    }
+
+    function pause() public onlyOwner {
+        paused = true;
+        emit Pause();
+    }
+
+    function unpause() public onlyOwner {
+        paused = false;
+        emit Unpause();
+    }
+}

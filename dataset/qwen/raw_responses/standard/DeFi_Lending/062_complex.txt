@@ -1,0 +1,161 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract LendingProtocol is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
+    struct CollateralType {
+        uint256 totalCollateral;
+        uint256 totalBorrowed;
+        uint256 liquidationThreshold;
+        uint256 liquidationBonus;
+        uint256 borrowRate; // Utilization-based borrow rate
+    }
+
+    struct Borrower {
+        mapping(address => uint256) collateral;
+        mapping(address => uint256) borrowed;
+    }
+
+    mapping(address => CollateralType) public collateralTypes;
+    mapping(address => Borrower) public borrowers;
+
+    event Deposit(address indexed user, address indexed collateral, uint256 amount);
+    event Withdraw(address indexed user, address indexed collateral, uint256 amount);
+    event Borrow(address indexed user, address indexed collateral, uint256 amount);
+    event Repay(address indexed user, address indexed collateral, uint256 amount);
+    event Liquidate(address indexed liquidator, address indexed borrower, address indexed collateral, uint256 amountCollateral, uint256 amountDebt);
+
+    function addCollateralType(address collateral, uint256 liquidationThreshold, uint256 liquidationBonus, uint256 borrowRate) external onlyOwner {
+        require(collateralTypes[collateral].totalCollateral == 0, "Collateral type already exists");
+        collateralTypes[collateral] = CollateralType({
+            totalCollateral: 0,
+            totalBorrowed: 0,
+            liquidationThreshold: liquidationThreshold,
+            liquidationBonus: liquidationBonus,
+            borrowRate: borrowRate
+        });
+    }
+
+    function deposit(address collateral, uint256 amount) external nonReentrant {
+        CollateralType storage collateralType = collateralTypes[collateral];
+        require(collateralType.totalCollateral > 0, "Collateral type not supported");
+
+        IERC20(collateral).safeTransferFrom(msg.sender, address(this), amount);
+        borrowers[msg.sender].collateral[collateral] += amount;
+        collateralType.totalCollateral += amount;
+
+        emit Deposit(msg.sender, collateral, amount);
+    }
+
+    function withdraw(address collateral, uint256 amount) external nonReentrant {
+        CollateralType storage collateralType = collateralTypes[collateral];
+        Borrower storage borrower = borrowers[msg.sender];
+        require(borrower.collateral[collateral] >= amount, "Insufficient collateral");
+        require(getLTV(msg.sender) <= collateralType.liquidationThreshold, "Cannot withdraw, LTV exceeds threshold");
+
+        borrower.collateral[collateral] -= amount;
+        collateralType.totalCollateral -= amount;
+        IERC20(collateral).safeTransfer(msg.sender, amount);
+
+        emit Withdraw(msg.sender, collateral, amount);
+    }
+
+    function borrow(address collateral, uint256 amount) external nonReentrant {
+        CollateralType storage collateralType = collateralTypes[collateral];
+        Borrower storage borrower = borrowers[msg.sender];
+        uint256 borrowRate = collateralType.borrowRate;
+        uint256 interest = (amount * borrowRate) / 1e18;
+        uint256 totalBorrowAmount = amount + interest;
+
+        require(borrower.collateral[collateral] > 0, "No collateral deposited");
+        require(getLTV(msg.sender) <= collateralType.liquidationThreshold, "Cannot borrow, LTV exceeds threshold");
+        require(collateralType.totalCollateral >= totalBorrowAmount, "Insufficient collateral in protocol");
+
+        borrower.borrowed[collateral] += totalBorrowAmount;
+        collateralType.totalBorrowed += totalBorrowAmount;
+        IERC20(collateral).safeTransfer(msg.sender, amount);
+
+        emit Borrow(msg.sender, collateral, amount);
+    }
+
+    function repay(address collateral, uint256 amount) external nonReentrant {
+        CollateralType storage collateralType = collateralTypes[collateral];
+        Borrower storage borrower = borrowers[msg.sender];
+        require(borrower.borrowed[collateral] >= amount, "Insufficient borrowed amount");
+
+        borrower.borrowed[collateral] -= amount;
+        collateralType.totalBorrowed -= amount;
+        IERC20(collateral).safeTransferFrom(msg.sender, address(this), amount);
+
+        emit Repay(msg.sender, collateral, amount);
+    }
+
+    function liquidate(address borrower, address collateral) external nonReentrant {
+        CollateralType storage collateralType = collateralTypes[collateral];
+        Borrower storage borrowerData = borrowers[borrower];
+        require(getLTV(borrower) > collateralType.liquidationThreshold, "Borrower not eligible for liquidation");
+
+        uint256 amountCollateral = borrowerData.collateral[collateral];
+        uint256 amountDebt = borrowerData.borrowed[collateral];
+        uint256 bonusCollateral = (amountCollateral * collateralType.liquidationBonus) / 1e18;
+
+        borrowerData.collateral[collateral] = 0;
+        borrowerData.borrowed[collateral] = 0;
+        collateralType.totalCollateral -= amountCollateral;
+        collateralType.totalBorrowed -= amountDebt;
+
+        IERC20(collateral).safeTransfer(msg.sender, amountCollateral + bonusCollateral);
+
+        emit Liquidate(msg.sender, borrower, collateral, amountCollateral, amountDebt);
+    }
+
+    function getLTV(address user) public view returns (uint256) {
+        uint256 totalCollateralValue = 0;
+        uint256 totalBorrowValue = 0;
+
+        Borrower storage borrower = borrowers[user];
+        for (uint256 i = 0; i < getCollateralTypes().length; i++) {
+            address collateral = getCollateralTypes()[i];
+            CollateralType storage collateralType = collateralTypes[collateral];
+
+            totalCollateralValue += borrower.collateral[collateral];
+            totalBorrowValue += borrower.borrowed[collateral];
+        }
+
+        return (totalBorrowValue * 1e18) / totalCollateralValue;
+    }
+
+    function getCollateralTypes() public view returns (address[] memory) {
+        address[] memory collaterals = new address[](0);
+        for (address collateral in collateralTypes) {
+            collaterals.push(collateral);
+        }
+        return collaterals;
+    }
+
+    function flashLoan(address collateral, uint256 amount, address borrower, bytes calldata params) external nonReentrant {
+        CollateralType storage collateralType = collateralTypes[collateral];
+        require(collateralType.totalCollateral >= amount, "Insufficient collateral in protocol");
+
+        collateralType.totalCollateral -= amount;
+        IERC20(collateral).safeTransfer(borrower, amount);
+
+        // Call the receiver function on the borrower contract
+        IFlashLoanReceiver(borrower).executeOperation(collateral, amount, params);
+
+        collateralType.totalCollateral += amount;
+        require(IERC20(collateral).balanceOf(address(this)) >= amount, "Flash loan not repaid");
+    }
+}
+
+interface IFlashLoanReceiver {
+    function executeOperation(address collateral, uint256 amount, bytes calldata params) external;
+}
+```

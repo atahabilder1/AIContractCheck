@@ -1,0 +1,57 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Auction {
+    address public owner;
+    uint public highestBid;
+    address public highestBidder;
+    uint public startBlock;
+    uint public endBlock;
+    uint public minBid;
+    bool public ended;
+
+    struct Bid {
+        address bidder;
+        uint amount;
+        uint blockNumber;
+    }
+
+    mapping(address => Bid[]) public bids;
+
+    event NewBid(address bidder, uint amount, uint blockNumber);
+    event AuctionEnded(address winner, uint amount, uint blockNumber);
+
+    constructor(uint _startBlock, uint _endBlock, uint _minBid) {
+        owner = msg.sender;
+        startBlock = _startBlock;
+        endBlock = _endBlock;
+        minBid = _minBid;
+    }
+
+    function bid(uint amount) public {
+        require(block.number >= startBlock && block.number <= endBlock, "Auction not active");
+        require(amount >= minBid, "Bid amount too low");
+        require(amount > highestBid, "Bid amount too low");
+
+        Bid memory bid = Bid(msg.sender, amount, block.number);
+        bids[msg.sender].push(bid);
+
+        if (amount > highestBid) {
+            highestBid = amount;
+            highestBidder = msg.sender;
+        }
+
+        emit NewBid(msg.sender, amount, block.number);
+    }
+
+    function endAuction() public {
+        require(block.number > endBlock, "Auction not ended");
+        require(!ended, "Auction already ended");
+
+        ended = true;
+
+        emit AuctionEnded(highestBidder, highestBid, block.number);
+    }
+}
+```

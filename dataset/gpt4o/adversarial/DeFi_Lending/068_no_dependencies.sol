@@ -1,0 +1,86 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiLending {
+    struct Loan {
+        uint256 amount;
+        uint256 interestRate; // in basis points (1% = 100 basis points)
+        uint256 duration; // in seconds
+        address borrower;
+        bool isActive;
+    }
+
+    mapping(address => uint256) public deposits;
+    mapping(uint256 => Loan) public loans;
+    uint256 public loanCounter;
+    uint256 public totalDeposits;
+    address public owner;
+
+    event Deposit(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
+    event LoanRequested(address indexed borrower, uint256 loanId, uint256 amount);
+    event LoanRepaid(address indexed borrower, uint256 loanId);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    modifier onlyActiveLoan(uint256 loanId) {
+        require(loans[loanId].isActive, "Loan is not active");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function deposit() external payable {
+        require(msg.value > 0, "Deposit amount must be greater than zero");
+        deposits[msg.sender] += msg.value;
+        totalDeposits += msg.value;
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function withdraw(uint256 amount) external {
+        require(deposits[msg.sender] >= amount, "Insufficient balance");
+        deposits[msg.sender] -= amount;
+        totalDeposits -= amount;
+        payable(msg.sender).transfer(amount);
+        emit Withdraw(msg.sender, amount);
+    }
+
+    function requestLoan(uint256 amount, uint256 interestRate, uint256 duration) external {
+        require(deposits[msg.sender] >= amount / 2, "Collateral must be at least 50% of the loan amount");
+        loanCounter++;
+        loans[loanCounter] = Loan({
+            amount: amount,
+            interestRate: interestRate,
+            duration: duration,
+            borrower: msg.sender,
+            isActive: true
+        });
+        emit LoanRequested(msg.sender, loanCounter, amount);
+    }
+
+    function repayLoan(uint256 loanId) external payable onlyActiveLoan(loanId) {
+        Loan storage loan = loans[loanId];
+        require(msg.sender == loan.borrower, "Not the borrower");
+        uint256 interest = (loan.amount * loan.interestRate * loan.duration) / (10000 * 365 days);
+        uint256 totalRepayment = loan.amount + interest;
+        require(msg.value >= totalRepayment, "Insufficient repayment amount");
+        
+        loan.isActive = false;
+        deposits[loan.borrower] += msg.value - totalRepayment;
+        totalDeposits += totalRepayment;
+        
+        emit LoanRepaid(msg.sender, loanId);
+    }
+
+    function liquidateLoan(uint256 loanId) external onlyOwner onlyActiveLoan(loanId) {
+        Loan storage loan = loans[loanId];
+        require(block.timestamp > loan.duration, "Loan is not overdue");
+        loan.isActive = false;
+        totalDeposits -= loan.amount;
+    }
+}

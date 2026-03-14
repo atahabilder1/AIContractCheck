@@ -1,0 +1,35 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IRemoteContract {
+    function receiveMessage(address sender, bytes calldata message) external;
+}
+
+contract CrossChainMessenger {
+    address public owner;
+    address public remoteChainContract;
+
+    event MessageSent(address indexed sender, bytes message);
+    event MessageReceived(address indexed sender, bytes message);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    constructor(address _remoteChainContract) {
+        owner = msg.sender;
+        remoteChainContract = _remoteChainContract;
+    }
+
+    function sendMessage(bytes memory message) public {
+        emit MessageSent(msg.sender, message);
+        IRemoteContract(remoteChainContract).receiveMessage(msg.sender, message);
+    }
+
+    function setRemoteChainContract(address _remoteChainContract) public onlyOwner {
+        remoteChainContract = _remoteChainContract;
+    }
+}
+```

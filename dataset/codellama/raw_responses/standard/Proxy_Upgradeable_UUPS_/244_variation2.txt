@@ -1,0 +1,40 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Proxy {
+    address public owner;
+    address public implementation;
+
+    constructor() public {
+        owner = msg.sender;
+    }
+
+    function upgrade(address newImplementation) public {
+        require(msg.sender == owner, "Only owner can upgrade");
+        implementation = newImplementation;
+    }
+}
+
+contract Admin {
+    address public owner;
+    address public proxy;
+
+    constructor(address _proxy) public {
+        owner = msg.sender;
+        proxy = _proxy;
+    }
+
+    function upgradeProxy(address newImplementation) public {
+        require(msg.sender == owner, "Only owner can upgrade");
+        Proxy(proxy).upgrade(newImplementation);
+    }
+}
+```
+This code defines two contracts: `Proxy` and `Admin`. The `Proxy` contract is the upgradeable contract that contains the implementation address, and the `Admin` contract is the admin contract that manages the proxy upgrades and ownership.
+
+The `Proxy` contract has a constructor that sets the owner to the creator of the contract. It also has an `upgrade` function that allows the owner to upgrade the implementation address.
+
+The `Admin` contract has a constructor that sets the owner to the creator of the contract and the proxy address to the address of the `Proxy` contract. It also has an `upgradeProxy` function that allows the owner to upgrade the implementation address of the `Proxy` contract.
+
+To use this code, you would first deploy the `Proxy` contract, then deploy the `Admin` contract and set the proxy address to the address of the `Proxy` contract. Then, you can use the `Admin` contract to upgrade the implementation address of the `Proxy` contract.

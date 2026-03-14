@@ -1,0 +1,114 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract IsolatedLendingPool {
+    struct Market {
+        address collateralToken;
+        address borrowToken;
+        uint256 collateralFactor; // e.g., 0.75 for 75%
+        uint256 interestRate; // Annual interest rate in basis points (e.g., 500 for 5.00%)
+        uint256 totalCollateral;
+        uint256 totalBorrow;
+    }
+
+    mapping(bytes32 => Market) public markets;
+    mapping(address => mapping(bytes32 => uint256)) public userCollaterals;
+    mapping(address => mapping(bytes32 => uint256)) public userBorrows;
+
+    event MarketCreated(
+        bytes32 indexed marketId,
+        address collateralToken,
+        address borrowToken,
+        uint256 collateralFactor,
+        uint256 interestRate
+    );
+
+    event CollateralDeposited(address indexed user, bytes32 indexed marketId, uint256 amount);
+    event Borrowed(address indexed user, bytes32 indexed marketId, uint256 amount);
+    event Repaid(address indexed user, bytes32 indexed marketId, uint256 amount);
+    event CollateralWithdrawn(address indexed user, bytes32 indexed marketId, uint256 amount);
+
+    function createMarket(
+        address _collateralToken,
+        address _borrowToken,
+        uint256 _collateralFactor,
+        uint256 _interestRate
+    ) external returns (bytes32) {
+        require(_collateralFactor <= 1e18, "Collateral factor must be <= 1e18");
+        require(_interestRate > 0, "Interest rate must be > 0");
+
+        bytes32 marketId = keccak256(abi.encodePacked(_collateralToken, _borrowToken));
+        markets[marketId] = Market({
+            collateralToken: _collateralToken,
+            borrowToken: _borrowToken,
+            collateralFactor: _collateralFactor,
+            interestRate: _interestRate,
+            totalCollateral: 0,
+            totalBorrow: 0
+        });
+
+        emit MarketCreated(marketId, _collateralToken, _borrowToken, _collateralFactor, _interestRate);
+        return marketId;
+    }
+
+    function depositCollateral(bytes32 marketId, uint256 amount) external {
+        Market storage market = markets[marketId];
+        require(market.collateralToken != address(0), "Market does not exist");
+
+        IERC20(market.collateralToken).transferFrom(msg.sender, address(this), amount);
+
+        userCollaterals[msg.sender][marketId] += amount;
+        market.totalCollateral += amount;
+
+        emit CollateralDeposited(msg.sender, marketId, amount);
+    }
+
+    function borrow(bytes32 marketId, uint256 amount) external {
+        Market storage market = markets[marketId];
+        require(market.borrowToken != address(0), "Market does not exist");
+
+        uint256 maxBorrow = (userCollaterals[msg.sender][marketId] * market.collateralFactor) / 1e18;
+        require(userBorrows[msg.sender][marketId] + amount <= maxBorrow, "Insufficient collateral");
+
+        IERC20(market.borrowToken).transfer(msg.sender, amount);
+
+        userBorrows[msg.sender][marketId] += amount;
+        market.totalBorrow += amount;
+
+        emit Borrowed(msg.sender, marketId, amount);
+    }
+
+    function repay(bytes32 marketId, uint256 amount) external {
+        Market storage market = markets[marketId];
+        require(market.borrowToken != address(0), "Market does not exist");
+
+        IERC20(market.borrowToken).transferFrom(msg.sender, address(this), amount);
+
+        userBorrows[msg.sender][marketId] -= amount;
+        market.totalBorrow -= amount;
+
+        emit Repaid(msg.sender, marketId, amount);
+    }
+
+    function withdrawCollateral(bytes32 marketId, uint256 amount) external {
+        Market storage market = markets[marketId];
+        require(market.collateralToken != address(0), "Market does not exist");
+
+        uint256 maxBorrow = (userCollaterals[msg.sender][marketId] * market.collateralFactor) / 1e18;
+        require(userBorrows[msg.sender][marketId] <= maxBorrow - amount, "Exceeds collateral limit");
+
+        userCollaterals[msg.sender][marketId] -= amount;
+        market.totalCollateral -= amount;
+
+        IERC20(market.collateralToken).transfer(msg.sender, amount);
+
+        emit CollateralWithdrawn(msg.sender, marketId, amount);
+    }
+}
+
+interface IERC20 {
+    function transfer(address to, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+}
+```

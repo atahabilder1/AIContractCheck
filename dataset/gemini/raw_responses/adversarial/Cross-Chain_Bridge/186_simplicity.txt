@@ -1,0 +1,49 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleBridge {
+    address public owner;
+    mapping(uint256 => bool) public processedMessages;
+    address public targetChainContract; // Address of the bridge contract on the other chain
+
+    event MessageSent(uint256 indexed messageId, address indexed sender, bytes data);
+    event MessageReceived(uint256 indexed messageId, address indexed sender, bytes data);
+
+    constructor(address _targetChainContract) {
+        owner = msg.sender;
+        targetChainContract = _targetChainContract;
+    }
+
+    // Function to send a message to the other chain
+    // In a real bridge, this would likely involve locking tokens and emitting an event
+    // that a relayer would pick up. This is a highly simplified representation.
+    function sendMessage(bytes calldata _data) external {
+        uint256 messageId = block.timestamp; // Simple unique ID for demonstration
+        emit MessageSent(messageId, msg.sender, _data);
+    }
+
+    // Function to receive a message from the other chain
+    // In a real bridge, this would be called by a relayer after verifying the message
+    // from the source chain.
+    function receiveMessage(uint256 _messageId, address _sender, bytes calldata _data) external {
+        // Only the target chain contract should be able to call this (or a trusted relayer)
+        // For simplicity, we'll assume the targetChainContract can call this.
+        // In a real scenario, this would have more robust access control.
+        require(msg.sender == targetChainContract, "Only target chain contract can call this");
+        require(!processedMessages[_messageId], "Message already processed");
+
+        processedMessages[_messageId] = true;
+        emit MessageReceived(_messageId, _sender, _data);
+
+        // In a real bridge, you would perform actions here based on _data,
+        // e.g., minting tokens on this chain, unlocking assets, etc.
+    }
+
+    // Function to update the target chain contract address
+    function updateTargetChainContract(address _newTargetChainContract) external {
+        require(msg.sender == owner, "Only owner can update");
+        targetChainContract = _newTargetChainContract;
+    }
+}
+```

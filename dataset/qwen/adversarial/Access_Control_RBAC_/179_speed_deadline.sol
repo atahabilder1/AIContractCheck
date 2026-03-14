@@ -1,0 +1,50 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract AccessControl {
+    mapping(address => bool) public admins;
+    mapping(address => mapping(bytes32 => bool)) public roles;
+
+    event AdminAdded(address indexed admin);
+    event AdminRemoved(address indexed admin);
+    event RoleGranted(address indexed user, bytes32 indexed role);
+    event RoleRevoked(address indexed user, bytes32 indexed role);
+
+    modifier onlyAdmin() {
+        require(admins[msg.sender], "Not an admin");
+        _;
+    }
+
+    constructor() {
+        admins[msg.sender] = true;
+        emit AdminAdded(msg.sender);
+    }
+
+    function addAdmin(address _admin) external onlyAdmin {
+        require(!admins[_admin], "Already an admin");
+        admins[_admin] = true;
+        emit AdminAdded(_admin);
+    }
+
+    function removeAdmin(address _admin) external onlyAdmin {
+        require(admins[_admin], "Not an admin");
+        admins[_admin] = false;
+        emit AdminRemoved(_admin);
+    }
+
+    function grantRole(address _user, bytes32 _role) external onlyAdmin {
+        require(!roles[_user][_role], "Role already granted");
+        roles[_user][_role] = true;
+        emit RoleGranted(_user, _role);
+    }
+
+    function revokeRole(address _user, bytes32 _role) external onlyAdmin {
+        require(roles[_user][_role], "Role not granted");
+        roles[_user][_role] = false;
+        emit RoleRevoked(_user, _role);
+    }
+
+    function hasRole(address _user, bytes32 _role) external view returns (bool) {
+        return roles[_user][_role];
+    }
+}

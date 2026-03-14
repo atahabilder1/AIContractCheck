@@ -1,0 +1,75 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract GovernanceDAO {
+    struct Proposal {
+        string description;
+        uint256 voteCount;
+        bool executed;
+        mapping(address => bool) voters;
+    }
+
+    address public owner;
+    uint256 public proposalCount;
+    mapping(uint256 => Proposal) public proposals;
+    mapping(address => bool) public members;
+
+    event ProposalCreated(uint256 proposalId, string description);
+    event Voted(uint256 proposalId, address voter);
+    event ProposalExecuted(uint256 proposalId);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    modifier onlyMember() {
+        require(members[msg.sender], "Not a member");
+        _;
+    }
+
+    modifier proposalExists(uint256 _proposalId) {
+        require(proposalCount > _proposalId, "Proposal does not exist");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function addMember(address _member) external onlyOwner {
+        require(!members[_member], "Already a member");
+        members[_member] = true;
+    }
+
+    function removeMember(address _member) external onlyOwner {
+        require(members[_member], "Not a member");
+        members[_member] = false;
+    }
+
+    function createProposal(string memory _description) external onlyMember {
+        proposals[proposalCount] = Proposal({
+            description: _description,
+            voteCount: 0,
+            executed: false
+        });
+        emit ProposalCreated(proposalCount, _description);
+        proposalCount++;
+    }
+
+    function vote(uint256 _proposalId) external onlyMember proposalExists(_proposalId) {
+        Proposal storage proposal = proposals[_proposalId];
+        require(!proposal.voters[msg.sender], "Already voted");
+        proposal.voters[msg.sender] = true;
+        proposal.voteCount++;
+        emit Voted(_proposalId, msg.sender);
+    }
+
+    function executeProposal(uint256 _proposalId) external onlyOwner proposalExists(_proposalId) {
+        Proposal storage proposal = proposals[_proposalId];
+        require(!proposal.executed, "Proposal already executed");
+        proposal.executed = true;
+        emit ProposalExecuted(_proposalId);
+        // Additional logic to execute the proposal can be added here
+    }
+}

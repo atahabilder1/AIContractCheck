@@ -1,0 +1,99 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transfer(address to, uint256 value) external returns (bool);
+    function approve(address spender, uint256 value) external returns (bool);
+    function transferFrom(address from, address to, uint256 value) external returns (bool);
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address who) external view returns (uint256);
+    function allowance(address owner, address spender) external view returns (uint256);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
+contract YieldAggregator {
+    struct Deposit {
+        uint256 amount;
+        uint256 rewardDebt;
+    }
+
+    struct UserInfo {
+        Deposit[] deposits;
+        uint256 rewardDebt;
+        uint256 rewardBalance;
+    }
+
+    IERC20 public token;
+    uint256 public rewardPerTokenStored;
+    uint256 public lastUpdateBlock;
+    uint256 public rewardRate;
+    uint256 public rewardsDuration;
+    uint256 public constant REWARD_PER_TOKEN_PRECISION = 1e18;
+
+    mapping(address => UserInfo) public userInfo;
+    mapping(address => uint256) public rewardPerTokenStoredAt;
+
+    event Deposit(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
+    event Harvest(address indexed user, uint256 amount);
+
+    constructor(address _token, uint256 _rewardRate, uint256 _rewardsDuration) {
+        token = IERC20(_token);
+        rewardRate = _rewardRate;
+        rewardsDuration = _rewardsDuration;
+        lastUpdateBlock = block.number;
+    }
+
+    function deposit(uint256 amount) public {
+        require(amount > 0, "Amount must be greater than zero");
+        token.transferFrom(msg.sender, address(this), amount);
+        UserInfo storage user = userInfo[msg.sender];
+        user.deposits.push(Deposit({amount: amount, rewardDebt: 0}));
+        emit Deposit(msg.sender, amount);
+    }
+
+    function withdraw(uint256 amount) public {
+        UserInfo storage user = userInfo[msg.sender];
+        require(user.deposits.length > 0, "No deposits found");
+        require(user.deposits[user.deposits.length - 1].amount >= amount, "Withdraw amount exceeds balance");
+
+        uint256 lastIndex = user.deposits.length - 1;
+        user.deposits[lastIndex].amount -= amount;
+        if (user.deposits[lastIndex].amount == 0) {
+            user.deposits.pop();
+        }
+        token.transfer(msg.sender, amount);
+        emit Withdraw(msg.sender, amount);
+    }
+
+    function harvest() public {
+        updateReward(msg.sender);
+        uint256 reward = userInfo[msg.sender].rewardBalance;
+        if (reward > 0) {
+            userInfo[msg.sender].rewardBalance = 0;
+            token.transfer(msg.sender, reward);
+            emit Harvest(msg.sender, reward);
+        }
+    }
+
+    function updateReward(address user) internal {
+        uint256 balance = token.balanceOf(user);
+        uint256 supply = token.totalSupply();
+        if (supply == 0) {
+            rewardPerTokenStored = 0;
+        } else {
+            rewardPerTokenStored += (block.timestamp - lastUpdateBlock) * REWARD_PER_TOKEN_PRECISION / supply;
+        }
+        lastUpdateBlock = block.timestamp;
+
+        UserInfo storage userInfo_ = userInfo[user];
+        uint256 userRewardDebt = userInfo_.rewardDebt;
+        uint256 newRewardDebt = balance * rewardPerTokenStored / REWARD_PER_TOKEN_PRECISION;
+        uint256 reward = newRewardDebt - userRewardDebt;
+        userInfo_.rewardDebt = newRewardDebt;
+        userInfo_.rewardBalance += reward;
+    }
+}
+```

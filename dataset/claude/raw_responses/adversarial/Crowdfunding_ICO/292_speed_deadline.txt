@@ -1,0 +1,88 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract CrowdfundingICO is ERC20, Ownable {
+    uint256 public rate;
+    uint256 public goal;
+    uint256 public raised;
+    uint256 public deadline;
+    bool public finalized;
+
+    mapping(address => uint256) public contributions;
+
+    event Contributed(address indexed contributor, uint256 amount, uint256 tokens);
+    event Refunded(address indexed contributor, uint256 amount);
+    event Finalized(uint256 totalRaised);
+
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        uint256 _rate,
+        uint256 _goal,
+        uint256 _durationDays
+    ) ERC20(_name, _symbol) Ownable(msg.sender) {
+        rate = _rate;
+        goal = _goal;
+        deadline = block.timestamp + (_durationDays * 1 days);
+    }
+
+    function contribute() external payable {
+        require(block.timestamp < deadline, "ICO ended");
+        require(msg.value > 0, "Send ETH");
+        require(!finalized, "Already finalized");
+
+        contributions[msg.sender] += msg.value;
+        raised += msg.value;
+
+        uint256 tokens = msg.value * rate;
+        _mint(msg.sender, tokens);
+
+        emit Contributed(msg.sender, msg.value, tokens);
+    }
+
+    function finalize() external onlyOwner {
+        require(block.timestamp >= deadline || raised >= goal, "Not ready");
+        require(!finalized, "Already finalized");
+        require(raised >= goal, "Goal not met");
+
+        finalized = true;
+        (bool sent, ) = owner().call{value: address(this).balance}("");
+        require(sent, "Transfer failed");
+
+        emit Finalized(raised);
+    }
+
+    function refund() external {
+        require(block.timestamp >= deadline, "ICO not ended");
+        require(raised < goal, "Goal was met");
+        require(!finalized, "Already finalized");
+
+        uint256 amount = contributions[msg.sender];
+        require(amount > 0, "Nothing to refund");
+
+        contributions[msg.sender] = 0;
+        uint256 tokenBalance = balanceOf(msg.sender);
+        if (tokenBalance > 0) {
+            _burn(msg.sender, tokenBalance);
+        }
+
+        (bool sent, ) = msg.sender.call{value: amount}("");
+        require(sent, "Refund failed");
+
+        emit Refunded(msg.sender, amount);
+    }
+
+    function timeLeft() external view returns (uint256) {
+        if (block.timestamp >= deadline) return 0;
+        return deadline - block.timestamp;
+    }
+
+    receive() external payable {
+        this.contribute();
+    }
+}
+```

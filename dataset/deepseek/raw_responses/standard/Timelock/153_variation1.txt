@@ -1,0 +1,75 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    struct Proposal {
+        address target;
+        uint256 value;
+        bytes data;
+        bool executed;
+    }
+
+    address public admin;
+    uint256 public constant MIN_APPROVAL_RATIO = 2; // 2 out of 3 guardians
+    uint256 public constant GUARDIANS_COUNT = 3;
+    address[] public guardians;
+    mapping(uint256 => mapping(address => bool)) public approvals;
+    uint256 public proposalCount;
+    mapping(uint256 => Proposal) public proposals;
+
+    constructor(address[] memory _guardians) {
+        require(_guardians.length == GUARDIANS_COUNT, "Invalid guardians count");
+        admin = msg.sender;
+        guardians = _guardians;
+    }
+
+    function propose(address target, uint256 value, bytes memory data) public {
+        require(isGuardian(msg.sender), "Not a guardian");
+        proposalCount++;
+        proposals[proposalCount] = Proposal({
+            target: target,
+            value: value,
+            data: data,
+            executed: false
+        });
+    }
+
+    function approve(uint256 proposalId) public {
+        require(isGuardian(msg.sender), "Not a guardian");
+        require(proposalId <= proposalCount, "Proposal does not exist");
+        require(!approvals[proposalId][msg.sender], "Already approved");
+        approvals[proposalId][msg.sender] = true;
+    }
+
+    function execute(uint256 proposalId) public {
+        require(isGuardian(msg.sender), "Not a guardian");
+        require(proposalId <= proposalCount, "Proposal does not exist");
+        require(!proposals[proposalId].executed, "Proposal already executed");
+        require(approvalCount(proposalId) >= MIN_APPROVAL_RATIO, "Approval count too low");
+
+        Proposal storage proposal = proposals[proposalId];
+        proposal.executed = true;
+
+        (bool success, ) = proposal.target.call{value: proposal.value}(proposal.data);
+        require(success, "Transaction failed");
+    }
+
+    function approvalCount(uint256 proposalId) public view returns (uint256 count) {
+        for (uint256 i = 0; i < guardians.length; i++) {
+            if (approvals[proposalId][guardians[i]]) {
+                count++;
+            }
+        }
+    }
+
+    function isGuardian(address account) public view returns (bool) {
+        for (uint256 i = 0; i < guardians.length; i++) {
+            if (guardians[i] == account) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+```

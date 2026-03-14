@@ -1,0 +1,53 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function approve(address spender, uint256 amount) external returns (bool);
+}
+
+contract CrossChainBridge {
+    address public owner;
+    mapping(address => bool) public approvedTokens;
+    mapping(bytes32 => bool) public processedMessages;
+
+    event TokenApproved(address indexed token);
+    event TokenRemoved(address indexed token);
+    event MessageProcessed(bytes32 indexed messageHash);
+    event Transfer(address indexed token, address indexed to, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function approveToken(address token) external onlyOwner {
+        approvedTokens[token] = true;
+        emit TokenApproved(token);
+    }
+
+    function removeToken(address token) external onlyOwner {
+        approvedTokens[token] = false;
+        emit TokenRemoved(token);
+    }
+
+    function transfer(address token, address to, uint256 amount) external {
+        require(approvedTokens[token], "Token not approved");
+        require(IERC20(token).transferFrom(msg.sender, address(this), amount), "Token transfer failed");
+        emit Transfer(token, to, amount);
+    }
+
+    function processMessage(bytes32 messageHash, address token, address to, uint256 amount) external onlyOwner {
+        require(!processedMessages[messageHash], "Message already processed");
+        require(approvedTokens[token], "Token not approved");
+        require(IERC20(token).transferFrom(owner, to, amount), "Token transfer failed");
+        processedMessages[messageHash] = true;
+        emit MessageProcessed(messageHash);
+    }
+}
+```

@@ -1,0 +1,82 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract StakingContract is Ownable {
+    using SafeERC20 for IERC20;
+
+    IERC20 public stakingToken;
+    IERC20 public rewardToken;
+    uint256 public rewardRate; // reward per second per staked token
+    uint256 public totalStaked;
+    uint256 public lastUpdateTime;
+
+    struct Stake {
+        uint256 amount;
+        uint256 rewardDebt;
+    }
+
+    mapping(address => Stake) public stakes;
+    mapping(address => uint256) public rewards;
+
+    event Staked(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
+    event RewardClaimed(address indexed user, uint256 amount);
+
+    constructor(IERC20 _stakingToken, IERC20 _rewardToken, uint256 _rewardRate) {
+        stakingToken = _stakingToken;
+        rewardToken = _rewardToken;
+        rewardRate = _rewardRate;
+        lastUpdateTime = block.timestamp;
+    }
+
+    modifier updateReward(address _account) {
+        uint256 reward = earned(_account);
+        if (reward > 0) {
+            rewards[_account] = reward;
+        }
+        _;
+    }
+
+    function earned(address _account) public view returns (uint256) {
+        if (totalStaked == 0) {
+            return 0;
+        }
+        uint256 blockTime = block.timestamp;
+        uint256 timeSinceLastUpdate = blockTime - lastUpdateTime;
+        uint256 reward = (totalStaked * rewardRate * timeSinceLastUpdate) / 1e18;
+        return (stakes[_account].amount * reward) / totalStaked - stakes[_account].rewardDebt;
+    }
+
+    function stake(uint256 _amount) external updateReward(msg.sender) {
+        require(_amount > 0, "Cannot stake 0");
+        stakingToken.safeTransferFrom(msg.sender, address(this), _amount);
+        totalStaked += _amount;
+        stakes[msg.sender].amount += _amount;
+        stakes[msg.sender].rewardDebt = (stakes[msg.sender].amount * earned(msg.sender)) / 1e18;
+        lastUpdateTime = block.timestamp;
+        emit Staked(msg.sender, _amount);
+    }
+
+    function withdraw(uint256 _amount) external updateReward(msg.sender) {
+        require(_amount > 0, "Cannot withdraw 0");
+        require(stakes[msg.sender].amount >= _amount, "Insufficient stake");
+        stakingToken.safeTransfer(msg.sender, _amount);
+        totalStaked -= _amount;
+        stakes[msg.sender].amount -= _amount;
+        stakes[msg.sender].rewardDebt = (stakes[msg.sender].amount * earned(msg.sender)) / 1e18;
+        lastUpdateTime = block.timestamp;
+        emit Withdrawn(msg.sender, _amount);
+    }
+
+    function claimReward() external updateReward(msg.sender) {
+        uint256 reward = rewards[msg.sender];
+        require(reward > 0, "No reward to claim");
+        rewards[msg.sender] = 0;
+        rewardToken.safeTransfer(msg.sender, reward);
+        emit RewardClaimed(msg.sender, reward);
+    }
+}

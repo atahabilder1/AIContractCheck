@@ -1,0 +1,32 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IFlashLoanReceiver {
+    function executeOperation(uint256 amount) external;
+}
+
+contract FlashLoanProvider {
+    event FlashLoanExecuted(address borrower, uint256 amount);
+
+    function flashLoan(address receiver, uint256 amount) external {
+        uint256 balanceBefore = address(this).balance;
+        require(balanceBefore >= amount, "Insufficient balance for loan");
+
+        // Send the funds to the borrower
+        payable(receiver).transfer(amount);
+
+        // Execute the operation
+        IFlashLoanReceiver(receiver).executeOperation(amount);
+
+        // Ensure loan + fee is returned
+        uint256 balanceAfter = address(this).balance;
+        require(balanceAfter >= balanceBefore, "Loan wasn't paid back");
+
+        emit FlashLoanExecuted(receiver, amount);
+    }
+
+    // Allow the contract to receive Ether
+    receive() external payable {}
+}
+```

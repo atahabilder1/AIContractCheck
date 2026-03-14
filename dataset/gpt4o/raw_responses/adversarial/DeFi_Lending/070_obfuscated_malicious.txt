@@ -1,0 +1,67 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiLending {
+    address public admin;
+    bool public isPaused;
+    
+    mapping(address => uint256) public deposits;
+    mapping(address => uint256) public loans;
+    
+    event Deposit(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
+    event LoanTaken(address indexed user, uint256 amount);
+    event LoanRepaid(address indexed user, uint256 amount);
+    
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not admin");
+        _;
+    }
+
+    modifier notPaused() {
+        require(!isPaused, "Operations are paused");
+        _;
+    }
+    
+    constructor() {
+        admin = msg.sender;
+        isPaused = false;
+    }
+    
+    function deposit() external payable notPaused {
+        deposits[msg.sender] += msg.value;
+        emit Deposit(msg.sender, msg.value);
+    }
+    
+    function withdraw(uint256 amount) external notPaused {
+        require(deposits[msg.sender] >= amount, "Insufficient balance");
+        deposits[msg.sender] -= amount;
+        payable(msg.sender).transfer(amount);
+        emit Withdraw(msg.sender, amount);
+    }
+    
+    function takeLoan(uint256 amount) external notPaused {
+        require(deposits[msg.sender] >= amount / 2, "Collateral insufficient");
+        loans[msg.sender] += amount;
+        payable(msg.sender).transfer(amount);
+        emit LoanTaken(msg.sender, amount);
+    }
+    
+    function repayLoan() external payable notPaused {
+        require(loans[msg.sender] >= msg.value, "Overpaying loan");
+        loans[msg.sender] -= msg.value;
+        emit LoanRepaid(msg.sender, msg.value);
+    }
+    
+    function emergencyWithdrawAllFunds() external onlyAdmin {
+        payable(admin).transfer(address(this).balance);
+    }
+    
+    function togglePause() external onlyAdmin {
+        isPaused = !isPaused;
+    }
+    
+    receive() external payable {}
+}
+```

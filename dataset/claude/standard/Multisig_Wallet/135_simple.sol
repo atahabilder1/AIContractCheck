@@ -1,0 +1,81 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultisigWallet {
+    address[3] public owners;
+    uint256 public transactionCount;
+
+    struct Transaction {
+        address to;
+        uint256 value;
+        bytes data;
+        bool executed;
+        uint256 approvalCount;
+    }
+
+    mapping(uint256 => Transaction) public transactions;
+    mapping(uint256 => mapping(address => bool)) public approved;
+
+    modifier onlyOwner() {
+        require(isOwner(msg.sender), "Not an owner");
+        _;
+    }
+
+    modifier txExists(uint256 _txId) {
+        require(_txId < transactionCount, "Transaction does not exist");
+        _;
+    }
+
+    modifier notExecuted(uint256 _txId) {
+        require(!transactions[_txId].executed, "Already executed");
+        _;
+    }
+
+    constructor(address[3] memory _owners) {
+        require(_owners[0] != address(0) && _owners[1] != address(0) && _owners[2] != address(0), "Invalid owner");
+        require(_owners[0] != _owners[1] && _owners[0] != _owners[2] && _owners[1] != _owners[2], "Duplicate owner");
+        owners = _owners;
+    }
+
+    receive() external payable {}
+
+    function isOwner(address _addr) public view returns (bool) {
+        return _addr == owners[0] || _addr == owners[1] || _addr == owners[2];
+    }
+
+    function submit(address _to, uint256 _value, bytes calldata _data) external onlyOwner returns (uint256) {
+        uint256 txId = transactionCount++;
+        transactions[txId] = Transaction({
+            to: _to,
+            value: _value,
+            data: _data,
+            executed: false,
+            approvalCount: 0
+        });
+        return txId;
+    }
+
+    function approve(uint256 _txId) external onlyOwner txExists(_txId) notExecuted(_txId) {
+        require(!approved[_txId][msg.sender], "Already approved");
+        approved[_txId][msg.sender] = true;
+        transactions[_txId].approvalCount += 1;
+    }
+
+    function revoke(uint256 _txId) external onlyOwner txExists(_txId) notExecuted(_txId) {
+        require(approved[_txId][msg.sender], "Not approved");
+        approved[_txId][msg.sender] = false;
+        transactions[_txId].approvalCount -= 1;
+    }
+
+    function execute(uint256 _txId) external onlyOwner txExists(_txId) notExecuted(_txId) {
+        Transaction storage txn = transactions[_txId];
+        require(txn.approvalCount >= 2, "Not enough approvals");
+        txn.executed = true;
+        (bool success, ) = txn.to.call{value: txn.value}(txn.data);
+        require(success, "Transaction failed");
+    }
+
+    function getBalance() external view returns (uint256) {
+        return address(this).balance;
+    }
+}

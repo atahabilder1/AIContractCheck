@@ -1,0 +1,202 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IStrategy {
+    function deposit(uint256 _amount) external;
+    function withdraw(uint256 _amount) external;
+    function harvest() external returns (uint256 harvestedAmount);
+    function getBalance() external view returns (uint256);
+    function getStrategyName() external view returns (string memory);
+}
+
+contract YieldAggregatorVault {
+    address public owner;
+    IStrategy public strategy;
+    string public vaultName;
+
+    uint256 public depositFeeBPS; // Basis points for deposit fee (e.g., 100 for 1%)
+    uint256 public withdrawalFeeBPS; // Basis points for withdrawal fee (e.g., 50 for 0.5%)
+    uint256 public compoundingFrequency; // Seconds between automatic compounding
+
+    mapping(address => uint256) public userShares;
+    uint256 public totalShares;
+
+    uint256 public lastCompoundedTime;
+
+    event Deposit(address indexed user, uint256 amount, uint256 shares);
+    event Withdraw(address indexed user, uint256 amount, uint256 shares);
+    event StrategySet(IStrategy indexed newStrategy);
+    event FeesUpdated(uint256 depositFeeBPS, uint256 withdrawalFeeBPS);
+    event CompoundingFrequencyUpdated(uint256 compoundingFrequency);
+    event Harvested(uint256 harvestedAmount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can perform this action");
+        _;
+    }
+
+    constructor(
+        string memory _vaultName,
+        IStrategy _strategy,
+        uint256 _depositFeeBPS,
+        uint256 _withdrawalFeeBPS,
+        uint256 _compoundingFrequency
+    ) {
+        owner = msg.sender;
+        vaultName = _vaultName;
+        strategy = _strategy;
+        depositFeeBPS = _depositFeeBPS;
+        withdrawalFeeBPS = _withdrawalFeeBPS;
+        compoundingFrequency = _compoundingFrequency;
+        lastCompoundedTime = block.timestamp;
+    }
+
+    function setStrategy(IStrategy _newStrategy) public onlyOwner {
+        require(_newStrategy != address(0), "Invalid strategy address");
+
+        // Potentially withdraw all funds from the old strategy before setting a new one
+        // This is a complex operation and depends on the specific strategy implementation.
+        // For simplicity, we'll assume funds are managed externally or the new strategy is compatible.
+
+        strategy = _newStrategy;
+        emit StrategySet(_newStrategy);
+    }
+
+    function updateFees(uint256 _depositFeeBPS, uint256 _withdrawalFeeBPS) public onlyOwner {
+        depositFeeBPS = _depositFeeBPS;
+        withdrawalFeeBPS = _withdrawalFeeBPS;
+        emit FeesUpdated(_depositFeeBPS, _withdrawalFeeBPS);
+    }
+
+    function updateCompoundingFrequency(uint256 _compoundingFrequency) public onlyOwner {
+        compoundingFrequency = _compoundingFrequency;
+        emit CompoundingFrequencyUpdated(_compoundingFrequency);
+    }
+
+    function deposit(uint256 _amount) public {
+        require(_amount > 0, "Deposit amount must be greater than zero");
+
+        // Calculate deposit fee
+        uint256 feeAmount = (_amount * depositFeeBPS) / 10000;
+        uint256 amountAfterFee = _amount - feeAmount;
+
+        // Transfer funds to the vault (assuming this contract receives the underlying token)
+        // In a real-world scenario, you'd likely be interacting with a token contract.
+        // For this example, we assume the underlying asset is Ether or a token that can be sent directly.
+        // If it's an ERC20 token, you'd need to approve this contract to spend tokens from the user.
+        // Example for ERC20: require(IERC20(underlyingTokenAddress).transferFrom(msg.sender, address(this), _amount), "Token transfer failed");
+
+        // Calculate shares to mint
+        uint256 sharesMinted = _calculateShares(amountAfterFee);
+
+        userShares[msg.sender] += sharesMinted;
+        totalShares += sharesMinted;
+
+        // Deposit into the strategy
+        strategy.deposit(amountAfterFee);
+
+        emit Deposit(msg.sender, _amount, sharesMinted);
+    }
+
+    function withdraw(uint256 _sharesToWithdraw) public {
+        require(_sharesToWithdraw > 0, "Shares to withdraw must be greater than zero");
+        require(userShares[msg.sender] >= _sharesToWithdraw, "Insufficient shares");
+
+        // Calculate amount to withdraw from the vault based on shares
+        uint256 totalUnderlyingValue = _getUnderlyingValue();
+        uint256 amountToWithdraw = (_sharesToWithdraw * totalUnderlyingValue) / totalShares;
+
+        // Calculate withdrawal fee
+        uint256 feeAmount = (amountToWithdraw * withdrawalFeeBPS) / 10000;
+        uint256 amountAfterFee = amountToWithdraw - feeAmount;
+
+        // Update user shares and total shares
+        userShares[msg.sender] -= _sharesToWithdraw;
+        totalShares -= _sharesToWithdraw;
+
+        // Withdraw from the strategy
+        strategy.withdraw(amountToWithdraw); // Withdraw the full amount before fee
+
+        // Transfer funds to the user
+        // Example for ERC20: require(IERC20(underlyingTokenAddress).transfer(msg.sender, amountAfterFee), "Token transfer failed");
+        // For Ether: payable(msg.sender).transfer(amountAfterFee);
+
+        emit Withdraw(msg.sender, amountAfterFee, _sharesToWithdraw);
+    }
+
+    function withdrawByAmount(uint256 _amountToWithdraw) public {
+        require(_amountToWithdraw > 0, "Amount to withdraw must be greater than zero");
+
+        uint256 totalUnderlyingValue = _getUnderlyingValue();
+        require(totalUnderlyingValue >= _amountToWithdraw, "Vault does not have enough underlying value");
+
+        // Calculate withdrawal fee
+        uint256 feeAmount = (_amountToWithdraw * withdrawalFeeBPS) / 10000;
+        uint256 amountAfterFee = _amountToWithdraw - feeAmount;
+
+        // Calculate shares to redeem
+        uint256 sharesToRedeem = (_amountToWithdraw * totalShares) / totalUnderlyingValue;
+        require(userShares[msg.sender] >= sharesToRedeem, "Insufficient shares");
+
+        // Update user shares and total shares
+        userShares[msg.sender] -= sharesToRedeem;
+        totalShares -= sharesToRedeem;
+
+        // Withdraw from the strategy
+        strategy.withdraw(_amountToWithdraw); // Withdraw the full amount before fee
+
+        // Transfer funds to the user
+        // Example for ERC20: require(IERC20(underlyingTokenAddress).transfer(msg.sender, amountAfterFee), "Token transfer failed");
+        // For Ether: payable(msg.sender).transfer(amountAfterFee);
+
+        emit Withdraw(msg.sender, amountAfterFee, sharesToRedeem);
+    }
+
+    function compound() public {
+        require(block.timestamp >= lastCompoundedTime + compoundingFrequency, "Compounding frequency not met");
+
+        // Harvest from the strategy
+        uint256 harvestedAmount = strategy.harvest();
+        require(harvestedAmount > 0, "No amount harvested");
+
+        // Deposit harvested amount back into the strategy
+        strategy.deposit(harvestedAmount);
+
+        lastCompoundedTime = block.timestamp;
+        emit Harvested(harvestedAmount);
+    }
+
+    function _calculateShares(uint256 _amount) internal view returns (uint256) {
+        if (totalShares == 0) {
+            return _amount; // First deposit, 1:1 ratio
+        }
+        return (_amount * totalShares) / _getUnderlyingValue();
+    }
+
+    function _getUnderlyingValue() internal view returns (uint256) {
+        // This function should return the total value of the underlying asset held by the vault.
+        // In a real-world scenario, this would involve checking the balance of the underlying token
+        // or querying the strategy for its current asset value.
+        // For this example, we'll assume the strategy's getBalance() directly reflects the underlying value.
+        return strategy.getBalance();
+    }
+
+    function getUserShares(address _user) public view returns (uint256) {
+        return userShares[_user];
+    }
+
+    function getTotalUnderlyingValue() public view returns (uint256) {
+        return _getUnderlyingValue();
+    }
+
+    function getStrategyName() public view returns (string memory) {
+        return strategy.getStrategyName();
+    }
+
+    // Fallback function to receive Ether if this contract is designed to hold Ether
+    // If this contract is for ERC20 tokens, this is not needed.
+    receive() external payable {
+        // Handle incoming Ether deposits if applicable
+        // This would typically be integrated with the deposit function.
+    }
+}

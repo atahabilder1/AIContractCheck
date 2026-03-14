@@ -1,0 +1,101 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract CrowdfundingICO is ERC20, Ownable {
+    uint256 public rate; // tokens per ETH
+    uint256 public goal;
+    uint256 public cap;
+    uint256 public raised;
+    uint256 public startTime;
+    uint256 public endTime;
+    bool public finalized;
+
+    mapping(address => uint256) public contributions;
+
+    event TokensPurchased(address indexed buyer, uint256 ethAmount, uint256 tokenAmount);
+    event GoalReached(uint256 totalRaised);
+    event Refunded(address indexed contributor, uint256 amount);
+    event Finalized(uint256 totalRaised);
+
+    modifier onlyWhileOpen() {
+        require(block.timestamp >= startTime && block.timestamp <= endTime, "Sale not active");
+        _;
+    }
+
+    constructor(
+        string memory name_,
+        string memory symbol_,
+        uint256 _rate,
+        uint256 _goal,
+        uint256 _cap,
+        uint256 _durationDays
+    ) ERC20(name_, symbol_) Ownable(msg.sender) {
+        require(_rate > 0, "Rate must be > 0");
+        require(_goal > 0 && _cap >= _goal, "Invalid goal/cap");
+        require(_durationDays > 0, "Invalid duration");
+
+        rate = _rate;
+        goal = _goal;
+        cap = _cap;
+        startTime = block.timestamp;
+        endTime = block.timestamp + (_durationDays * 1 days);
+    }
+
+    receive() external payable {
+        buyTokens();
+    }
+
+    function buyTokens() public payable onlyWhileOpen {
+        require(msg.value > 0, "Send ETH to buy tokens");
+        require(raised + msg.value <= cap, "Cap exceeded");
+
+        uint256 tokens = msg.value * rate;
+        raised += msg.value;
+        contributions[msg.sender] += msg.value;
+
+        _mint(msg.sender, tokens);
+        emit TokensPurchased(msg.sender, msg.value, tokens);
+
+        if (raised >= goal) {
+            emit GoalReached(raised);
+        }
+    }
+
+    function finalize() external onlyOwner {
+        require(!finalized, "Already finalized");
+        require(block.timestamp > endTime || raised >= cap, "Sale still active");
+        finalized = true;
+
+        if (raised >= goal) {
+            (bool sent, ) = owner().call{value: address(this).balance}("");
+            require(sent, "Transfer failed");
+        }
+
+        emit Finalized(raised);
+    }
+
+    function claimRefund() external {
+        require(finalized, "Not finalized");
+        require(raised < goal, "Goal was met");
+        uint256 amount = contributions[msg.sender];
+        require(amount > 0, "Nothing to refund");
+
+        contributions[msg.sender] = 0;
+        (bool sent, ) = msg.sender.call{value: amount}("");
+        require(sent, "Refund failed");
+
+        emit Refunded(msg.sender, amount);
+    }
+
+    function timeRemaining() external view returns (uint256) {
+        if (block.timestamp >= endTime) return 0;
+        return endTime - block.timestamp;
+    }
+
+    function goalReached() external view returns (bool) {
+        return raised >= goal;
+    }
+}

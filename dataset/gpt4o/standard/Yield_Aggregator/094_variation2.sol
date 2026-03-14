@@ -1,0 +1,77 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IStrategy {
+    function deposit(uint256 amount) external;
+    function withdraw(uint256 amount) external;
+    function balance() external view returns (uint256);
+    function currentAPY() external view returns (uint256);
+}
+
+contract YieldAggregator {
+    IStrategy[] public strategies;
+    uint256 public currentStrategyIndex;
+    address public keeper;
+    address public owner;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    modifier onlyKeeper() {
+        require(msg.sender == keeper, "Not the keeper");
+        _;
+    }
+
+    constructor(address[] memory _strategies, address _keeper) {
+        for (uint256 i = 0; i < _strategies.length; i++) {
+            strategies.push(IStrategy(_strategies[i]));
+        }
+        keeper = _keeper;
+        owner = msg.sender;
+    }
+
+    function deposit(uint256 amount) external onlyOwner {
+        strategies[currentStrategyIndex].deposit(amount);
+    }
+
+    function withdraw(uint256 amount) external onlyOwner {
+        strategies[currentStrategyIndex].withdraw(amount);
+    }
+
+    function rotateStrategy() external onlyKeeper {
+        uint256 currentBalance = strategies[currentStrategyIndex].balance();
+        strategies[currentStrategyIndex].withdraw(currentBalance);
+
+        uint256 highestAPY = 0;
+        uint256 newStrategyIndex = currentStrategyIndex;
+
+        for (uint256 i = 0; i < strategies.length; i++) {
+            uint256 apy = strategies[i].currentAPY();
+            if (apy > highestAPY) {
+                highestAPY = apy;
+                newStrategyIndex = i;
+            }
+        }
+
+        currentStrategyIndex = newStrategyIndex;
+        strategies[currentStrategyIndex].deposit(currentBalance);
+    }
+
+    function updateKeeper(address _newKeeper) external onlyOwner {
+        keeper = _newKeeper;
+    }
+
+    function getCurrentStrategy() external view returns (address) {
+        return address(strategies[currentStrategyIndex]);
+    }
+
+    function getStrategies() external view returns (address[] memory) {
+        address[] memory strategyAddresses = new address[](strategies.length);
+        for (uint256 i = 0; i < strategies.length; i++) {
+            strategyAddresses[i] = address(strategies[i]);
+        }
+        return strategyAddresses;
+    }
+}

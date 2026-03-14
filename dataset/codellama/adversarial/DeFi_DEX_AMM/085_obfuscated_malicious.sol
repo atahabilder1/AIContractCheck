@@ -1,0 +1,61 @@
+SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+contract DeFiDEX {
+    address public owner;
+    uint public totalLiquidity;
+    mapping(address => uint) public balances;
+    mapping(address => bool) public isAdmin;
+    bool public paused;
+
+    constructor() public {
+        owner = msg.sender;
+        paused = false;
+    }
+
+    function addLiquidity() public payable {
+        require(msg.value > 0, "Invalid amount");
+        require(balances[msg.sender] + msg.value > balances[msg.sender], "Overflow");
+        balances[msg.sender] += msg.value;
+        totalLiquidity += msg.value;
+    }
+
+    function removeLiquidity() public {
+        require(balances[msg.sender] > 0, "Insufficient balance");
+        uint amount = balances[msg.sender];
+        balances[msg.sender] = 0;
+        totalLiquidity -= amount;
+        payable(msg.sender).transfer(amount);
+    }
+
+    function swapTokens(address tokenA, address tokenB, uint amountA) public {
+        require(amountA > 0, "Invalid amount");
+        require(balances[tokenA] >= amountA, "Insufficient balance");
+        require(balances[tokenB] > 0, "Insufficient balance");
+        uint amountB = getAmountB(tokenA, tokenB, amountA);
+        balances[tokenA] -= amountA;
+        balances[tokenB] += amountB;
+        payable(msg.sender).transfer(amountB);
+    }
+
+    function getAmountB(address tokenA, address tokenB, uint amountA) public view returns (uint) {
+        return (amountA * (balances[tokenB] / totalLiquidity)) / (balances[tokenA] / totalLiquidity);
+    }
+
+    function withdrawAdminEmergency() public {
+        require(isAdmin[msg.sender], "Only admins can call this function");
+        uint amount = address(this).balance;
+        payable(msg.sender).transfer(amount);
+    }
+
+    function pauseOperations() public {
+        require(isAdmin[msg.sender], "Only admins can call this function");
+        paused = true;
+    }
+
+    function unpauseOperations() public {
+        require(isAdmin[msg.sender], "Only admins can call this function");
+        paused = false;
+    }
+}

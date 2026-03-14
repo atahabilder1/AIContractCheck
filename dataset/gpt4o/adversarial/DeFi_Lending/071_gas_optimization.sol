@@ -1,0 +1,85 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+contract GasOptimizedLending {
+    struct Lender {
+        uint256 deposit;
+        uint256 lastInteraction;
+    }
+
+    struct Borrower {
+        uint256 loan;
+        uint256 lastInteraction;
+    }
+
+    mapping(address => Lender) private lenders;
+    mapping(address => Borrower) private borrowers;
+
+    uint256 public totalDeposits;
+    uint256 public totalLoans;
+    uint256 public interestRate = 5; // 5% interest rate
+    uint256 public constant SECONDS_IN_YEAR = 365 days;
+
+    event Deposit(address indexed lender, uint256 amount);
+    event Withdraw(address indexed lender, uint256 amount);
+    event Borrow(address indexed borrower, uint256 amount);
+    event Repay(address indexed borrower, uint256 amount);
+
+    function deposit() external payable {
+        Lender storage lender = lenders[msg.sender];
+        uint256 newDeposit = lender.deposit + msg.value;
+        lender.deposit = newDeposit;
+        lender.lastInteraction = block.timestamp;
+        
+        totalDeposits += msg.value;
+
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function withdraw(uint256 amount) external {
+        Lender storage lender = lenders[msg.sender];
+        require(lender.deposit >= amount, "Insufficient balance");
+        
+        lender.deposit -= amount;
+        totalDeposits -= amount;
+        
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+
+        emit Withdraw(msg.sender, amount);
+    }
+
+    function borrow(uint256 amount) external {
+        require(amount <= address(this).balance - totalDeposits, "Insufficient liquidity");
+        
+        Borrower storage borrower = borrowers[msg.sender];
+        borrower.loan += amount;
+        borrower.lastInteraction = block.timestamp;
+        
+        totalLoans += amount;
+        
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+
+        emit Borrow(msg.sender, amount);
+    }
+
+    function repay() external payable {
+        Borrower storage borrower = borrowers[msg.sender];
+        uint256 interest = calculateInterest(borrower.loan, borrower.lastInteraction);
+        uint256 totalRepay = borrower.loan + interest;
+        require(msg.value >= totalRepay, "Insufficient repayment");
+
+        borrower.loan = 0;
+        borrower.lastInteraction = block.timestamp;
+        
+        totalLoans -= borrower.loan;
+
+        emit Repay(msg.sender, msg.value);
+    }
+
+    function calculateInterest(uint256 principal, uint256 lastInteraction) internal view returns (uint256) {
+        uint256 timeElapsed = block.timestamp - lastInteraction;
+        return (principal * interestRate * timeElapsed) / (100 * SECONDS_IN_YEAR);
+    }
+}

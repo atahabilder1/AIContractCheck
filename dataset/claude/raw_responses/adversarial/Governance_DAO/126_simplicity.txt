@@ -1,0 +1,83 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleDAO {
+    struct Proposal {
+        string description;
+        uint256 yesVotes;
+        uint256 noVotes;
+        uint256 deadline;
+        bool executed;
+        mapping(address => bool) hasVoted;
+    }
+
+    address public owner;
+    uint256 public proposalCount;
+    mapping(uint256 => Proposal) public proposals;
+    mapping(address => uint256) public memberStake;
+    uint256 public totalStake;
+
+    event ProposalCreated(uint256 indexed id, string description, uint256 deadline);
+    event Voted(uint256 indexed id, address voter, bool support, uint256 weight);
+    event ProposalExecuted(uint256 indexed id, bool passed);
+
+    modifier onlyMember() {
+        require(memberStake[msg.sender] > 0, "Not a member");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function join() external payable {
+        require(msg.value > 0, "Must stake ETH");
+        memberStake[msg.sender] += msg.value;
+        totalStake += msg.value;
+    }
+
+    function createProposal(string calldata description, uint256 duration) external onlyMember returns (uint256) {
+        uint256 id = proposalCount++;
+        Proposal storage p = proposals[id];
+        p.description = description;
+        p.deadline = block.timestamp + duration;
+        emit ProposalCreated(id, description, p.deadline);
+        return id;
+    }
+
+    function vote(uint256 proposalId, bool support) external onlyMember {
+        Proposal storage p = proposals[proposalId];
+        require(block.timestamp < p.deadline, "Voting ended");
+        require(!p.hasVoted[msg.sender], "Already voted");
+
+        p.hasVoted[msg.sender] = true;
+        uint256 weight = memberStake[msg.sender];
+
+        if (support) {
+            p.yesVotes += weight;
+        } else {
+            p.noVotes += weight;
+        }
+
+        emit Voted(proposalId, msg.sender, support, weight);
+    }
+
+    function executeProposal(uint256 proposalId) external {
+        Proposal storage p = proposals[proposalId];
+        require(block.timestamp >= p.deadline, "Voting not ended");
+        require(!p.executed, "Already executed");
+
+        p.executed = true;
+        bool passed = p.yesVotes > p.noVotes;
+        emit ProposalExecuted(proposalId, passed);
+    }
+
+    function withdraw() external onlyMember {
+        uint256 stake = memberStake[msg.sender];
+        memberStake[msg.sender] = 0;
+        totalStake -= stake;
+        payable(msg.sender).transfer(stake);
+    }
+}
+```

@@ -1,0 +1,33 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleCrossChainBridge {
+    address public owner;
+    mapping(address => bool) public approvedHandlers;
+
+    event Transfer(address indexed from, address indexed to, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    modifier onlyApprovedHandler() {
+        require(approvedHandlers[msg.sender], "Only approved handlers can call this function");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function approveHandler(address handler) public onlyOwner {
+        approvedHandlers[handler] = true;
+    }
+
+    function transfer(address to, uint256 amount) public onlyApprovedHandler {
+        emit Transfer(msg.sender, to, amount);
+    }
+}
+```

@@ -1,0 +1,176 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+contract TieredStakingPool is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
+    IERC20 public immutable stakingToken;
+    IERC20 public immutable rewardToken;
+
+    uint256 public constant PRECISION = 1e18;
+    uint256 public constant EARLY_WITHDRAWAL_PENALTY_BPS = 2000; // 20%
+
+    enum Tier {
+        Flexible,  // no lock, 5% APR
+        Silver,    // 30 days, 10% APR
+        Gold,      // 90 days, 18% APR
+        Platinum   // 180 days, 30% APR
+    }
+
+    struct TierInfo {
+        uint256 lockDuration;
+        uint256 annualRateBps; // basis points
+    }
+
+    struct Stake {
+        uint256 amount;
+        uint256 startTime;
+        uint256 lastClaimTime;
+        Tier tier;
+    }
+
+    mapping(Tier => TierInfo) public tiers;
+    mapping(address => Stake[]) public userStakes;
+
+    uint256 public totalStaked;
+    uint256 public penaltyPool;
+
+    event Staked(address indexed user, uint256 stakeIndex, uint256 amount, Tier tier);
+    event Withdrawn(address indexed user, uint256 stakeIndex, uint256 amount, uint256 penalty);
+    event RewardsClaimed(address indexed user, uint256 stakeIndex, uint256 reward);
+    event PenaltyWithdrawn(address indexed owner, uint256 amount);
+
+    constructor(address _stakingToken, address _rewardToken) Ownable(msg.sender) {
+        stakingToken = IERC20(_stakingToken);
+        rewardToken = IERC20(_rewardToken);
+
+        tiers[Tier.Flexible] = TierInfo(0, 500);
+        tiers[Tier.Silver] = TierInfo(30 days, 1000);
+        tiers[Tier.Gold] = TierInfo(90 days, 1800);
+        tiers[Tier.Platinum] = TierInfo(180 days, 3000);
+    }
+
+    function stake(uint256 _amount, Tier _tier) external nonReentrant {
+        require(_amount > 0, "Cannot stake 0");
+
+        stakingToken.safeTransferFrom(msg.sender, address(this), _amount);
+
+        userStakes[msg.sender].push(Stake({
+            amount: _amount,
+            startTime: block.timestamp,
+            lastClaimTime: block.timestamp,
+            tier: _tier
+        }));
+
+        totalStaked += _amount;
+
+        emit Staked(msg.sender, userStakes[msg.sender].length - 1, _amount, _tier);
+    }
+
+    function withdraw(uint256 _stakeIndex) external nonReentrant {
+        require(_stakeIndex < userStakes[msg.sender].length, "Invalid stake index");
+
+        Stake storage userStake = userStakes[msg.sender][_stakeIndex];
+        require(userStake.amount > 0, "Already withdrawn");
+
+        uint256 amount = userStake.amount;
+        uint256 penalty = 0;
+
+        // Claim pending rewards first
+        uint256 reward = _calculateReward(msg.sender, _stakeIndex);
+
+        TierInfo memory tierInfo = tiers[userStake.tier];
+        bool earlyWithdrawal = block.timestamp < userStake.startTime + tierInfo.lockDuration;
+
+        if (earlyWithdrawal && tierInfo.lockDuration > 0) {
+            penalty = (amount * EARLY_WITHDRAWAL_PENALTY_BPS) / 10000;
+            penaltyPool += penalty;
+            reward = 0; // forfeit rewards on early withdrawal
+        }
+
+        userStake.amount = 0;
+        userStake.lastClaimTime = block.timestamp;
+        totalStaked -= amount;
+
+        uint256 withdrawAmount = amount - penalty;
+        stakingToken.safeTransfer(msg.sender, withdrawAmount);
+
+        if (reward > 0) {
+            rewardToken.safeTransfer(msg.sender, reward);
+            emit RewardsClaimed(msg.sender, _stakeIndex, reward);
+        }
+
+        emit Withdrawn(msg.sender, _stakeIndex, withdrawAmount, penalty);
+    }
+
+    function claimRewards(uint256 _stakeIndex) external nonReentrant {
+        require(_stakeIndex < userStakes[msg.sender].length, "Invalid stake index");
+
+        Stake storage userStake = userStakes[msg.sender][_stakeIndex];
+        require(userStake.amount > 0, "No active stake");
+
+        uint256 reward = _calculateReward(msg.sender, _stakeIndex);
+        require(reward > 0, "No rewards to claim");
+
+        userStake.lastClaimTime = block.timestamp;
+
+        rewardToken.safeTransfer(msg.sender, reward);
+
+        emit RewardsClaimed(msg.sender, _stakeIndex, reward);
+    }
+
+    function _calculateReward(address _user, uint256 _stakeIndex) internal view returns (uint256) {
+        Stake storage userStake = userStakes[_user][_stakeIndex];
+        if (userStake.amount == 0) return 0;
+
+        TierInfo memory tierInfo = tiers[userStake.tier];
+        uint256 elapsed = block.timestamp - userStake.lastClaimTime;
+
+        return (userStake.amount * tierInfo.annualRateBps * elapsed) / (365 days * 10000);
+    }
+
+    function pendingRewards(address _user, uint256 _stakeIndex) external view returns (uint256) {
+        return _calculateReward(_user, _stakeIndex);
+    }
+
+    function getUserStakeCount(address _user) external view returns (uint256) {
+        return userStakes[_user].length;
+    }
+
+    function getStakeInfo(address _user, uint256 _stakeIndex)
+        external
+        view
+        returns (
+            uint256 amount,
+            uint256 startTime,
+            Tier tier,
+            uint256 lockEndsAt,
+            bool isLocked,
+            uint256 pending
+        )
+    {
+        require(_stakeIndex < userStakes[_user].length, "Invalid stake index");
+        Stake storage s = userStakes[_user][_stakeIndex];
+        TierInfo memory t = tiers[s.tier];
+
+        amount = s.amount;
+        startTime = s.startTime;
+        tier = s.tier;
+        lockEndsAt = s.startTime + t.lockDuration;
+        isLocked = block.timestamp < lockEndsAt && t.lockDuration > 0;
+        pending = _calculateReward(_user, _stakeIndex);
+    }
+
+    function withdrawPenaltyPool() external onlyOwner {
+        uint256 amount = penaltyPool;
+        require(amount > 0, "No penalties to withdraw");
+        penaltyPool = 0;
+        stakingToken.safeTransfer(owner(), amount);
+        emit PenaltyWithdrawn(owner(), amount);
+    }
+}

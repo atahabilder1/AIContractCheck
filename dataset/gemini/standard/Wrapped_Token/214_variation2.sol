@@ -1,0 +1,196 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract WrappedTokenWithFee is ERC20, Ownable {
+    using SafeMath for uint256;
+
+    // The underlying token that this contract wraps
+    IERC20 public underlyingToken;
+
+    // The address where collected fees will be distributed
+    address public feeRecipient;
+
+    // The fee percentage charged on unwrapping (e.g., 100 means 1%)
+    uint256 public wrapFeePercentage; // e.g., 100 for 1%
+
+    // Minimum duration in seconds to be considered a long-term holder
+    uint256 public minHoldingDuration; // e.g., 30 days in seconds
+
+    // Mapping to store the timestamp when a user first received tokens
+    mapping(address => uint256) public firstReceivedTimestamp;
+
+    // Event for successful wrapping
+    event Wrapped(address indexed user, uint256 amount);
+
+    // Event for successful unwrapping with fee deduction
+    event Unwrapped(address indexed user, uint256 amount, uint256 fee);
+
+    // Event for fee recipient change
+    event FeeRecipientChanged(address indexed newRecipient);
+
+    // Event for fee percentage change
+    event WrapFeePercentageChanged(uint256 newPercentage);
+
+    // Event for minimum holding duration change
+    event MinHoldingDurationChanged(uint256 newDuration);
+
+    constructor(
+        string memory name,
+        string memory symbol,
+        IERC20 _underlyingToken,
+        address _feeRecipient,
+        uint256 _wrapFeePercentage,
+        uint256 _minHoldingDuration
+    ) ERC20(name, symbol) {
+        require(_underlyingToken != address(0), "WrappedToken: Underlying token cannot be zero address");
+        require(_feeRecipient != address(0), "WrappedToken: Fee recipient cannot be zero address");
+        require(_wrapFeePercentage <= 10000, "WrappedToken: Fee percentage cannot exceed 100%"); // Max 100%
+        require(_minHoldingDuration > 0, "WrappedToken: Minimum holding duration must be greater than 0");
+
+        underlyingToken = _underlyingToken;
+        feeRecipient = _feeRecipient;
+        wrapFeePercentage = _wrapFeePercentage;
+        minHoldingDuration = _minHoldingDuration;
+    }
+
+    /**
+     * @notice Wraps the underlying ERC20 token into this token.
+     * @dev The user must approve this contract to spend their underlying tokens.
+     * @param amount The amount of underlying tokens to wrap.
+     */
+    function wrap(uint256 amount) external {
+        require(amount > 0, "WrappedToken: Amount must be greater than 0");
+
+        // Transfer underlying tokens from the user to this contract
+        underlyingToken.transferFrom(msg.sender, address(this), amount);
+
+        // Mint the wrapped tokens to the user
+        _mint(msg.sender, amount);
+
+        // Record the first time the user received tokens if not already recorded
+        if (firstReceivedTimestamp[msg.sender] == 0) {
+            firstReceivedTimestamp[msg.sender] = block.timestamp;
+        }
+
+        emit Wrapped(msg.sender, amount);
+    }
+
+    /**
+     * @notice Unwraps the wrapped tokens back into the underlying ERC20 token.
+     * @dev Charges a fee based on the wrapFeePercentage and distributes it to long-term holders.
+     * @param amount The amount of wrapped tokens to unwrap.
+     */
+    function unwrap(uint256 amount) external {
+        require(amount > 0, "WrappedToken: Amount must be greater than 0");
+
+        // Burn the wrapped tokens from the user
+        _burn(msg.sender, amount);
+
+        // Calculate the fee
+        uint256 fee = amount.mul(wrapFeePercentage).div(10000);
+        uint256 amountToTransfer = amount.sub(fee);
+
+        // Distribute fees to long-term holders
+        _distributeFees(fee);
+
+        // Transfer the remaining underlying tokens to the user
+        underlyingToken.transfer(msg.sender, amountToTransfer);
+
+        emit Unwrapped(msg.sender, amountToTransfer, fee);
+    }
+
+    /**
+     * @notice Distributes collected fees to eligible long-term holders.
+     * @dev This is a simplified distribution mechanism. A more complex system might involve staking or a dedicated fee pool.
+     * @param fee The amount of fees to distribute.
+     */
+    function _distributeFees(uint256 fee) internal {
+        // In this simplified model, we assume the collected fees are held by the contract
+        // and then transferred to the feeRecipient. A more sophisticated model would
+        // identify and reward long-term holders directly.
+
+        // For demonstration, we will transfer the collected fee to the feeRecipient.
+        // A real-world implementation would require a mechanism to track and reward
+        // long-term holders, potentially by sending them a portion of the fees.
+
+        // Example of a more advanced logic (commented out):
+        /*
+        uint256 totalLongTermHolders = 0;
+        uint256 feePerHolder = 0;
+        // Iterate through all token holders (requires iterating over a dynamically sized mapping or a list of holders, which is gas intensive and not recommended for large scale)
+        // For a scalable solution, consider using an external service or a more advanced contract design.
+
+        // For this simplified example, we'll just transfer to the feeRecipient.
+        // A true long-term holder reward would involve checking `firstReceivedTimestamp` and `block.timestamp` against `minHoldingDuration`.
+        */
+
+        // Transfer the collected fee to the designated fee recipient.
+        // This recipient would then be responsible for distributing it further
+        // or it represents a pool for future rewards.
+        underlyingToken.transfer(feeRecipient, fee);
+    }
+
+    /**
+     * @notice Allows the owner to change the fee recipient.
+     * @param _newRecipient The new address for fee distribution.
+     */
+    function setFeeRecipient(address _newRecipient) external onlyOwner {
+        require(_newRecipient != address(0), "WrappedToken: Fee recipient cannot be zero address");
+        feeRecipient = _newRecipient;
+        emit FeeRecipientChanged(_newRecipient);
+    }
+
+    /**
+     * @notice Allows the owner to change the wrap fee percentage.
+     * @param _newPercentage The new fee percentage (e.g., 100 for 1%).
+     */
+    function setWrapFeePercentage(uint256 _newPercentage) external onlyOwner {
+        require(_newPercentage <= 10000, "WrappedToken: Fee percentage cannot exceed 100%");
+        wrapFeePercentage = _newPercentage;
+        emit WrapFeePercentageChanged(_newPercentage);
+    }
+
+    /**
+     * @notice Allows the owner to change the minimum holding duration for long-term holders.
+     * @param _newDuration The new minimum duration in seconds.
+     */
+    function setMinHoldingDuration(uint256 _newDuration) external onlyOwner {
+        require(_newDuration > 0, "WrappedToken: Minimum holding duration must be greater than 0");
+        minHoldingDuration = _newDuration;
+        emit MinHoldingDurationChanged(_newDuration);
+    }
+
+    /**
+     * @notice Allows the contract to receive underlying tokens for wrapping.
+     * @dev This function is implicitly called by `transferFrom` in the `wrap` function.
+     */
+    receive() external payable {
+        // This receive function is typically for native tokens (ETH).
+        // For ERC20 tokens, `transferFrom` is used.
+    }
+
+    /**
+     * @notice Returns the current balance of the underlying token held by this contract.
+     * @return The balance of the underlying token.
+     */
+    function getUnderlyingTokenBalance() external view returns (uint256) {
+        return underlyingToken.balanceOf(address(this));
+    }
+
+    /**
+     * @notice Checks if a user is considered a long-term holder.
+     * @param user The address to check.
+     * @return True if the user is a long-term holder, false otherwise.
+     */
+    function isLongTermHolder(address user) public view returns (bool) {
+        uint256 firstTimestamp = firstReceivedTimestamp[user];
+        if (firstTimestamp == 0) {
+            return false; // User has never received tokens
+        }
+        return block.timestamp.sub(firstTimestamp) >= minHoldingDuration;
+    }
+}

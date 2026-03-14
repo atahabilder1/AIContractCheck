@@ -1,0 +1,73 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+
+contract CrossChainBridge is Ownable {
+    uint256 public constant RATE_LIMIT = 100 ether; // 100 ETH rate limit per day
+    uint256 public dailyTransferredAmount;
+    uint256 public lastResetTime;
+    bool public isPaused;
+    bytes32 public merkleRoot;
+
+    mapping(address => uint256) public lastTransferredTime;
+
+    event Deposit(address indexed sender, uint256 amount, bytes32 indexed depositId);
+    event Withdrawal(address indexed receiver, uint256 amount, bytes32 indexed depositId);
+
+    modifier whenNotPaused() {
+        require(!isPaused, "Contract is paused");
+        _;
+    }
+
+    modifier onlyAfterRateLimit(address _sender) {
+        require(block.timestamp >= lastTransferredTime[_sender] + 1 days, "Rate limit not yet reached");
+        _;
+    }
+
+    constructor(bytes32 _merkleRoot) {
+        merkleRoot = _merkleRoot;
+        lastResetTime = block.timestamp;
+    }
+
+    function deposit(uint256 _amount, bytes32 _depositId) external payable whenNotPaused onlyAfterRateLimit(msg.sender) {
+        require(msg.value == _amount, "Incorrect deposit amount");
+        require(dailyTransferredAmount + _amount <= RATE_LIMIT, "Daily rate limit exceeded");
+
+        dailyTransferredAmount += _amount;
+        lastTransferredTime[msg.sender] = block.timestamp;
+
+        emit Deposit(msg.sender, _amount, _depositId);
+    }
+
+    function withdraw(uint256 _amount, bytes32 _depositId, bytes32[] memory _proof) external whenNotPaused {
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender, _amount, _depositId));
+        require(MerkleProof.verify(_proof, merkleRoot, leaf), "Invalid Merkle proof");
+
+        (bool success, ) = msg.sender.call{value: _amount}("");
+        require(success, "Transfer failed");
+
+        emit Withdrawal(msg.sender, _amount, _depositId);
+    }
+
+    function updateMerkleRoot(bytes32 _newMerkleRoot) external onlyOwner {
+        merkleRoot = _newMerkleRoot;
+    }
+
+    function pause() external onlyOwner {
+        isPaused = true;
+    }
+
+    function unpause() external onlyOwner {
+        isPaused = false;
+    }
+
+    function resetDailyTransferredAmount() external onlyOwner {
+        require(block.timestamp >= lastResetTime + 1 days, "Not time to reset");
+        dailyTransferredAmount = 0;
+        lastResetTime = block.timestamp;
+    }
+}
+```

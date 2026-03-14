@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract WrappedToken is ERC20, Ownable {
+    IERC20 public underlyingToken;
+
+    event Minted(address indexed to, uint256 amount);
+    event Burned(address indexed from, uint256 amount);
+
+    constructor(string memory name, string memory symbol, IERC20 _underlyingToken) ERC20(name, symbol) {
+        underlyingToken = _underlyingToken;
+    }
+
+    function mint(uint256 amount) public onlyOwner {
+        _mint(msg.sender, amount);
+        emit Minted(msg.sender, amount);
+    }
+
+    function burn(uint256 amount) public {
+        _burn(msg.sender, amount);
+        emit Burned(msg.sender, amount);
+    }
+
+    function deposit(uint256 amount) public {
+        require(underlyingToken.transferFrom(msg.sender, address(this), amount), "Deposit failed");
+        _mint(msg.sender, amount);
+        emit Minted(msg.sender, amount);
+    }
+
+    function withdraw(uint256 amount) public {
+        require(balanceOf(msg.sender) >= amount, "Insufficient balance");
+        _burn(msg.sender, amount);
+        require(underlyingToken.transfer(msg.sender, amount), "Withdrawal failed");
+        emit Burned(msg.sender, amount);
+    }
+
+    function depositAndMint(uint256 amount) public {
+        deposit(amount);
+    }
+
+    function burnAndWithdraw(uint256 amount) public {
+        withdraw(amount);
+    }
+}

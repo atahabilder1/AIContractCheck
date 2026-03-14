@@ -1,0 +1,182 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+contract P2PLending is ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
+    enum LoanStatus {
+        Proposed,
+        Funded,
+        Active,
+        Repaid,
+        Defaulted,
+        Cancelled
+    }
+
+    struct LoanTerms {
+        address borrower;
+        address lender;
+        address loanToken;
+        address collateralToken;
+        uint256 loanAmount;
+        uint256 collateralAmount;
+        uint256 interestRate; // basis points (e.g., 500 = 5%)
+        uint256 duration; // seconds
+        uint256 startTime;
+        uint256 repaidAmount;
+        LoanStatus status;
+    }
+
+    uint256 public nextLoanId;
+    mapping(uint256 => LoanTerms) public loans;
+    mapping(address => uint256[]) public borrowerLoans;
+    mapping(address => uint256[]) public lenderLoans;
+
+    event LoanProposed(uint256 indexed loanId, address indexed borrower, address loanToken, uint256 loanAmount);
+    event LoanFunded(uint256 indexed loanId, address indexed lender);
+    event LoanRepaid(uint256 indexed loanId, uint256 amount);
+    event LoanFullyRepaid(uint256 indexed loanId);
+    event LoanDefaulted(uint256 indexed loanId);
+    event LoanCancelled(uint256 indexed loanId);
+    event CollateralClaimed(uint256 indexed loanId, address indexed lender);
+
+    modifier onlyBorrower(uint256 loanId) {
+        require(msg.sender == loans[loanId].borrower, "Not borrower");
+        _;
+    }
+
+    modifier onlyLender(uint256 loanId) {
+        require(msg.sender == loans[loanId].lender, "Not lender");
+        _;
+    }
+
+    function proposeLoan(
+        address _loanToken,
+        address _collateralToken,
+        uint256 _loanAmount,
+        uint256 _collateralAmount,
+        uint256 _interestRate,
+        uint256 _duration
+    ) external nonReentrant returns (uint256 loanId) {
+        require(_loanToken != address(0) && _collateralToken != address(0), "Invalid token");
+        require(_loanAmount > 0 && _collateralAmount > 0, "Zero amount");
+        require(_duration > 0, "Zero duration");
+        require(_loanToken != _collateralToken, "Same token");
+
+        loanId = nextLoanId++;
+
+        loans[loanId] = LoanTerms({
+            borrower: msg.sender,
+            lender: address(0),
+            loanToken: _loanToken,
+            collateralToken: _collateralToken,
+            loanAmount: _loanAmount,
+            collateralAmount: _collateralAmount,
+            interestRate: _interestRate,
+            duration: _duration,
+            startTime: 0,
+            repaidAmount: 0,
+            status: LoanStatus.Proposed
+        });
+
+        IERC20(_collateralToken).safeTransferFrom(msg.sender, address(this), _collateralAmount);
+
+        borrowerLoans[msg.sender].push(loanId);
+
+        emit LoanProposed(loanId, msg.sender, _loanToken, _loanAmount);
+    }
+
+    function fundLoan(uint256 loanId) external nonReentrant {
+        LoanTerms storage loan = loans[loanId];
+        require(loan.status == LoanStatus.Proposed, "Not proposed");
+        require(msg.sender != loan.borrower, "Cannot fund own loan");
+
+        loan.lender = msg.sender;
+        loan.status = LoanStatus.Active;
+        loan.startTime = block.timestamp;
+
+        lenderLoans[msg.sender].push(loanId);
+
+        IERC20(loan.loanToken).safeTransferFrom(msg.sender, loan.borrower, loan.loanAmount);
+
+        emit LoanFunded(loanId, msg.sender);
+    }
+
+    function repay(uint256 loanId, uint256 amount) external nonReentrant onlyBorrower(loanId) {
+        LoanTerms storage loan = loans[loanId];
+        require(loan.status == LoanStatus.Active, "Not active");
+
+        uint256 totalOwed = getTotalOwed(loanId);
+        uint256 remaining = totalOwed - loan.repaidAmount;
+        uint256 payAmount = amount > remaining ? remaining : amount;
+
+        loan.repaidAmount += payAmount;
+
+        IERC20(loan.loanToken).safeTransferFrom(msg.sender, loan.lender, payAmount);
+
+        emit LoanRepaid(loanId, payAmount);
+
+        if (loan.repaidAmount >= totalOwed) {
+            loan.status = LoanStatus.Repaid;
+            IERC20(loan.collateralToken).safeTransfer(loan.borrower, loan.collateralAmount);
+            emit LoanFullyRepaid(loanId);
+        }
+    }
+
+    function claimDefault(uint256 loanId) external nonReentrant onlyLender(loanId) {
+        LoanTerms storage loan = loans[loanId];
+        require(loan.status == LoanStatus.Active, "Not active");
+        require(block.timestamp > loan.startTime + loan.duration, "Not expired");
+
+        loan.status = LoanStatus.Defaulted;
+
+        IERC20(loan.collateralToken).safeTransfer(loan.lender, loan.collateralAmount);
+
+        emit LoanDefaulted(loanId);
+        emit CollateralClaimed(loanId, loan.lender);
+    }
+
+    function cancelLoan(uint256 loanId) external nonReentrant onlyBorrower(loanId) {
+        LoanTerms storage loan = loans[loanId];
+        require(loan.status == LoanStatus.Proposed, "Not proposed");
+
+        loan.status = LoanStatus.Cancelled;
+
+        IERC20(loan.collateralToken).safeTransfer(loan.borrower, loan.collateralAmount);
+
+        emit LoanCancelled(loanId);
+    }
+
+    function getTotalOwed(uint256 loanId) public view returns (uint256) {
+        LoanTerms storage loan = loans[loanId];
+        uint256 interest = (loan.loanAmount * loan.interestRate) / 10000;
+        return loan.loanAmount + interest;
+    }
+
+    function getRemainingDebt(uint256 loanId) external view returns (uint256) {
+        uint256 totalOwed = getTotalOwed(loanId);
+        uint256 repaid = loans[loanId].repaidAmount;
+        return totalOwed > repaid ? totalOwed - repaid : 0;
+    }
+
+    function getTimeRemaining(uint256 loanId) external view returns (uint256) {
+        LoanTerms storage loan = loans[loanId];
+        if (loan.status != LoanStatus.Active) return 0;
+        uint256 deadline = loan.startTime + loan.duration;
+        return block.timestamp >= deadline ? 0 : deadline - block.timestamp;
+    }
+
+    function getBorrowerLoans(address borrower) external view returns (uint256[] memory) {
+        return borrowerLoans[borrower];
+    }
+
+    function getLenderLoans(address lender) external view returns (uint256[] memory) {
+        return lenderLoans[lender];
+    }
+}
+```

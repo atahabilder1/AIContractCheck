@@ -1,0 +1,119 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Auction {
+    address payable public owner;
+    address public admin;
+    bool public paused = false;
+
+    struct Bid {
+        address bidder;
+        uint256 amount;
+    }
+
+    Bid public highestBid;
+    uint256 public auctionEndTime;
+    bool public auctionEnded = false;
+
+    event BidPlaced(address bidder, uint256 amount);
+    event AuctionEnded(address winner, uint256 winningBid);
+    event FundsWithdrawn(address recipient, uint256 amount);
+    event PausedStatusChanged(bool _paused);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Caller is not the owner");
+        _;
+    }
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Caller is not the admin");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
+    modifier whenAuctionNotEnded() {
+        require(!auctionEnded, "Auction has already ended");
+        _;
+    }
+
+    constructor(uint256 _auctionDurationInSeconds) {
+        owner = payable(msg.sender);
+        admin = msg.sender; // Initially, owner is also the admin
+        auctionEndTime = block.timestamp + _auctionDurationInSeconds;
+    }
+
+    function placeBid() public payable whenNotPaused whenAuctionNotEnded {
+        require(msg.value > highestBid.amount, "Bid amount must be higher than the current highest bid");
+        require(block.timestamp < auctionEndTime, "Auction has ended");
+
+        if (highestBid.bidder != address(0)) {
+            // Refund previous highest bid to the previous bidder
+            (bool success, ) = payable(highestBid.bidder).call{value: highestBid.amount}("");
+            require(success, "Refund failed");
+        }
+
+        highestBid = Bid(msg.sender, msg.value);
+        emit BidPlaced(msg.sender, msg.value);
+    }
+
+    function endAuction() public whenNotPaused whenAuctionNotEnded {
+        require(block.timestamp >= auctionEndTime, "Auction has not ended yet");
+        auctionEnded = true;
+
+        emit AuctionEnded(highestBid.bidder, highestBid.amount);
+    }
+
+    function withdrawFunds() public onlyAdmin {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No funds to withdraw");
+
+        (bool success, ) = admin.call{value: balance}("");
+        require(success, "Fund withdrawal failed");
+
+        emit FundsWithdrawn(admin, balance);
+    }
+
+    function pause() public onlyAdmin {
+        paused = true;
+        emit PausedStatusChanged(true);
+    }
+
+    function unpause() public onlyAdmin {
+        paused = false;
+        emit PausedStatusChanged(false);
+    }
+
+    function setAdmin(address _admin) public onlyOwner {
+        admin = _admin;
+    }
+
+    function getHighestBid() public view returns (address bidder, uint256 amount) {
+        return (highestBid.bidder, highestBid.amount);
+    }
+
+    function getAuctionEndTime() public view returns (uint256) {
+        return auctionEndTime;
+    }
+
+    function getAuctionStatus() public view returns (bool ended, bool pausedStatus) {
+        return (auctionEnded, paused);
+    }
+
+    // Fallback function to receive Ether if not through placeBid
+    receive() external payable {
+        // This can be used for initial deposit or if someone sends Ether directly
+        // In a real auction, you might want to disallow direct Ether transfers or handle them
+        // For this example, we'll allow it but it won't be considered a valid bid.
+    }
+
+    // Fallback function for unexpected calls
+    fallback() external payable {
+        // Handle or revert if needed
+    }
+}
+```

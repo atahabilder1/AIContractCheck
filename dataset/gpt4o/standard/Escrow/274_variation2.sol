@@ -1,0 +1,65 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721Holder.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract NFTForETHSwap is ERC721Holder, ReentrancyGuard {
+    struct Swap {
+        address nftContract;
+        uint256 tokenId;
+        address seller;
+        uint256 price;
+        bool isActive;
+    }
+
+    mapping(bytes32 => Swap) public swaps;
+
+    event SwapCreated(bytes32 indexed swapId, address indexed nftContract, uint256 indexed tokenId, address seller, uint256 price);
+    event SwapCompleted(bytes32 indexed swapId, address buyer);
+    event SwapCancelled(bytes32 indexed swapId);
+
+    function createSwap(address _nftContract, uint256 _tokenId, uint256 _price) external nonReentrant returns (bytes32) {
+        require(_price > 0, "Price must be greater than zero");
+        IERC721 nft = IERC721(_nftContract);
+        require(nft.ownerOf(_tokenId) == msg.sender, "Caller is not the owner");
+
+        bytes32 swapId = keccak256(abi.encodePacked(_nftContract, _tokenId, msg.sender, block.timestamp));
+        swaps[swapId] = Swap({
+            nftContract: _nftContract,
+            tokenId: _tokenId,
+            seller: msg.sender,
+            price: _price,
+            isActive: true
+        });
+
+        nft.safeTransferFrom(msg.sender, address(this), _tokenId);
+        emit SwapCreated(swapId, _nftContract, _tokenId, msg.sender, _price);
+
+        return swapId;
+    }
+
+    function completeSwap(bytes32 _swapId) external payable nonReentrant {
+        Swap storage swap = swaps[_swapId];
+        require(swap.isActive, "Swap is not active");
+        require(msg.value >= swap.price, "Insufficient Ether sent");
+
+        swap.isActive = false;
+        IERC721(swap.nftContract).safeTransferFrom(address(this), msg.sender, swap.tokenId);
+        payable(swap.seller).transfer(swap.price);
+
+        emit SwapCompleted(_swapId, msg.sender);
+    }
+
+    function cancelSwap(bytes32 _swapId) external nonReentrant {
+        Swap storage swap = swaps[_swapId];
+        require(swap.isActive, "Swap is not active");
+        require(swap.seller == msg.sender, "Caller is not the seller");
+
+        swap.isActive = false;
+        IERC721(swap.nftContract).safeTransferFrom(address(this), swap.seller, swap.tokenId);
+
+        emit SwapCancelled(_swapId);
+    }
+}

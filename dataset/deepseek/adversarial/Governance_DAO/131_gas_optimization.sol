@@ -1,0 +1,96 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address recipient, uint2atural amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+}
+
+contract Governance {
+    address public owner;
+    IERC20 public token;
+    uint256 public proposalThreshold;
+    uint256 public voteDuration;
+    uint256 public quorum;
+    uint256 public votingPower;
+
+    struct Proposal {
+        address recipient;
+        uint256 amount;
+        string description;
+        uint256 startTime;
+        uint256 endTime;
+        uint256 forVotes;
+        uint256 againstVotes;
+        mapping(address => bool) voted;
+    }
+
+    mapping(uint256 => Proposal) public proposals;
+    uint256 public proposalCount;
+
+    event ProposalCreated(uint256 indexed proposalId, address indexed recipient, uint256 amount, string description);
+    event VoteCast(uint256 indexed proposalId, address indexed voter, bool support, uint256 votes);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    constructor(address _token, uint256 _proposalThreshold, uint256 _voteDuration, uint256 _quorum) {
+        owner = msg.sender;
+        token = IERC20(_token);
+        proposalThreshold = _proposalThreshold;
+        voteDuration = _voteDuration;
+        quorum = _quorum;
+    }
+
+    function createProposal(address _recipient, uint256 _amount, string memory _description) public {
+        require(token.balanceOf(msg.sender) >= proposalThreshold, "Insufficient token balance");
+        require(token.allowance(msg.sender, address(this)) >= _amount, "Token allowance too low");
+
+        Proposal storage proposal = proposals[proposalCount];
+        proposal.recipient = _recipient;
+        proposal.amount = _amount;
+        proposal.description = _description;
+        proposal.startTime = block.timestamp;
+        proposal.endTime = block.timestamp + voteDuration;
+
+        emit ProposalCreated(proposalCount, _recipient, _amount, _description);
+        proposalCount++;
+    }
+
+    function vote(uint256 _proposalId, bool _support) public {
+        Proposal storage proposal = proposals[_proposalId];
+        require(block.timestamp < proposal.endTime, "Voting period ended");
+        require(!proposal.voted[msg.sender], "Already voted");
+
+        uint256 voterBalance = token.balanceOf(msg.sender);
+        proposal.voted[msg.sender] = true;
+
+        if (_support) {
+            proposal.forVotes += voterBalance;
+        } else {
+            proposal.againstVotes += voterBalance;
+        }
+
+        emit VoteCast(_proposalId, msg.sender, _support, voterBalance);
+    }
+
+    function executeProposal(uint256 _proposalId) public {
+        Proposal storage proposal = proposals[_proposalId];
+        require(block.timestamp >= proposal.endTime, "Voting period not ended");
+        require(proposal.forVotes > proposal.againstVotes, "Not enough votes in favor");
+        require(proposal.forVotes >= quorum, "Not enough quorum");
+
+        token.transferFrom(owner, proposal.recipient, proposal.amount);
+    }
+
+    function withdrawTokens(uint256 _amount) public onlyOwner {
+        require(token.balanceOf(address(this)) >= _amount, "Insufficient token balance");
+        token.transfer(owner, _amount);
+    }
+}

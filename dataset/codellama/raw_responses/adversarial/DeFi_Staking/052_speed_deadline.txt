@@ -1,0 +1,64 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DeFiStaking {
+    // Staking balance for each user
+    mapping(address => uint256) public balances;
+
+    // Total staking balance
+    uint256 public totalStaked;
+
+    // Staking reward percentage
+    uint256 public rewardPercentage;
+
+    // Staking reward interval
+    uint256 public rewardInterval;
+
+    // Staking reward minimum
+    uint256 public rewardMinimum;
+
+    constructor(uint256 _rewardPercentage, uint256 _rewardInterval, uint256 _rewardMinimum) public {
+        rewardPercentage = _rewardPercentage;
+        rewardInterval = _rewardInterval;
+        rewardMinimum = _rewardMinimum;
+    }
+
+    // Deposit Ether for staking
+    function deposit() public payable {
+        // Update the user's balance
+        balances[msg.sender] += msg.value;
+        // Update the total staked amount
+        totalStaked += msg.value;
+    }
+
+    // Withdraw Ether from staking
+    function withdraw(uint256 amount) public {
+        // Check if the user has enough balance to withdraw
+        require(balances[msg.sender] >= amount, "Not enough balance");
+        // Update the user's balance
+        balances[msg.sender] -= amount;
+        // Update the total staked amount
+        totalStaked -= amount;
+        // Transfer the Ether to the user's wallet
+        payable(msg.sender).transfer(amount);
+    }
+
+    // Claim staking rewards
+    function claimRewards() public {
+        // Check if the user has any rewards to claim
+        require(balances[msg.sender] > 0, "No rewards to claim");
+        // Calculate the rewards amount
+        uint256 rewardsAmount = (rewardPercentage * totalStaked) / 100;
+        // Check if the rewards amount meets the minimum requirement
+        require(rewardsAmount >= rewardMinimum, "Rewards amount too low");
+        // Update the user's balance
+        balances[msg.sender] += rewardsAmount;
+        // Update the total staked amount
+        totalStaked += rewardsAmount;
+        // Transfer the rewards to the user's wallet
+        payable(msg.sender).transfer(rewardsAmount);
+    }
+}
+```
+This DeFi Staking contract allows users to deposit Ether for staking, and claim rewards based on the total staked amount. The rewards are calculated as a percentage of the total staked amount, and are capped at a minimum amount. The contract also includes a withdraw function for users to withdraw their staked Ether.

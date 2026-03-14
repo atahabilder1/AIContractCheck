@@ -1,0 +1,95 @@
+```
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+contract DeFiLending {
+    // User's balance
+    mapping (address => uint) public balances;
+
+    // Lending pool
+    mapping (address => uint) public lendingPool;
+
+    // Minimum borrow amount
+    uint public minBorrowAmount;
+
+    // Maximum borrow amount
+    uint public maxBorrowAmount;
+
+    // Lending interest rate
+    uint public interestRate;
+
+    // Time to repay
+    uint public repayTime;
+
+    // Constructor
+    constructor() public {
+        minBorrowAmount = 1000;
+        maxBorrowAmount = 1000000;
+        interestRate = 500000;
+        repayTime = 365 days;
+    }
+
+    // Deposit function
+    function deposit(uint amount) public {
+        require(amount > 0, "Invalid amount");
+        require(msg.sender.balance >= amount, "Insufficient balance");
+        balances[msg.sender] += amount;
+    }
+
+    // Withdraw function
+    function withdraw(uint amount) public {
+        require(amount > 0, "Invalid amount");
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        msg.sender.transfer(amount);
+        balances[msg.sender] -= amount;
+    }
+
+    // Borrow function
+    function borrow(uint amount) public {
+        require(amount >= minBorrowAmount, "Amount too small");
+        require(amount <= maxBorrowAmount, "Amount too large");
+        require(interestRate > 0, "Invalid interest rate");
+        require(repayTime > 0, "Invalid repay time");
+        require(msg.sender.balance >= amount, "Insufficient balance");
+        uint borrowFee = amount * interestRate / 100;
+        uint repayment = amount + borrowFee;
+        lendingPool[msg.sender] += repayment;
+        balances[msg.sender] -= amount;
+        msg.sender.transfer(amount);
+    }
+
+    // Repay function
+    function repay(uint amount) public {
+        require(amount > 0, "Invalid amount");
+        require(lendingPool[msg.sender] >= amount, "Insufficient balance");
+        uint remaining = amount - msg.sender.balance;
+        if (remaining > 0) {
+            msg.sender.transfer(remaining);
+            lendingPool[msg.sender] -= remaining;
+        }
+        lendingPool[msg.sender] -= amount;
+        msg.sender.transfer(amount);
+    }
+
+    // Get interest rate
+    function getInterestRate() public view returns (uint) {
+        return interestRate;
+    }
+
+    // Get repay time
+    function getRepayTime() public view returns (uint) {
+        return repayTime;
+    }
+
+    // Get lending pool
+    function getLendingPool() public view returns (mapping(address => uint)) {
+        return lendingPool;
+    }
+
+    // Get user balance
+    function getBalance() public view returns (uint) {
+        return balances[msg.sender];
+    }
+}
+```

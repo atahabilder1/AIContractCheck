@@ -1,0 +1,349 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract ICOSale is Ownable, ReentrancyGuard {
+    using SafeMath for uint256;
+
+    IERC20 public saleToken;
+    IERC20 public paymentToken;
+
+    uint256 public startTime;
+    uint256 public endTime;
+
+    uint256 public softCap; // Minimum to raise to proceed with token distribution
+    uint256 public hardCap; // Maximum to raise
+
+    uint256 public totalRaised; // Amount raised in payment tokens
+    uint256 public totalTokensSold; // Amount of sale tokens sold
+
+    address public kycVerifier; // Address of the KYC verification contract/service
+
+    struct Round {
+        uint256 pricePerToken; // Price in payment tokens for 1 sale token
+        uint256 startDate;
+        uint256 endDate;
+    }
+
+    struct Tier {
+        uint256 minContribution;
+        uint256 maxContribution;
+        uint256 bonusPercentage; // Percentage bonus tokens
+    }
+
+    struct VestingSchedule {
+        uint256 totalTokens;
+        uint256 startTime;
+        uint256 cliffDuration; // Duration in seconds before first release
+        uint256 releasePeriod; // Duration in seconds for each subsequent release
+        uint256 numberOfVestingPeriods; // Total number of release periods after cliff
+    }
+
+    struct Investor {
+        uint256 totalPurchased; // Total sale tokens purchased by this investor
+        uint256 tokensClaimed; // Total sale tokens claimed by this investor
+        mapping(uint256 => VestingSchedule) vestingSchedules; // Vesting schedules indexed by round/purchase
+        bool isWhitelisted; // Flag for general whitelist
+        uint256 whitelistTierId; // ID of the whitelist tier for this investor
+        bool kycVerified; // Flag for KYC verification status
+    }
+
+    mapping(address => Investor) public investors;
+    Tier[] public tiers;
+    Round[] public rounds;
+
+    event TokensPurchased(address indexed buyer, uint256 amount, uint256 tokensReceived);
+    event VestingScheduleCreated(address indexed investor, uint256 scheduleId, uint256 totalTokens, uint256 startTime, uint256 cliffDuration, uint256 releasePeriod, uint256 numberOfVestingPeriods);
+    event TokensClaimed(address indexed investor, uint256 amount);
+    event KYCStatusUpdated(address indexed user, bool verified);
+    event SalePhaseChanged(uint256 currentRoundIndex);
+    event SaleEnded(bool success);
+
+    modifier onlyKycVerifier() {
+        require(msg.sender == kycVerifier, "ICO: Only KYC verifier can call this function");
+        _;
+    }
+
+    modifier inSalePeriod() {
+        require(block.timestamp >= startTime && block.timestamp <= endTime, "ICO: Sale is not active");
+        _;
+    }
+
+    modifier afterSalePeriod() {
+        require(block.timestamp > endTime, "ICO: Sale is still active");
+        _;
+    }
+
+    modifier inRound(uint256 _roundIndex) {
+        require(_roundIndex < rounds.length, "ICO: Invalid round index");
+        require(block.timestamp >= rounds[_roundIndex].startDate && block.timestamp <= rounds[_roundIndex].endDate, "ICO: Not in the specified round period");
+        _;
+    }
+
+    constructor(
+        address _saleTokenAddress,
+        address _paymentTokenAddress,
+        uint256 _startTime,
+        uint256 _endTime,
+        uint256 _softCap,
+        uint256 _hardCap,
+        address _kycVerifier
+    ) {
+        saleToken = IERC20(_saleTokenAddress);
+        paymentToken = IERC20(_paymentTokenAddress);
+        startTime = _startTime;
+        endTime = _endTime;
+        softCap = _softCap;
+        hardCap = _hardCap;
+        kycVerifier = _kycVerifier;
+    }
+
+    function addRound(uint256 _pricePerToken, uint256 _startDate, uint256 _endDate) public onlyOwner {
+        require(_startDate >= block.timestamp && _startDate < _endDate, "ICO: Invalid round dates");
+        rounds.push(Round({
+            pricePerToken: _pricePerToken,
+            startDate: _startDate,
+            endDate: _endDate
+        }));
+    }
+
+    function addTier(uint256 _minContribution, uint256 _maxContribution, uint256 _bonusPercentage) public onlyOwner {
+        require(_minContribution < _maxContribution, "ICO: Invalid tier contribution limits");
+        tiers.push(Tier({
+            minContribution: _minContribution,
+            maxContribution: _maxContribution,
+            bonusPercentage: _bonusPercentage
+        }));
+    }
+
+    function setKycVerifier(address _kycVerifier) public onlyOwner {
+        kycVerifier = _kycVerifier;
+    }
+
+    function updateKycStatus(address _user, bool _verified) public onlyKycVerifier {
+        investors[_user].kycVerified = _verified;
+        emit KYCStatusUpdated(_user, _verified);
+    }
+
+    function whitelistAddress(address _investor, uint256 _tierId) public onlyOwner {
+        require(_tierId < tiers.length, "ICO: Invalid tier ID");
+        investors[_investor].isWhitelisted = true;
+        investors[_investor].whitelistTierId = _tierId;
+    }
+
+    function whitelistAddresses(address[] memory _investors, uint256 _tierId) public onlyOwner {
+        require(_tierId < tiers.length, "ICO: Invalid tier ID");
+        for (uint256 i = 0; i < _investors.length; i++) {
+            investors[_investors[i]].isWhitelisted = true;
+            investors[_investors[i]].whitelistTierId = _tierId;
+        }
+    }
+
+    function removeWhitelist(address _investor) public onlyOwner {
+        investors[_investor].isWhitelisted = false;
+        investors[_investor].whitelistTierId = 0;
+    }
+
+    function getCurrentRoundIndex() internal view returns (uint256) {
+        for (uint256 i = 0; i < rounds.length; i++) {
+            if (block.timestamp >= rounds[i].startDate && block.timestamp <= rounds[i].endDate) {
+                return i;
+            }
+        }
+        return type(uint256).max; // Indicate no active round
+    }
+
+    function getPriceForCurrentRound() internal view returns (uint256) {
+        uint256 currentRoundIndex = getCurrentRoundIndex();
+        if (currentRoundIndex != type(uint256).max) {
+            return rounds[currentRoundIndex].pricePerToken;
+        }
+        return 0; // Or revert if price is needed and no round is active
+    }
+
+    function calculateTokensToReceive(uint256 _contributionAmount, uint256 _pricePerToken) internal view returns (uint256) {
+        uint256 tokens = _contributionAmount.mul(_pricePerToken).div(1 ether); // Assuming price is in wei per token
+        // Apply bonus based on tier
+        uint256 tierId = investors[msg.sender].whitelistTierId;
+        if (tierId > 0 && tierId <= tiers.length) {
+            uint256 bonusPercentage = tiers[tierId - 1].bonusPercentage; // tierId is 1-based, array is 0-based
+            tokens = tokens.mul(100 + bonusPercentage).div(100);
+        }
+        return tokens;
+    }
+
+    function purchaseTokens(uint256 _amountInPaymentTokens) public inSalePeriod nonReentrant {
+        require(investors[msg.sender].kycVerified, "ICO: KYC verification required");
+        require(investors[msg.sender].isWhitelisted, "ICO: Not whitelisted");
+
+        uint256 currentRoundIndex = getCurrentRoundIndex();
+        require(currentRoundIndex != type(uint256).max, "ICO: No active sale round");
+        Round storage currentRound = rounds[currentRoundIndex];
+
+        uint256 pricePerToken = currentRound.pricePerToken;
+        require(pricePerToken > 0, "ICO: Price not set for this round");
+
+        require(_amountInPaymentTokens >= tiers[investors[msg.sender].whitelistTierId - 1].minContribution, "ICO: Contribution below minimum for tier");
+        require(_amountInPaymentTokens <= tiers[investors[msg.sender].whitelistTierId - 1].maxContribution, "ICO: Contribution above maximum for tier");
+
+        uint256 requiredPayment = _amountInPaymentTokens; // Assuming 1:1 ratio for simplicity, adjust if needed
+        require(paymentToken.balanceOf(msg.sender) >= requiredPayment, "ICO: Insufficient payment tokens");
+
+        require(totalRaised.add(_amountInPaymentTokens) <= hardCap, "ICO: Hard cap reached");
+
+        paymentToken.transferFrom(msg.sender, address(this), requiredPayment);
+
+        uint256 tokensToReceive = calculateTokensToReceive(requiredPayment, pricePerToken);
+        require(tokensToReceive > 0, "ICO: No tokens to receive");
+
+        totalRaised = totalRaised.add(requiredPayment);
+        totalTokensSold = totalTokensSold.add(tokensToReceive);
+
+        investors[msg.sender].totalPurchased = investors[msg.sender].totalPurchased.add(tokensToReceive);
+
+        // For simplicity, we'll create one vesting schedule per purchase.
+        // In a real scenario, you might want to group purchases or have predefined schedules.
+        uint256 scheduleId = getNextVestingScheduleId(msg.sender);
+        uint256 vestingStartTime = block.timestamp; // Vesting starts immediately after purchase
+        uint256 cliffDuration = 30 days; // Example: 30-day cliff
+        uint256 releasePeriod = 30 days; // Example: monthly releases
+        uint256 numberOfVestingPeriods = 12; // Example: 12 monthly releases after cliff
+
+        VestingSchedule storage newSchedule = investors[msg.sender].vestingSchedules[scheduleId];
+        newSchedule.totalTokens = tokensToReceive;
+        newSchedule.startTime = vestingStartTime;
+        newSchedule.cliffDuration = cliffDuration;
+        newSchedule.releasePeriod = releasePeriod;
+        newSchedule.numberOfVestingPeriods = numberOfVestingPeriods;
+
+        emit VestingScheduleCreated(msg.sender, scheduleId, tokensToReceive, vestingStartTime, cliffDuration, releasePeriod, numberOfVestingPeriods);
+        emit TokensPurchased(msg.sender, _amountInPaymentTokens, tokensToReceive);
+    }
+
+    function getNextVestingScheduleId(address _investor) internal view returns (uint256) {
+        uint256 id = 0;
+        while (true) {
+            if (investors[_investor].vestingSchedules[id].totalTokens == 0 && id != 0) { // Check if schedule exists
+                break;
+            }
+            if (id == type(uint256).max) {
+                revert("ICO: Too many vesting schedules");
+            }
+            id++;
+        }
+        return id;
+    }
+
+
+    function claimTokens() public nonReentrant {
+        require(address(this).balance >= saleToken.balanceOf(address(this)), "ICO: Not enough sale tokens in contract balance"); // Ensure we have tokens to distribute
+        require(investors[msg.sender].totalPurchased > investors[msg.sender].tokensClaimed, "ICO: No tokens available to claim");
+
+        uint256 claimableTokens = 0;
+        uint256 currentTime = block.timestamp;
+
+        for (uint256 i = 0; i < type(uint256).max; i++) {
+            VestingSchedule storage schedule = investors[msg.sender].vestingSchedules[i];
+            if (schedule.totalTokens > 0) {
+                uint256 releasedTokens = calculateReleasedTokens(schedule, currentTime);
+                uint256 alreadyClaimedFromSchedule = investors[msg.sender].tokensClaimed.sub(getTokensClaimedFromOtherSchedules(msg.sender, i)); // Subtract tokens claimed from other schedules
+                uint256 claimableFromThisSchedule = releasedTokens.sub(alreadyClaimedFromSchedule);
+
+                if (claimableFromThisSchedule > 0) {
+                    claimableTokens = claimableTokens.add(claimableFromThisSchedule);
+                }
+            }
+            if (i == type(uint256).max - 1) break; // Prevent infinite loop if schedule IDs are not contiguous
+        }
+
+        require(claimableTokens > 0, "ICO: No tokens currently available for claim");
+
+        // Ensure we don't claim more than purchased
+        uint256 totalPurchased = investors[msg.sender].totalPurchased;
+        uint256 currentClaimed = investors[msg.sender].tokensClaimed;
+        uint256 maxClaimable = totalPurchased.sub(currentClaimed);
+
+        if (claimableTokens > maxClaimable) {
+            claimableTokens = maxClaimable;
+        }
+
+        require(claimableTokens > 0, "ICO: No tokens currently available for claim");
+
+        // Check if the contract has enough tokens to send
+        require(saleToken.balanceOf(address(this)) >= claimableTokens, "ICO: Insufficient sale tokens in contract");
+
+        investors[msg.sender].tokensClaimed = investors[msg.sender].tokensClaimed.add(claimableTokens);
+        saleToken.transfer(msg.sender, claimableTokens);
+
+        emit TokensClaimed(msg.sender, claimableTokens);
+    }
+
+    function calculateReleasedTokens(VestingSchedule storage _schedule, uint256 _currentTime) internal view returns (uint256) {
+        if (_currentTime < _schedule.startTime.add(_schedule.cliffDuration)) {
+            return 0; // Within cliff period
+        }
+
+        uint256 timeSinceCliff = _currentTime.sub(_schedule.startTime.add(_schedule.cliffDuration));
+        uint256 periodsPassed = timeSinceCliff.div(_schedule.releasePeriod);
+
+        if (periodsPassed >= _schedule.numberOfVestingPeriods) {
+            return _schedule.totalTokens; // All tokens vested
+        }
+
+        uint256 tokensPerPeriod = _schedule.totalTokens.div(_schedule.numberOfVestingPeriods);
+        return tokensPerPeriod.mul(periodsPassed);
+    }
+
+    function getTokensClaimedFromOtherSchedules(address _investor, uint256 _currentScheduleId) internal view returns (uint256) {
+        uint256 claimedFromOthers = 0;
+        uint256 totalClaimed = investors[_investor].tokensClaimed;
+
+        for (uint256 i = 0; i < type(uint256).max; i++) {
+            if (i == _currentScheduleId) continue; // Skip current schedule
+            VestingSchedule storage schedule = investors[_investor].vestingSchedules[i];
+            if (schedule.totalTokens > 0) {
+                uint256 released = calculateReleasedTokens(schedule, block.timestamp);
+                uint256 claimedFromThis = released; // This is a simplification, real logic would track claims per schedule
+                // A more robust implementation would track claimed amounts per schedule.
+                // For this example, we'll assume `tokensClaimed` is the total across all schedules.
+                // To accurately calculate claimable, we need to know how much has been claimed *from each schedule*.
+                // This requires an additional mapping like `mapping(uint256 => uint256) claimedFromSchedule;` per investor.
+                // For now, we'll return 0 as a placeholder to avoid complex state management in this example.
+            }
+             if (i == type(uint256).max - 1) break;
+        }
+        return 0; // Placeholder
+    }
+
+
+    function getInvestorInfo(address _investor) public view returns (
+        uint256 totalPurchased,
+        uint256 tokensClaimed,
+        bool isWhitelisted,
+        uint256 whitelistTierId,
+        bool kycVerified
+    ) {
+        Investor storage investor = investors[_investor];
+        return (
+            investor.totalPurchased,
+            investor.tokensClaimed,
+            investor.isWhitelisted,
+            investor.whitelistTierId,
+            investor.kycVerified
+        );
+    }
+
+    function getVestingSchedule(address _investor, uint256 _scheduleId) public view returns (
+        uint256 totalTokens,
+        uint256 startTime,
+        uint256 cliffDuration,
+        uint256 releasePeriod,
+        uint256 numberOfVestingPeriods
+    ) {
+        VestingSchedule storage schedule = investors[_investor].vestingSchedules[_scheduleId];
+        return (

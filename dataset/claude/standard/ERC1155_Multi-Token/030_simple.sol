@@ -1,0 +1,82 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract GameItems is ERC1155, Ownable {
+    uint256 private _nextTokenId;
+
+    struct TokenInfo {
+        bool isNFT;
+        uint256 maxSupply;
+        uint256 totalSupply;
+        string name;
+    }
+
+    mapping(uint256 => TokenInfo) public tokenInfo;
+    mapping(uint256 => string) private _tokenURIs;
+
+    event TokenTypeCreated(uint256 indexed id, string name, bool isNFT, uint256 maxSupply);
+
+    constructor(string memory baseURI) ERC1155(baseURI) Ownable(msg.sender) {}
+
+    function createFungibleToken(
+        string memory name,
+        uint256 maxSupply,
+        uint256 initialSupply
+    ) external onlyOwner returns (uint256) {
+        require(initialSupply <= maxSupply, "Initial exceeds max");
+        uint256 id = _nextTokenId++;
+        tokenInfo[id] = TokenInfo(false, maxSupply, initialSupply, name);
+        if (initialSupply > 0) {
+            _mint(msg.sender, id, initialSupply, "");
+        }
+        emit TokenTypeCreated(id, name, false, maxSupply);
+        return id;
+    }
+
+    function createNFT(string memory name, string memory tokenURI_) external onlyOwner returns (uint256) {
+        uint256 id = _nextTokenId++;
+        tokenInfo[id] = TokenInfo(true, 1, 1, name);
+        _tokenURIs[id] = tokenURI_;
+        _mint(msg.sender, id, 1, "");
+        emit TokenTypeCreated(id, name, true, 1);
+        return id;
+    }
+
+    function mint(address to, uint256 id, uint256 amount) external onlyOwner {
+        TokenInfo storage info = tokenInfo[id];
+        require(info.maxSupply > 0, "Token does not exist");
+        require(!info.isNFT, "Cannot mint additional NFTs");
+        require(info.totalSupply + amount <= info.maxSupply, "Exceeds max supply");
+        info.totalSupply += amount;
+        _mint(to, id, amount, "");
+    }
+
+    function mintBatch(address to, uint256[] memory ids, uint256[] memory amounts) external onlyOwner {
+        for (uint256 i = 0; i < ids.length; i++) {
+            TokenInfo storage info = tokenInfo[ids[i]];
+            require(info.maxSupply > 0, "Token does not exist");
+            require(!info.isNFT, "Cannot mint additional NFTs");
+            require(info.totalSupply + amounts[i] <= info.maxSupply, "Exceeds max supply");
+            info.totalSupply += amounts[i];
+        }
+        _mintBatch(to, ids, amounts, "");
+    }
+
+    function uri(uint256 id) public view override returns (string memory) {
+        if (bytes(_tokenURIs[id]).length > 0) {
+            return _tokenURIs[id];
+        }
+        return super.uri(id);
+    }
+
+    function setURI(string memory newURI) external onlyOwner {
+        _setURI(newURI);
+    }
+
+    function setTokenURI(uint256 id, string memory tokenURI_) external onlyOwner {
+        _tokenURIs[id] = tokenURI_;
+    }
+}

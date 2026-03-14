@@ -1,0 +1,73 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+}
+
+contract FlashLoanProvider {
+    address public admin;
+    bool public paused;
+    IERC20 public token;
+
+    event FlashLoanExecuted(address borrower, uint256 amount, uint256 fee);
+    event Paused();
+    event Unpaused();
+    event EmergencyWithdraw(address admin, uint256 amount);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not admin");
+        _;
+    }
+
+    modifier notPaused() {
+        require(!paused, "Paused");
+        _;
+    }
+
+    constructor(address _token) {
+        admin = msg.sender;
+        token = IERC20(_token);
+    }
+
+    function flashLoan(uint256 amount) external notPaused {
+        uint256 balanceBefore = token.balanceOf(address(this));
+        require(balanceBefore >= amount, "Insufficient funds");
+
+        // Transfer the loan amount to the borrower
+        require(token.transfer(msg.sender, amount), "Transfer failed");
+
+        // Borrower must return the loan amount plus fee within the same transaction
+        uint256 fee = calculateFee(amount);
+        require(token.transferFrom(msg.sender, address(this), amount + fee), "Repayment failed");
+
+        uint256 balanceAfter = token.balanceOf(address(this));
+        require(balanceAfter == balanceBefore + fee, "Invalid balance after loan");
+
+        emit FlashLoanExecuted(msg.sender, amount, fee);
+    }
+
+    function calculateFee(uint256 amount) public pure returns (uint256) {
+        return (amount * 3) / 1000; // 0.3% fee
+    }
+
+    function pause() external onlyAdmin {
+        paused = true;
+        emit Paused();
+    }
+
+    function unpause() external onlyAdmin {
+        paused = false;
+        emit Unpaused();
+    }
+
+    function emergencyWithdraw() external onlyAdmin {
+        uint256 balance = token.balanceOf(address(this));
+        require(token.transfer(admin, balance), "Transfer failed");
+        emit EmergencyWithdraw(admin, balance);
+    }
+}
+```

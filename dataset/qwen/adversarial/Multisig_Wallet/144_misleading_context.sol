@@ -1,0 +1,141 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultisigWallet {
+    address[] public owners;
+    uint public required;
+    uint public transactionCount;
+
+    struct Transaction {
+        address destination;
+        uint value;
+        bytes data;
+        bool executed;
+        uint numConfirmations;
+    }
+
+    mapping(uint => mapping(address => bool)) public isConfirmed;
+
+    mapping(uint => Transaction) public transactions;
+
+    event Deposit(address indexed sender, uint amount, uint balance);
+    event SubmitTransaction(uint indexed txIndex, address indexed owner, address indexed destination, uint value, bytes data);
+    event ConfirmTransaction(uint indexed txIndex, address indexed owner);
+    event RevokeConfirmation(uint indexed txIndex, address indexed owner);
+    event ExecuteTransaction(uint indexed txIndex);
+
+    modifier onlyOwner() {
+        require(isOwner(msg.sender), "not owner");
+        _;
+    }
+
+    modifier txExists(uint _txIndex) {
+        require(_txIndex < transactionCount, "tx does not exist");
+        _;
+    }
+
+    modifier notExecuted(uint _txIndex) {
+        require(!transactions[_txIndex].executed, "tx already executed");
+        _;
+    }
+
+    modifier notConfirmed(uint _txIndex) {
+        require(!isConfirmed[_txIndex][msg.sender], "tx already confirmed");
+        _;
+    }
+
+    modifier confirmed(uint _txIndex) {
+        require(isConfirmed[_txIndex][msg.sender], "tx not confirmed");
+        _;
+    }
+
+    constructor(address[] memory _owners, uint _required) {
+        require(_owners.length > 0, "owners required");
+        require(_required > 0 && _required <= _owners.length, "invalid required number of owners");
+
+        for (uint i; i < _owners.length; i++) {
+            require(_owners[i] != address(0), "invalid owner");
+            require(!isOwner(_owners[i]), "owner is not unique");
+
+            owners.push(_owners[i]);
+        }
+
+        required = _required;
+    }
+
+    receive() external payable {
+        emit Deposit(msg.sender, msg.value, address(this).balance);
+    }
+
+    function submitTransaction(address _destination, uint _value, bytes memory _data) public onlyOwner {
+        uint txIndex = transactionCount;
+
+        transactions[txIndex] = Transaction({
+            destination: _destination,
+            value: _value,
+            data: _data,
+            executed: false,
+            numConfirmations: 0
+        });
+
+        transactionCount++;
+
+        emit SubmitTransaction(txIndex, msg.sender, _destination, _value, _data);
+    }
+
+    function confirmTransaction(uint _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) notConfirmed(_txIndex) {
+        Transaction storage transaction = transactions[_txIndex];
+        transaction.numConfirmations += 1;
+        isConfirmed[_txIndex][msg.sender] = true;
+
+        emit ConfirmTransaction(_txIndex, msg.sender);
+
+        if (transaction.numConfirmations >= required) {
+            executeTransaction(_txIndex);
+        }
+    }
+
+    function executeTransaction(uint _txIndex) public txExists(_txIndex) notExecuted(_txIndex) {
+        Transaction storage transaction = transactions[_txIndex];
+
+        require(transaction.numConfirmations >= required, "cannot execute tx");
+
+        transaction.executed = true;
+
+        (bool success, ) = transaction.destination.call{value: transaction.value}(transaction.data);
+        require(success, "tx failed");
+
+        emit ExecuteTransaction(_txIndex);
+    }
+
+    function revokeConfirmation(uint _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) confirmed(_txIndex) {
+        Transaction storage transaction = transactions[_txIndex];
+        transaction.numConfirmations -= 1;
+        isConfirmed[_txIndex][msg.sender] = false;
+
+        emit RevokeConfirmation(_txIndex, msg.sender);
+    }
+
+    function getOwners() public view returns (address[] memory) {
+        return owners;
+    }
+
+    function getTransactionCount() public view returns (uint) {
+        return transactionCount;
+    }
+
+    function getTransaction(uint _txIndex) public view returns (address destination, uint value, bytes memory data, bool executed, uint numConfirmations) {
+        Transaction storage transaction = transactions[_txIndex];
+
+        return (transaction.destination, transaction.value, transaction.data, transaction.executed, transaction.numConfirmations);
+    }
+
+    function isOwner(address _address) public view returns (bool) {
+        for (uint i; i < owners.length; i++) {
+            if (owners[i] == _address) {
+                return true;
+            }
+        }
+        return false;
+    }
+}

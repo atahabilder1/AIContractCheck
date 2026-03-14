@@ -1,0 +1,40 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IBridge {
+    function sendMessage(bytes32 messageId, bytes memory message) external;
+}
+
+contract CrossChainMessenger {
+    IBridge public immutable bridge;
+    uint256 public constant BATCH_SIZE = 10;
+    uint256 public batchCounter;
+
+    event BatchSent(uint256 indexed batchId, bytes32[] messageIds);
+
+    constructor(address _bridge) {
+        bridge = IBridge(_bridge);
+    }
+
+    struct Batch {
+        bytes32[] messageIds;
+        bytes[] messages;
+    }
+
+    mapping(uint256 => Batch) public batches;
+
+    function addMessage(bytes32 messageId, bytes memory message) external {
+        uint256 currentBatchId = batchCounter;
+        Batch storage currentBatch = batches[currentBatchId];
+        currentBatch.messageIds.push(messageId);
+        currentBatch.messages.push(message);
+
+        if (currentBatch.messageIds.length >= BATCH_SIZE) {
+            bridge.sendMessage(keccak256(abi.encodePacked(currentBatchId)), abi.encode(currentBatch));
+            delete batches[currentBatchId];
+            batchCounter++;
+        }
+    }
+}
+```

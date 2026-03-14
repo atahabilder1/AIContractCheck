@@ -1,0 +1,58 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract GasOptimizedDAO {
+    uint256 public proposalCount;
+    address public owner;
+
+    struct Proposal {
+        address proposer;
+        uint256 votes;
+        bool executed;
+    }
+
+    mapping(uint256 => Proposal) public proposals;
+    mapping(address => mapping(uint256 => bool)) public hasVoted;
+
+    event ProposalCreated(uint256 indexed proposalId, address indexed proposer);
+    event Voted(uint256 indexed proposalId, address indexed voter, uint256 votes);
+    event ProposalExecuted(uint256 indexed proposalId);
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    function createProposal() external returns (uint256) {
+        proposalCount++;
+        proposals[proposalCount] = Proposal({
+            proposer: msg.sender,
+            votes: 0,
+            executed: false
+        });
+        emit ProposalCreated(proposalCount, msg.sender);
+        return proposalCount;
+    }
+
+    function vote(uint256 _proposalId) external {
+        require(!hasVoted[msg.sender][_proposalId], "Already voted");
+        Proposal storage proposal = proposals[_proposalId];
+        require(!proposal.executed, "Proposal already executed");
+        proposal.votes++;
+        hasVoted[msg.sender][_proposalId] = true;
+        emit Voted(_proposalId, msg.sender, proposal.votes);
+    }
+
+    function executeProposal(uint256 _proposalId) external onlyOwner {
+        Proposal storage proposal = proposals[_proposalId];
+        require(!proposal.executed, "Proposal already executed");
+        proposal.executed = true;
+        emit ProposalExecuted(_proposalId);
+    }
+}
+```

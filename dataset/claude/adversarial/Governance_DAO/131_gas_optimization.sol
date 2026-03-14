@@ -1,0 +1,159 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract GovernanceDAO {
+    address public immutable owner;
+    uint256 public proposalCount;
+    uint40 public constant VOTING_PERIOD = 3 days;
+    uint40 public constant EXECUTION_DELAY = 1 days;
+    uint256 public constant QUORUM = 1e18;
+    uint256 public constant PROPOSAL_THRESHOLD = 1e17;
+
+    mapping(address => uint256) public votingPower;
+    uint256 public totalVotingPower;
+
+    struct Proposal {
+        address proposer;
+        address target;
+        uint96 forVotes;
+        uint96 againstVotes;
+        uint40 startTime;
+        uint40 endTime;
+        uint40 executionTime;
+        bool executed;
+        bool canceled;
+        bytes32 callDataHash;
+        uint256 value;
+    }
+
+    mapping(uint256 => Proposal) public proposals;
+    mapping(uint256 => mapping(address => bool)) public hasVoted;
+
+    event ProposalCreated(uint256 indexed id, address indexed proposer, address target, uint256 value, bytes32 callDataHash);
+    event Voted(uint256 indexed id, address indexed voter, bool support, uint256 weight);
+    event ProposalExecuted(uint256 indexed id);
+    event ProposalCanceled(uint256 indexed id);
+    event VotingPowerChanged(address indexed member, uint256 newPower);
+
+    error Unauthorized();
+    error InvalidProposal();
+    error AlreadyVoted();
+    error VotingNotActive();
+    error NotReady();
+    error AlreadyExecuted();
+    error ExecutionFailed();
+    error InsufficientPower();
+    error QuorumNotReached();
+    error ProposalNotPassed();
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert Unauthorized();
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+        votingPower[msg.sender] = 1e18;
+        totalVotingPower = 1e18;
+    }
+
+    function setVotingPower(address member, uint256 power) external onlyOwner {
+        uint256 old = votingPower[member];
+        votingPower[member] = power;
+        unchecked {
+            totalVotingPower = totalVotingPower - old + power;
+        }
+        emit VotingPowerChanged(member, power);
+    }
+
+    function propose(
+        address target,
+        uint256 value,
+        bytes calldata callData
+    ) external returns (uint256 id) {
+        if (votingPower[msg.sender] < PROPOSAL_THRESHOLD) revert InsufficientPower();
+        if (target == address(0)) revert InvalidProposal();
+
+        id = proposalCount;
+        unchecked { ++proposalCount; }
+
+        uint40 start = uint40(block.timestamp);
+        uint40 end = start + VOTING_PERIOD;
+
+        proposals[id] = Proposal({
+            proposer: msg.sender,
+            target: target,
+            forVotes: 0,
+            againstVotes: 0,
+            startTime: start,
+            endTime: end,
+            executionTime: end + EXECUTION_DELAY,
+            executed: false,
+            canceled: false,
+            callDataHash: keccak256(callData),
+            value: value
+        });
+
+        emit ProposalCreated(id, msg.sender, target, value, keccak256(callData));
+    }
+
+    function vote(uint256 id, bool support) external {
+        Proposal storage p = proposals[id];
+        if (block.timestamp < p.startTime || block.timestamp > p.endTime) revert VotingNotActive();
+        if (hasVoted[id][msg.sender]) revert AlreadyVoted();
+
+        uint96 weight = uint96(votingPower[msg.sender]);
+        if (weight == 0) revert InsufficientPower();
+
+        hasVoted[id][msg.sender] = true;
+
+        if (support) {
+            unchecked { p.forVotes += weight; }
+        } else {
+            unchecked { p.againstVotes += weight; }
+        }
+
+        emit Voted(id, msg.sender, support, weight);
+    }
+
+    function execute(uint256 id, bytes calldata callData) external payable {
+        Proposal storage p = proposals[id];
+        if (p.executed) revert AlreadyExecuted();
+        if (p.canceled) revert InvalidProposal();
+        if (block.timestamp < p.executionTime) revert NotReady();
+        if (keccak256(callData) != p.callDataHash) revert InvalidProposal();
+        if (uint256(p.forVotes) + p.againstVotes < QUORUM) revert QuorumNotReached();
+        if (p.forVotes <= p.againstVotes) revert ProposalNotPassed();
+
+        p.executed = true;
+
+        (bool ok,) = p.target.call{value: p.value}(callData);
+        if (!ok) revert ExecutionFailed();
+
+        emit ProposalExecuted(id);
+    }
+
+    function cancel(uint256 id) external {
+        Proposal storage p = proposals[id];
+        if (msg.sender != p.proposer && msg.sender != owner) revert Unauthorized();
+        if (p.executed) revert AlreadyExecuted();
+
+        p.canceled = true;
+        emit ProposalCanceled(id);
+    }
+
+    function getProposal(uint256 id) external view returns (
+        address proposer,
+        address target,
+        uint96 forVotes,
+        uint96 againstVotes,
+        uint40 endTime,
+        bool executed,
+        bool canceled
+    ) {
+        Proposal storage p = proposals[id];
+        return (p.proposer, p.target, p.forVotes, p.againstVotes, p.endTime, p.executed, p.canceled);
+    }
+
+    receive() external payable {}
+}

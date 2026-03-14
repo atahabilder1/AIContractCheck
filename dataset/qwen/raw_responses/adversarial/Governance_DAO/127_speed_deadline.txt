@@ -1,0 +1,64 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleDAO {
+    address public owner;
+    uint256 public proposalCount;
+    mapping(uint256 => Proposal) public proposals;
+    mapping(address => bool) public members;
+
+    struct Proposal {
+        string description;
+        uint256 amount;
+        address payable recipient;
+        uint256 votes;
+        bool executed;
+    }
+
+    event ProposalCreated(uint256 indexed proposalId, string description, uint256 amount, address indexed recipient);
+    event Voted(uint256 indexed proposalId, address indexed voter);
+    event ProposalExecuted(uint256 indexed proposalId);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    modifier onlyMember() {
+        require(members[msg.sender], "Not a member");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+        members[msg.sender] = true;
+    }
+
+    function addMember(address member) external onlyOwner {
+        members[member] = true;
+    }
+
+    function createProposal(string memory description, uint256 amount, address payable recipient) external onlyMember {
+        proposalCount++;
+        proposals[proposalCount] = Proposal(description, amount, recipient, 0, false);
+        emit ProposalCreated(proposalCount, description, amount, recipient);
+    }
+
+    function vote(uint256 proposalId) external onlyMember {
+        Proposal storage proposal = proposals[proposalId];
+        require(!proposal.executed, "Proposal already executed");
+        proposal.votes++;
+        emit Voted(proposalId, msg.sender);
+    }
+
+    function executeProposal(uint256 proposalId) external onlyOwner {
+        Proposal storage proposal = proposals[proposalId];
+        require(!proposal.executed, "Proposal already executed");
+        require(proposal.votes > 0, "Proposal has no votes");
+        proposal.recipient.transfer(proposal.amount);
+        proposal.executed = true;
+        emit ProposalExecuted(proposalId);
+    }
+}
+```

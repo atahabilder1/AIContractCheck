@@ -1,0 +1,75 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract RBAC {
+    address public admin;
+    bool public paused;
+
+    mapping(address => bool) public specialAdmins;
+
+    event AdminAdded(address indexed admin);
+    event AdminRemoved(address indexed admin);
+    event Paused();
+    event Unpaused();
+
+    modifier onlyAdmin() {
+        require(isAdmin(msg.sender), "AccessControl: caller is not an admin");
+        _;
+    }
+
+    modifier onlySpecialAdmin() {
+        require(specialAdmins[msg.sender], "AccessControl: caller is not a special admin");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "AccessControl: contract is paused");
+        _;
+    }
+
+    modifier whenPaused() {
+        require(paused, "AccessControl: contract is not paused");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+        specialAdmins[msg.sender] = true;
+    }
+
+    function addAdmin(address newAdmin) public onlyAdmin {
+        require(newAdmin != address(0), "AccessControl: new admin is the zero address");
+        require(!isAdmin(newAdmin), "AccessControl: new admin is already an admin");
+        specialAdmins[newAdmin] = true;
+        emit AdminAdded(newAdmin);
+    }
+
+    function removeAdmin(address adminToRemove) public onlyAdmin {
+        require(adminToRemove != address(0), "AccessControl: admin to remove is the zero address");
+        require(isAdmin(adminToRemove), "AccessControl: admin to remove is not an admin");
+        require(adminToRemove != msg.sender, "AccessControl: cannot remove self as admin");
+        delete specialAdmins[adminToRemove];
+        emit AdminRemoved(adminToRemove);
+    }
+
+    function pause() public onlyAdmin whenNotPaused {
+        paused = true;
+        emit Paused();
+    }
+
+    function unpause() public onlyAdmin whenPaused {
+        paused = false;
+        emit Unpaused();
+    }
+
+    function withdrawFunds(address payable recipient, uint256 amount) public onlySpecialAdmin {
+        require(address(this).balance >= amount, "AccessControl: insufficient balance");
+        recipient.transfer(amount);
+    }
+
+    function isAdmin(address account) public view returns (bool) {
+        return specialAdmins[account] || account == admin;
+    }
+}
+```

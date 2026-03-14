@@ -1,0 +1,71 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+
+contract Timelock is Ownable {
+    event LogScheduled(bytes32 indexed indexed_id, address indexed target, uint256 value, bytes data, uint256 delay, uint256 timestamp);
+    event LogExecuted(bytes32 indexed indexed_id, address indexed target, uint256 value, bytes data);
+    event LogCanceled(bytes32 indexed indexed_id);
+
+    struct Transaction {
+        address target;
+        uint256 value;
+        bytes data;
+        uint256 eta; // Estimated Time of Arrival
+    }
+
+    mapping(bytes32 => Transaction) public transactions;
+
+    function schedule(
+        address target,
+        uint256 value,
+        bytes memory data,
+        uint256 delay
+    ) public onlyOwner returns (bytes32 id) {
+        id = keccak256(abi.encodePacked(target, value, data, block.timestamp + delay));
+        require(transactions[id].target == address(0), "Timelock: Transaction already scheduled");
+
+        transactions[id] = Transaction({
+            target: target,
+            value: value,
+            data: data,
+            eta: block.timestamp + delay
+        });
+
+        emit LogScheduled(id, target, value, data, delay, transactions[id].eta);
+        return id;
+    }
+
+    function execute(bytes32 id) public payable onlyOwner {
+        Transaction storage txn = transactions[id];
+        require(txn.target != address(0), "Timelock: Transaction not found");
+        require(block.timestamp >= txn.eta, "Timelock: Transaction hasn't reached eta");
+
+        // Clear storage before execution to prevent reentrancy and save gas
+        delete transactions[id];
+
+        (bool success, ) = txn.target.call{value: txn.value}(txn.data);
+        require(success, "Timelock: Transaction failed");
+
+        emit LogExecuted(id, txn.target, txn.value, txn.data);
+    }
+
+    function cancel(bytes32 id) public onlyOwner {
+        Transaction storage txn = transactions[id];
+        require(txn.target != address(0), "Timelock: Transaction not found");
+        // No need to check eta here, as cancellation can happen anytime before execution
+
+        delete transactions[id];
+        emit LogCanceled(id);
+    }
+
+    function pendingTransactions(bytes32 id) public view returns (address target, uint256 value, bytes memory data, uint256 eta) {
+        Transaction storage txn = transactions[id];
+        return (txn.target, txn.value, txn.data, txn.eta);
+    }
+
+    // Fallback function to receive Ether
+    receive() external payable {}
+}

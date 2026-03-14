@@ -1,0 +1,158 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+contract FeeWrappedToken is ERC20, Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
+    IERC20 public immutable underlying;
+    uint256 public constant UNWRAP_FEE_BPS = 50; // 0.5%
+    uint256 public constant MIN_HOLD_DURATION = 30 days;
+    uint256 public constant BPS_DENOMINATOR = 10000;
+
+    uint256 public accFeePerShare;
+    uint256 public totalEligibleShares;
+
+    struct HolderInfo {
+        uint256 depositTimestamp;
+        uint256 balance;
+        uint256 rewardDebt;
+        uint256 pendingRewards;
+    }
+
+    mapping(address => HolderInfo) public holders;
+
+    event Wrapped(address indexed user, uint256 amount);
+    event Unwrapped(address indexed user, uint256 amountOut, uint256 fee);
+    event RewardsClaimed(address indexed user, uint256 amount);
+
+    constructor(
+        address _underlying,
+        string memory _name,
+        string memory _symbol
+    ) ERC20(_name, _symbol) Ownable(msg.sender) {
+        underlying = IERC20(_underlying);
+    }
+
+    function decimals() public view override returns (uint8) {
+        return ERC20(address(underlying)).decimals();
+    }
+
+    function wrap(uint256 amount) external nonReentrant {
+        require(amount > 0, "Zero amount");
+
+        _settleRewards(msg.sender);
+
+        underlying.safeTransferFrom(msg.sender, address(this), amount);
+        _mint(msg.sender, amount);
+
+        HolderInfo storage info = holders[msg.sender];
+        if (info.balance == 0) {
+            info.depositTimestamp = block.timestamp;
+        }
+        info.balance += amount;
+
+        if (_isEligible(msg.sender)) {
+            totalEligibleShares += amount;
+            info.rewardDebt = (info.balance * accFeePerShare) / 1e18;
+        }
+
+        emit Wrapped(msg.sender, amount);
+    }
+
+    function unwrap(uint256 amount) external nonReentrant {
+        require(amount > 0, "Zero amount");
+        require(holders[msg.sender].balance >= amount, "Insufficient balance");
+
+        _settleRewards(msg.sender);
+
+        uint256 fee = (amount * UNWRAP_FEE_BPS) / BPS_DENOMINATOR;
+        uint256 amountOut = amount - fee;
+
+        HolderInfo storage info = holders[msg.sender];
+
+        if (_isEligible(msg.sender)) {
+            totalEligibleShares -= amount;
+        }
+
+        info.balance -= amount;
+        if (info.balance == 0) {
+            info.depositTimestamp = 0;
+        }
+
+        _burn(msg.sender, amount);
+
+        if (fee > 0 && totalEligibleShares > 0) {
+            accFeePerShare += (fee * 1e18) / totalEligibleShares;
+        }
+
+        if (_isEligible(msg.sender) && info.balance > 0) {
+            info.rewardDebt = (info.balance * accFeePerShare) / 1e18;
+        }
+
+        underlying.safeTransfer(msg.sender, amountOut);
+
+        emit Unwrapped(msg.sender, amountOut, fee);
+    }
+
+    function claimRewards() external nonReentrant {
+        _settleRewards(msg.sender);
+
+        HolderInfo storage info = holders[msg.sender];
+        uint256 rewards = info.pendingRewards;
+        require(rewards > 0, "No rewards");
+
+        info.pendingRewards = 0;
+        underlying.safeTransfer(msg.sender, rewards);
+
+        emit RewardsClaimed(msg.sender, rewards);
+    }
+
+    function pendingRewardsOf(address account) external view returns (uint256) {
+        HolderInfo storage info = holders[account];
+        uint256 pending = info.pendingRewards;
+        if (_isEligible(account) && info.balance > 0) {
+            pending += (info.balance * accFeePerShare) / 1e18 - info.rewardDebt;
+        }
+        return pending;
+    }
+
+    function _isEligible(address account) internal view returns (bool) {
+        HolderInfo storage info = holders[account];
+        return info.depositTimestamp > 0 &&
+            block.timestamp >= info.depositTimestamp + MIN_HOLD_DURATION;
+    }
+
+    function _settleRewards(address account) internal {
+        HolderInfo storage info = holders[account];
+        if (_isEligible(account) && info.balance > 0) {
+            uint256 pending = (info.balance * accFeePerShare) / 1e18 - info.rewardDebt;
+            if (pending > 0) {
+                info.pendingRewards += pending;
+            }
+            info.rewardDebt = (info.balance * accFeePerShare) / 1e18;
+        }
+    }
+
+    function becomeEligible() external {
+        require(_isEligible(msg.sender), "Not yet eligible");
+        HolderInfo storage info = holders[msg.sender];
+        require(info.balance > 0, "No balance");
+
+        totalEligibleShares += info.balance;
+        info.rewardDebt = (info.balance * accFeePerShare) / 1e18;
+    }
+
+    function _update(address from, address to, uint256 value) internal override {
+        super._update(from, to, value);
+
+        if (from != address(0) && to != address(0)) {
+            revert("Direct transfers disabled; use wrap/unwrap");
+        }
+    }
+}

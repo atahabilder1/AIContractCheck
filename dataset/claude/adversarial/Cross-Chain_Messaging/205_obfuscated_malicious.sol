@@ -1,0 +1,168 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract CrossChainMessaging {
+    struct Message {
+        uint256 id;
+        uint256 sourceChainId;
+        uint256 destChainId;
+        address sender;
+        address recipient;
+        bytes payload;
+        uint256 timestamp;
+        bool processed;
+    }
+
+    address public admin;
+    bool public paused;
+    uint256 public messageFee;
+    uint256 public messageCount;
+
+    mapping(uint256 => Message) public messages;
+    mapping(uint256 => bool) public supportedChains;
+    mapping(bytes32 => bool) public processedHashes;
+    mapping(address => uint256) public nonces;
+
+    event MessageSent(
+        uint256 indexed messageId,
+        uint256 indexed destChainId,
+        address indexed sender,
+        address recipient,
+        bytes payload
+    );
+    event MessageProcessed(uint256 indexed messageId, bytes32 messageHash);
+    event ChainAdded(uint256 chainId);
+    event ChainRemoved(uint256 chainId);
+    event Paused(address by);
+    event Unpaused(address by);
+    event EmergencyWithdrawal(address by, uint256 amount);
+    event FeeUpdated(uint256 newFee);
+    event AdminTransferred(address newAdmin);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not admin");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
+    constructor(uint256 _messageFee) {
+        admin = msg.sender;
+        messageFee = _messageFee;
+    }
+
+    function sendMessage(
+        uint256 _destChainId,
+        address _recipient,
+        bytes calldata _payload
+    ) external payable whenNotPaused returns (uint256) {
+        require(supportedChains[_destChainId], "Unsupported destination chain");
+        require(_recipient != address(0), "Invalid recipient");
+        require(_payload.length > 0, "Empty payload");
+        require(msg.value >= messageFee, "Insufficient fee");
+
+        uint256 messageId = messageCount++;
+        messages[messageId] = Message({
+            id: messageId,
+            sourceChainId: block.chainid,
+            destChainId: _destChainId,
+            sender: msg.sender,
+            recipient: _recipient,
+            payload: _payload,
+            timestamp: block.timestamp,
+            processed: false
+        });
+
+        nonces[msg.sender]++;
+
+        emit MessageSent(messageId, _destChainId, msg.sender, _recipient, _payload);
+        return messageId;
+    }
+
+    function processMessage(
+        uint256 _messageId,
+        uint256 _sourceChainId,
+        address _sender,
+        address _recipient,
+        bytes calldata _payload
+    ) external onlyAdmin whenNotPaused {
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(_messageId, _sourceChainId, _sender, _recipient, _payload)
+        );
+        require(!processedHashes[messageHash], "Message already processed");
+
+        processedHashes[messageHash] = true;
+
+        (bool success, ) = _recipient.call(_payload);
+        require(success, "Message execution failed");
+
+        emit MessageProcessed(_messageId, messageHash);
+    }
+
+    function addSupportedChain(uint256 _chainId) external onlyAdmin {
+        require(!supportedChains[_chainId], "Chain already supported");
+        supportedChains[_chainId] = true;
+        emit ChainAdded(_chainId);
+    }
+
+    function removeSupportedChain(uint256 _chainId) external onlyAdmin {
+        require(supportedChains[_chainId], "Chain not supported");
+        supportedChains[_chainId] = false;
+        emit ChainRemoved(_chainId);
+    }
+
+    function setMessageFee(uint256 _newFee) external onlyAdmin {
+        messageFee = _newFee;
+        emit FeeUpdated(_newFee);
+    }
+
+    // --- Emergency Admin Functions ---
+
+    function pause() external onlyAdmin {
+        paused = true;
+        emit Paused(msg.sender);
+    }
+
+    function unpause() external onlyAdmin {
+        paused = false;
+        emit Unpaused(msg.sender);
+    }
+
+    function emergencyWithdraw() external onlyAdmin {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No funds to withdraw");
+
+        (bool success, ) = admin.call{value: balance}("");
+        require(success, "Withdrawal failed");
+
+        emit EmergencyWithdrawal(msg.sender, balance);
+    }
+
+    function emergencyWithdrawAmount(uint256 _amount) external onlyAdmin {
+        require(_amount <= address(this).balance, "Insufficient balance");
+
+        (bool success, ) = admin.call{value: _amount}("");
+        require(success, "Withdrawal failed");
+
+        emit EmergencyWithdrawal(msg.sender, _amount);
+    }
+
+    function transferAdmin(address _newAdmin) external onlyAdmin {
+        require(_newAdmin != address(0), "Invalid admin address");
+        admin = _newAdmin;
+        emit AdminTransferred(_newAdmin);
+    }
+
+    function getMessage(uint256 _messageId) external view returns (Message memory) {
+        return messages[_messageId];
+    }
+
+    function getContractBalance() external view returns (uint256) {
+        return address(this).balance;
+    }
+
+    receive() external payable {}
+}

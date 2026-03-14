@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Auction {
+    address public owner;
+    address public highestBidder;
+    uint256 public highestBid;
+    uint256 public auctionEndTime;
+    bool public ended;
+
+    mapping(address => uint256) public pendingReturns;
+
+    event HighestBidIncreased(address indexed bidder, uint256 amount);
+    event AuctionEnded(address indexed winner, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier auctionActive() {
+        require(block.timestamp < auctionEndTime, "Auction ended");
+        require(!ended, "Auction ended");
+        _;
+    }
+
+    constructor(uint256 _biddingTime) {
+        owner = msg.sender;
+        auctionEndTime = block.timestamp + _biddingTime;
+    }
+
+    function bid() external payable auctionActive {
+        require(msg.value > highestBid, "Bid not high enough");
+
+        if (highestBidder != address(0)) {
+            pendingReturns[highestBidder] += highestBid;
+        }
+
+        highestBidder = msg.sender;
+        highestBid = msg.value;
+
+        emit HighestBidIncreased(msg.sender, msg.value);
+    }
+
+    function withdraw() external {
+        uint256 amount = pendingReturns[msg.sender];
+        require(amount > 0, "No funds to withdraw");
+
+        pendingReturns[msg.sender] = 0;
+
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        require(success, "Transfer failed");
+    }
+
+    function endAuction() external onlyOwner {
+        require(block.timestamp >= auctionEndTime, "Auction not yet ended");
+        require(!ended, "Already ended");
+
+        ended = true;
+        emit AuctionEnded(highestBidder, highestBid);
+
+        if (highestBid > 0) {
+            (bool success, ) = payable(owner).call{value: highestBid}("");
+            require(success, "Transfer failed");
+        }
+    }
+}

@@ -1,0 +1,26 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleEscrow {
+    address public payer;
+    address public payee;
+    address public arbiter;
+    uint256 public amount;
+
+    constructor(address _payee, address _arbiter) payable {
+        payer = msg.sender;
+        payee = _payee;
+        arbiter = _arbiter;
+        amount = msg.value;
+    }
+
+    function release() external {
+        require(msg.sender == arbiter, "Only arbiter can release funds");
+        payable(payee).transfer(amount);
+    }
+
+    function refund() external {
+        require(msg.sender == arbiter, "Only arbiter can refund funds");
+        payable(payer).transfer(amount);
+    }
+}

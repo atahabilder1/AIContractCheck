@@ -1,0 +1,73 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract GovernanceToken is ERC20, Ownable {
+    constructor() ERC20("GovernanceToken", "GT") {
+        _mint(msg.sender, 1000000 * 10 ** decimals());
+    }
+}
+
+contract GovernanceDAO is Ownable {
+    using SafeMath for uint256;
+
+    GovernanceToken public governanceToken;
+    mapping(address => bool) public members;
+    uint256 public quorum;
+
+    event ProposalCreated(uint256 proposalId, string description);
+    event ProposalExecuted(uint256 proposalId);
+
+    struct Proposal {
+        uint256 id;
+        string description;
+        uint256 yesVotes;
+        uint256 noVotes;
+        bool executed;
+        mapping(address => bool) voted;
+    }
+
+    uint256 public proposalCount;
+    mapping(uint256 => Proposal) public proposals;
+
+    constructor(uint256 _quorum, address _governanceToken) {
+        quorum = _quorum;
+        governanceToken = GovernanceToken(_governanceToken);
+    }
+
+    function createProposal(string memory description) public onlyOwner {
+        proposalCount++;
+        Proposal storage proposal = proposals[proposalCount];
+        proposal.id = proposalCount;
+        proposal.description = description;
+        proposal.executed = false;
+
+        emit ProposalCreated(proposalCount, description);
+    }
+
+    function vote(uint256 proposalId, bool support) public {
+        require(members[msg.sender], "You are not a member");
+        require(!proposals[proposalId].voted[msg.sender], "Already voted");
+
+        Proposal storage proposal = proposals[proposalId];
+        proposal.voted[msg.sender] = true;
+        if (support) {
+            proposal.yesVotes++;
+        } else {
+            proposal.noVotes++;
+        }
+    }
+
+    function executeProposal(uint256 proposalId) public onlyOwner {
+        Proposal storage proposal = proposals[proposalId];
+        require(!proposal.executed, "Proposal already executed");
+        require(proposal.yesVotes.add(proposal.noVotes) >= quorum, "Not enough votes to execute");
+
+        proposal.executed = true;
+        emit ProposalExecuted(proposalId);
+    }
+}
+```

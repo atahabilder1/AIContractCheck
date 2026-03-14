@@ -1,0 +1,96 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultiRelayerConsensus {
+
+    struct Message {
+        bytes32 messageHash;
+        uint256 timestamp;
+        mapping(address => bool) submittedBy;
+        uint256 submissionCount;
+    }
+
+    mapping(bytes32 => Message) public messages;
+    address[] public registeredRelayers;
+    mapping(address => bool) public isRelayerRegistered;
+    uint256 public requiredConfirmations;
+
+    event MessageSubmitted(bytes32 indexed messageHash, address indexed relayer);
+    event MessageConfirmed(bytes32 indexed messageHash);
+    event RelayerRegistered(address indexed relayer);
+    event RelayerDeregistered(address indexed relayer);
+
+    modifier onlyRegisteredRelayer() {
+        require(isRelayerRegistered[msg.sender], "Not a registered relayer");
+        _;
+    }
+
+    constructor(address[] memory _initialRelayers, uint256 _requiredConfirmations) {
+        require(_requiredConfirmations > 0, "Required confirmations must be greater than 0");
+        for (address relayer in _initialRelayers) {
+            registerRelayer(relayer);
+        }
+        requiredConfirmations = _requiredConfirmations;
+    }
+
+    function registerRelayer(address _relayer) public {
+        require(!isRelayerRegistered[_relayer], "Relayer already registered");
+        registeredRelayers.push(_relayer);
+        isRelayerRegistered[_relayer] = true;
+        emit RelayerRegistered(_relayer);
+    }
+
+    function deregisterRelayer(address _relayer) public {
+        require(isRelayerRegistered[_relayer], "Relayer not registered");
+        // To remove from array efficiently, swap with last element and pop
+        for (uint256 i = 0; i < registeredRelayers.length; i++) {
+            if (registeredRelayers[i] == _relayer) {
+                registeredRelayers[i] = registeredRelayers[registeredRelayers.length - 1];
+                registeredRelayers.pop();
+                break;
+            }
+        }
+        isRelayerRegistered[_relayer] = false;
+        emit RelayerDeregistered(_relayer);
+    }
+
+    function submitMessage(bytes32 _messageHash) public onlyRegisteredRelayer {
+        Message storage msgData = messages[_messageHash];
+
+        require(!msgData.submittedBy[msg.sender], "Message already submitted by this relayer");
+
+        if (msgData.messageHash == bytes32(0)) { // First submission for this message hash
+            msgData.messageHash = _messageHash;
+            msgData.timestamp = block.timestamp;
+        }
+
+        msgData.submittedBy[msg.sender] = true;
+        msgData.submissionCount++;
+
+        emit MessageSubmitted(_messageHash, msg.sender);
+
+        if (msgData.submissionCount >= requiredConfirmations) {
+            emit MessageConfirmed(_messageHash);
+            // Optionally, you can add logic here to process the confirmed message
+            // For example, calling another contract or emitting an event to be picked up
+            // by an off-chain service.
+            // delete messages[_messageHash]; // Clear message data if no longer needed
+        }
+    }
+
+    function getMessageConfirmationStatus(bytes32 _messageHash) public view returns (uint256 count, uint256 timestamp, bool confirmed) {
+        Message storage msgData = messages[_messageHash];
+        confirmed = msgData.submissionCount >= requiredConfirmations;
+        return (msgData.submissionCount, msgData.timestamp, confirmed);
+    }
+
+    function getRegisteredRelayers() public view returns (address[] memory) {
+        return registeredRelayers;
+    }
+
+    function setRequiredConfirmations(uint256 _requiredConfirmations) public {
+        // Consider adding an owner/admin role for this function
+        require(_requiredConfirmations > 0, "Required confirmations must be greater than 0");
+        requiredConfirmations = _requiredConfirmations;
+    }
+}

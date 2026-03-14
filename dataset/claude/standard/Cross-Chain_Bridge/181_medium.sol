@@ -1,0 +1,174 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract CrossChainBridge {
+    struct Message {
+        uint256 sourceChain;
+        uint256 destChain;
+        address sender;
+        address recipient;
+        uint256 amount;
+        uint256 nonce;
+        bytes data;
+    }
+
+    address public owner;
+    uint256 public chainId;
+    uint256 public nonce;
+
+    mapping(address => bool) public whitelistedRelayers;
+    mapping(bytes32 => bool) public processedMessages;
+    mapping(address => uint256) public outboundNonces;
+
+    event MessageSent(
+        bytes32 indexed messageId,
+        uint256 indexed destChain,
+        address indexed sender,
+        address recipient,
+        uint256 amount,
+        uint256 nonce,
+        bytes data
+    );
+
+    event MessageProcessed(
+        bytes32 indexed messageId,
+        uint256 indexed sourceChain,
+        address indexed recipient,
+        uint256 amount
+    );
+
+    event RelayerAdded(address indexed relayer);
+    event RelayerRemoved(address indexed relayer);
+    event Deposited(address indexed sender, uint256 amount);
+    event Withdrawn(address indexed to, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier onlyRelayer() {
+        require(whitelistedRelayers[msg.sender], "Not whitelisted relayer");
+        _;
+    }
+
+    constructor(uint256 _chainId) {
+        owner = msg.sender;
+        chainId = _chainId;
+    }
+
+    receive() external payable {
+        emit Deposited(msg.sender, msg.value);
+    }
+
+    function addRelayer(address _relayer) external onlyOwner {
+        require(_relayer != address(0), "Zero address");
+        require(!whitelistedRelayers[_relayer], "Already whitelisted");
+        whitelistedRelayers[_relayer] = true;
+        emit RelayerAdded(_relayer);
+    }
+
+    function removeRelayer(address _relayer) external onlyOwner {
+        require(whitelistedRelayers[_relayer], "Not whitelisted");
+        whitelistedRelayers[_relayer] = false;
+        emit RelayerRemoved(_relayer);
+    }
+
+    function sendMessage(
+        uint256 _destChain,
+        address _recipient,
+        bytes calldata _data
+    ) external payable {
+        require(_destChain != chainId, "Same chain");
+        require(_recipient != address(0), "Zero recipient");
+
+        uint256 currentNonce = outboundNonces[msg.sender]++;
+
+        Message memory message = Message({
+            sourceChain: chainId,
+            destChain: _destChain,
+            sender: msg.sender,
+            recipient: _recipient,
+            amount: msg.value,
+            nonce: currentNonce,
+            data: _data
+        });
+
+        bytes32 messageId = hashMessage(message);
+
+        emit MessageSent(
+            messageId,
+            _destChain,
+            msg.sender,
+            _recipient,
+            msg.value,
+            currentNonce,
+            _data
+        );
+    }
+
+    function processMessage(
+        uint256 _sourceChain,
+        address _sender,
+        address _recipient,
+        uint256 _amount,
+        uint256 _nonce,
+        bytes calldata _data
+    ) external onlyRelayer {
+        require(_recipient != address(0), "Zero recipient");
+
+        Message memory message = Message({
+            sourceChain: _sourceChain,
+            destChain: chainId,
+            sender: _sender,
+            recipient: _recipient,
+            amount: _amount,
+            nonce: _nonce,
+            data: _data
+        });
+
+        bytes32 messageId = hashMessage(message);
+        require(!processedMessages[messageId], "Already processed");
+
+        processedMessages[messageId] = true;
+
+        if (_amount > 0) {
+            require(address(this).balance >= _amount, "Insufficient bridge balance");
+            (bool success, ) = payable(_recipient).call{value: _amount}("");
+            require(success, "Transfer failed");
+        }
+
+        emit MessageProcessed(messageId, _sourceChain, _recipient, _amount);
+    }
+
+    function hashMessage(Message memory _message) public pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                _message.sourceChain,
+                _message.destChain,
+                _message.sender,
+                _message.recipient,
+                _message.amount,
+                _message.nonce,
+                keccak256(_message.data)
+            )
+        );
+    }
+
+    function isMessageProcessed(bytes32 _messageId) external view returns (bool) {
+        return processedMessages[_messageId];
+    }
+
+    function withdraw(address _to, uint256 _amount) external onlyOwner {
+        require(_to != address(0), "Zero address");
+        require(address(this).balance >= _amount, "Insufficient balance");
+        (bool success, ) = payable(_to).call{value: _amount}("");
+        require(success, "Transfer failed");
+        emit Withdrawn(_to, _amount);
+    }
+
+    function transferOwnership(address _newOwner) external onlyOwner {
+        require(_newOwner != address(0), "Zero address");
+        owner = _newOwner;
+    }
+}

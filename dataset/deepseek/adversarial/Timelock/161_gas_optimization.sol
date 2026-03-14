@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    mapping(address => uint256) public balances;
+    mapping(address => uint256) public lockTime;
+
+    address public owner;
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function deposit() public payable {
+        require(msg.value > 0, "Deposit must be greater than zero");
+        balances[msg.sender] += msg.value;
+        lockTime[msg.sender] = block.timestamp + 30 days; // Lock for 30 days
+    }
+
+    function withdraw() public {
+        require(balances[msg.sender] > 0, "No funds to withdraw");
+        require(block.timestamp >= lockTime[msg.sender], "Funds are still locked");
+        uint256 amount = balances[msg.sender];
+        balances[msg.sender] = 0;
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+    }
+
+    function getBalance() public view returns (uint256) {
+        return address(this).balance;
+    }
+}

@@ -1,0 +1,24 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleEscrow {
+    address public seller;
+    address public buyer;
+    address public arbiter;
+    bool public isReleased;
+
+    constructor(address _seller, address _buyer, address _arbiter) {
+        seller = _seller;
+        buyer = _buyer;
+        arbiter = _arbiter;
+    }
+
+    function releaseFunds() public {
+        require(msg.sender == buyer || msg.sender == arbiter, "Not authorized");
+        require(!isReleased, "Funds already released");
+        payable(seller).transfer(address(this).balance);
+        isReleased = true;
+    }
+}
+```

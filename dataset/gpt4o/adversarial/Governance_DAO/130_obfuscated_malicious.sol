@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DAO {
+    address public admin;
+    bool public paused;
+    mapping(address => uint256) public balances;
+    uint256 public totalFunds;
+
+    event Deposit(address indexed sender, uint256 amount);
+    event Withdrawal(address indexed to, uint256 amount);
+    event EmergencyWithdrawal(address indexed admin, uint256 amount);
+    event Paused(address indexed admin);
+    event Unpaused(address indexed admin);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not authorized");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "Operations are paused");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+        paused = false;
+    }
+
+    function deposit() external payable whenNotPaused {
+        require(msg.value > 0, "Deposit amount must be greater than zero");
+        balances[msg.sender] += msg.value;
+        totalFunds += msg.value;
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function withdraw(uint256 amount) external whenNotPaused {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        balances[msg.sender] -= amount;
+        totalFunds -= amount;
+        payable(msg.sender).transfer(amount);
+        emit Withdrawal(msg.sender, amount);
+    }
+
+    function emergencyWithdraw() external onlyAdmin {
+        uint256 balance = address(this).balance;
+        payable(admin).transfer(balance);
+        totalFunds = 0;
+        emit EmergencyWithdrawal(admin, balance);
+    }
+
+    function pause() external onlyAdmin {
+        paused = true;
+        emit Paused(admin);
+    }
+
+    function unpause() external onlyAdmin {
+        paused = false;
+        emit Unpaused(admin);
+    }
+
+    receive() external payable {
+        deposit();
+    }
+}

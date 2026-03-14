@@ -1,0 +1,23 @@
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "https://github.com/OpenZeppelin/openzeppelin-solidity/contracts/proxy/UUPS.sol";
+
+contract MyProxy is UUPS {
+    address public implementation;
+
+    function initialize() public {
+        implementation = address(this);
+    }
+
+    function upgradeTo(address newImplementation) public {
+        implementation = newImplementation;
+    }
+}
+```
+This contract is a simple UUPS (Upgradeable, Upgradeable Proxy) contract that allows the owner to upgrade the implementation of the contract without needing to redeploy the entire contract. The `upgradeTo` function is called by the owner to upgrade the implementation, and the `initialize` function is called once the contract is deployed to set the initial implementation.
+
+It's important to note that this is a basic example and in a real-world scenario you would want to have more complex access control and validation on the upgrades.
+
+Also, you should keep in mind that the `upgradeTo` function should only be called by the owner of the contract, and the `initialize` function should only be called once.

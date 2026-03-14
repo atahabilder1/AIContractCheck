@@ -1,0 +1,53 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract RoleBasedAccessControl {
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 public constant USER_ROLE = keccak256("USER_ROLE");
+
+    mapping(bytes32 => mapping(address => bool)) private _roles;
+
+    event RoleGranted(bytes32 indexed role, address indexed account);
+    event RoleRevoked(bytes32 indexed role, address indexed account);
+
+    modifier onlyRole(bytes32 role) {
+        require(hasRole(role, msg.sender), "AccessControl: access denied");
+        _;
+    }
+
+    constructor() {
+        _grantRole(ADMIN_ROLE, msg.sender);
+    }
+
+    function hasRole(bytes32 role, address account) public view returns (bool) {
+        return _roles[role][account];
+    }
+
+    function grantRole(bytes32 role, address account) external onlyRole(ADMIN_ROLE) {
+        require(!hasRole(role, account), "AccessControl: account already has role");
+        _grantRole(role, account);
+    }
+
+    function revokeRole(bytes32 role, address account) external onlyRole(ADMIN_ROLE) {
+        require(hasRole(role, account), "AccessControl: account does not have role");
+        _revokeRole(role, account);
+    }
+
+    function renounceRole(bytes32 role, address account) external {
+        require(account == msg.sender, "AccessControl: can only renounce roles for self");
+        require(hasRole(role, account), "AccessControl: account does not have role");
+        _revokeRole(role, account);
+    }
+
+    function _grantRole(bytes32 role, address account) private {
+        _roles[role][account] = true;
+        emit RoleGranted(role, account);
+    }
+
+    function _revokeRole(bytes32 role, address account) private {
+        _roles[role][account] = false;
+        emit RoleRevoked(role, account);
+    }
+}
+```

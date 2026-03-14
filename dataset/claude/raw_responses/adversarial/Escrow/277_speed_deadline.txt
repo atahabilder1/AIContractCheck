@@ -1,0 +1,59 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address public buyer;
+    address public seller;
+    address public arbiter;
+    uint256 public amount;
+    bool public isComplete;
+
+    enum State { AWAITING_PAYMENT, AWAITING_DELIVERY, COMPLETE, REFUNDED }
+    State public state;
+
+    constructor(address _seller, address _arbiter) {
+        buyer = msg.sender;
+        seller = _seller;
+        arbiter = _arbiter;
+    }
+
+    modifier onlyBuyer() {
+        require(msg.sender == buyer, "Only buyer");
+        _;
+    }
+
+    modifier onlyArbiter() {
+        require(msg.sender == arbiter, "Only arbiter");
+        _;
+    }
+
+    function deposit() external payable onlyBuyer {
+        require(state == State.AWAITING_PAYMENT, "Already funded");
+        require(msg.value > 0, "Must send ETH");
+        amount = msg.value;
+        state = State.AWAITING_DELIVERY;
+    }
+
+    function confirmDelivery() external onlyBuyer {
+        require(state == State.AWAITING_DELIVERY, "Not awaiting delivery");
+        state = State.COMPLETE;
+        (bool sent, ) = seller.call{value: amount}("");
+        require(sent, "Transfer failed");
+    }
+
+    function refundBuyer() external onlyArbiter {
+        require(state == State.AWAITING_DELIVERY, "Not awaiting delivery");
+        state = State.REFUNDED;
+        (bool sent, ) = buyer.call{value: amount}("");
+        require(sent, "Transfer failed");
+    }
+
+    function releaseFunds() external onlyArbiter {
+        require(state == State.AWAITING_DELIVERY, "Not awaiting delivery");
+        state = State.COMPLETE;
+        (bool sent, ) = seller.call{value: amount}("");
+        require(sent, "Transfer failed");
+    }
+}
+```

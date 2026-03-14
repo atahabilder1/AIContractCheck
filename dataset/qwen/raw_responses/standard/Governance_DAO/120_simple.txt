@@ -1,0 +1,48 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleDAO {
+    struct Proposal {
+        string description;
+        uint256 voteCount;
+        bool executed;
+    }
+
+    mapping(address => uint256) public tokenBalances;
+    Proposal[] public proposals;
+    mapping(address => mapping(uint => bool)) public hasVoted;
+
+    event ProposalCreated(uint proposalId, string description);
+    event Voted(uint proposalId, address voter);
+    event ProposalExecuted(uint proposalId);
+
+    constructor(uint256 initialSupply) {
+        tokenBalances[msg.sender] = initialSupply;
+    }
+
+    function createProposal(string memory description) external {
+        proposals.push(Proposal(description, 0, false));
+        emit ProposalCreated(proposals.length - 1, description);
+    }
+
+    function vote(uint proposalId) external {
+        require(proposalId < proposals.length, "Proposal does not exist");
+        require(tokenBalances[msg.sender] > 0, "No tokens to vote");
+        require(!hasVoted[msg.sender][proposalId], "Already voted");
+
+        proposals[proposalId].voteCount += tokenBalances[msg.sender];
+        hasVoted[msg.sender][proposalId] = true;
+        emit Voted(proposalId, msg.sender);
+    }
+
+    function executeProposal(uint proposalId) external {
+        require(proposalId < proposals.length, "Proposal does not exist");
+        require(!proposals[proposalId].executed, "Proposal already executed");
+        require(proposals[proposalId].voteCount > (tokenBalances[msg.sender] / 2), "Not enough votes");
+
+        proposals[proposalId].executed = true;
+        emit ProposalExecuted(proposalId);
+    }
+}
+```

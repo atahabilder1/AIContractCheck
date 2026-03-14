@@ -1,0 +1,21 @@
+
+Here is a sample ERC1155 Multi-Token contract written in Solidity for testnet deployment:
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "https://github.com/OpenZeppelin/openzeppelin-solidity/contracts/token/ERC1155/ERC1155.sol";
+
+contract MyMultiToken is ERC1155 {
+    constructor() ERC1155("My Multi-Token", "MMT") {}
+
+    function mint(address to, uint256 amount) public {
+        _mint(to, amount);
+    }
+
+    function burn(address from, uint256 amount) public {
+        _burn(from, amount);
+    }
+}
+```
+Note that this is a simplified version of the ERC1155 contract and should not be used for production-level deployments. The `ERC1155` contract is a part of the OpenZeppelin library and provides a basic implementation of the ERC1155 standard. The `MyMultiToken` contract is a custom contract that inherits from the `ERC1155` contract and adds the `mint` and `burn` functions.

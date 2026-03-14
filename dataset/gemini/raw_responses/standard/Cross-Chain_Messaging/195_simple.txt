@@ -1,0 +1,67 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainMessenger {
+
+    address public owner;
+    mapping(uint256 => mapping(bytes32 => bool)) public messagesSent; // chainId => messageHash => true
+    mapping(uint256 => mapping(bytes32 => bool)) public messagesReceived; // chainId => messageHash => true
+
+    event MessageSent(uint256 indexed destinationChainId, bytes32 indexed messageHash, bytes message);
+    event MessageReceived(uint256 indexed sourceChainId, bytes32 indexed messageHash, bytes message);
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can call this function.");
+        _;
+    }
+
+    /**
+     * @notice Sends a message to another chain.
+     * @param destinationChainId The ID of the chain to send the message to.
+     * @param message The arbitrary message to send.
+     */
+    function sendMessage(uint256 destinationChainId, bytes memory message) public {
+        bytes32 messageHash = keccak256(abi.encodePacked(msg.sender, destinationChainId, message));
+        require(!messagesSent[destinationChainId][messageHash], "Message already sent to this destination chain.");
+
+        messagesSent[destinationChainId][messageHash] = true;
+
+        emit MessageSent(destinationChainId, messageHash, message);
+    }
+
+    /**
+     * @notice Receives a message from another chain. This function should be called by a trusted relayer or a cross-chain communication protocol.
+     * @param sourceChainId The ID of the chain the message originated from.
+     * @param messageHash The hash of the message.
+     * @param message The arbitrary message received.
+     */
+    function receiveMessage(uint256 sourceChainId, bytes32 messageHash, bytes memory message) public {
+        // In a real-world scenario, you would add robust verification here.
+        // For example, verifying a signature from a trusted source on the source chain,
+        // or checking if the message hash was previously marked as sent from the source chain.
+
+        // Basic check: prevent re-entrancy by checking if already received
+        require(!messagesReceived[sourceChainId][messageHash], "Message already received from this source chain.");
+
+        // In a more advanced system, you might check if messagesSent[sourceChainId][messageHash] is true
+        // and potentially remove it after successful reception. This basic example doesn't enforce that.
+
+        messagesReceived[sourceChainId][messageHash] = true;
+
+        emit MessageReceived(sourceChainId, messageHash, message);
+    }
+
+    /**
+     * @notice Allows the owner to transfer ownership of the contract.
+     * @param newOwner The address of the new owner.
+     */
+    function transferOwnership(address newOwner) public onlyOwner {
+        owner = newOwner;
+    }
+}
+```

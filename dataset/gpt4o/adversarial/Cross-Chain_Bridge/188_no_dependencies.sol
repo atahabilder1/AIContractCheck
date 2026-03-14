@@ -1,0 +1,69 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address public owner;
+    mapping(address => mapping(uint256 => bool)) public processedNonces;
+    uint256 public chainId;
+
+    event SwapInitialized(
+        address indexed from,
+        address indexed to,
+        uint256 amount,
+        uint256 indexed nonce,
+        uint256 targetChainId
+    );
+
+    event RedeemInitialized(
+        address indexed from,
+        address indexed to,
+        uint256 amount,
+        uint256 indexed nonce,
+        uint256 sourceChainId
+    );
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    constructor(uint256 _chainId) {
+        owner = msg.sender;
+        chainId = _chainId;
+    }
+
+    function swap(
+        address to,
+        uint256 amount,
+        uint256 nonce,
+        uint256 targetChainId
+    ) external {
+        require(amount > 0, "Amount must be greater than zero");
+        require(!processedNonces[msg.sender][nonce], "Transfer already processed");
+
+        processedNonces[msg.sender][nonce] = true;
+
+        emit SwapInitialized(msg.sender, to, amount, nonce, targetChainId);
+    }
+
+    function redeem(
+        address from,
+        address to,
+        uint256 amount,
+        uint256 nonce,
+        uint256 sourceChainId
+    ) external onlyOwner {
+        require(amount > 0, "Amount must be greater than zero");
+        require(sourceChainId != chainId, "Invalid source chain ID");
+        require(!processedNonces[from][nonce], "Transfer already processed");
+
+        processedNonces[from][nonce] = true;
+
+        emit RedeemInitialized(from, to, amount, nonce, sourceChainId);
+    }
+
+    function updateOwner(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "New owner is the zero address");
+        owner = newOwner;
+    }
+}

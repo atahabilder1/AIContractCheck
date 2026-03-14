@@ -1,0 +1,66 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract YieldAggregator {
+    address public owner;
+
+    struct Deposit {
+        uint256 amount;
+        uint256 timestamp;
+    }
+
+    mapping(address => Deposit[]) public deposits;
+
+    event DepositMade(address indexed user, uint256 amount);
+    event WithdrawalMade(address indexed user, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function deposit() external payable {
+        require(msg.value > 0, "Deposit amount must be greater than 0");
+        deposits[msg.sender].push(Deposit({amount: msg.value, timestamp: block.timestamp}));
+        emit DepositMade(msg.sender, msg.value);
+    }
+
+    function withdraw(uint256 amount) external {
+        require(amount > 0, "Withdrawal amount must be greater than 0");
+        require(amount <= getBalance(msg.sender), "Insufficient balance");
+
+        uint256 totalWithdrawn = 0;
+        for (uint256 i = deposits[msg.sender].length; i > 0; i--) {
+            Deposit storage deposit = deposits[msg.sender][i - 1];
+            if (totalWithdrawn < amount) {
+                uint256 withdrawAmount = amount - totalWithdrawn > deposit.amount ? deposit.amount : amount - totalWithdrawn;
+                deposit.amount -= withdrawAmount;
+                totalWithdrawn += withdrawAmount;
+                if (deposit.amount == 0) {
+                    deposits[msg.sender].pop();
+                }
+            }
+        }
+
+        payable(msg.sender).transfer(amount);
+        emit WithdrawalMade(msg.sender, amount);
+    }
+
+    function getBalance(address user) public view returns (uint256) {
+        uint256 balance = 0;
+        for (uint256 i = 0; i < deposits[user].length; i++) {
+            balance += deposits[user][i].amount;
+        }
+        return balance;
+    }
+
+    function emergencyWithdraw() external onlyOwner {
+        payable(owner).transfer(address(this).balance);
+    }
+}
+```

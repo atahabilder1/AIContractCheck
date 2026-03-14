@@ -1,0 +1,107 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainMessenger {
+
+    struct Message {
+        address sender;
+        bytes32 messageHash;
+        uint64 timestamp;
+        uint64 chainId;
+        uint64 destinationChainId;
+    }
+
+    mapping(bytes32 => Message) public messages;
+    mapping(bytes32 => bool) public received;
+
+    event MessageSent(
+        address indexed sender,
+        bytes32 indexed messageHash,
+        uint64 chainId,
+        uint64 destinationChainId
+    );
+    event MessageReceived(
+        address indexed sender,
+        bytes32 indexed messageHash,
+        uint64 chainId,
+        uint64 destinationChainId
+    );
+
+    function sendMessage(
+        bytes32 _messageHash,
+        uint64 _destinationChainId
+    ) external {
+        uint64 currentChainId = getChainId(); // Assume a function to get current chain ID
+
+        // Minimal validation: ensure sender is not the zero address
+        require(msg.sender != address(0), "Sender cannot be the zero address");
+
+        bytes32 messageId = keccak256(abi.encodePacked(msg.sender, _messageHash, currentChainId, _destinationChainId));
+        require(messages[messageId].sender == address(0), "Message already sent");
+
+        messages[messageId] = Message({
+            sender: msg.sender,
+            messageHash: _messageHash,
+            timestamp: uint64(block.timestamp),
+            chainId: currentChainId,
+            destinationChainId: _destinationChainId
+        });
+
+        emit MessageSent(msg.sender, _messageHash, currentChainId, _destinationChainId);
+    }
+
+    function receiveMessage(
+        address _sender,
+        bytes32 _messageHash,
+        uint64 _chainId,
+        uint64 _destinationChainId,
+        bytes calldata _signature // Signature from the sender's chain for verification
+    ) external {
+        uint64 currentChainId = getChainId();
+
+        // Minimal validation: ensure the message is intended for this chain
+        require(_destinationChainId == currentChainId, "Message not for this chain");
+        // Minimal validation: ensure the message has not been received before
+        bytes32 messageId = keccak256(abi.encodePacked(_sender, _messageHash, _chainId, _destinationChainId));
+        require(!received[messageId], "Message already received");
+
+        // Minimal validation: signature verification (requires off-chain signature generation and a way to recover the sender's address)
+        // This is a placeholder. In a real scenario, you would need a robust signature verification mechanism,
+        // potentially involving an oracle or a trusted relay service to verify the signature and the origin chain.
+        // For extreme speed, this might involve a pre-approved list of message relayers or a very simple check.
+        // Example placeholder:
+        // address signer = recoverSigner(_messageId, _signature); // This function needs to be implemented
+        // require(signer == _sender, "Invalid signature"); // Or a trusted relayer address
+
+        received[messageId] = true;
+        messages[messageId] = Message({
+            sender: _sender,
+            messageHash: _messageHash,
+            timestamp: uint64(block.timestamp), // Timestamp of when it was received on this chain
+            chainId: _chainId,
+            destinationChainId: _destinationChainId
+        });
+
+        emit MessageReceived(_sender, _messageHash, _chainId, _destinationChainId);
+    }
+
+    // Placeholder function to get the current chain ID.
+    // In a real cross-chain scenario, this would need to be determined by the network or a configuration.
+    function getChainId() internal pure returns (uint64) {
+        // This is a placeholder. A real implementation would depend on the environment.
+        // For example, on some EVM-compatible chains, you might use:
+        // uint256 chainId;
+        // assembly { chainId := chainid() }
+        // return uint64(chainId);
+        // For now, we'll return a dummy value.
+        return 1; // Dummy chain ID
+    }
+
+    // Placeholder for signature recovery.
+    // This function would typically be implemented using ECDSA recovery.
+    // function recoverSigner(bytes32 _messageId, bytes calldata _signature) internal pure returns (address) {
+    //     return ecrecover(_messageId, _signature);
+    // }
+}
+```

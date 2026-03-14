@@ -1,0 +1,58 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+import "https://github.com/OpenZeppelin/openzeppelin-solidity/contracts/token/ERC1155/ERC1155.sol";
+
+contract MultiToken is ERC1155 {
+    string public name;
+    string public symbol;
+    uint256 public totalSupply;
+
+    mapping (address => uint256) public balances;
+    mapping (uint256 => address) public tokenOwners;
+    mapping (uint256 => uint256) public tokenValues;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    constructor(string memory _name, string memory _symbol) public {
+        name = _name;
+        symbol = _symbol;
+    }
+
+    function mint(uint256 _tokenId, address _to, uint256 _value) public {
+        require(msg.sender == address(this), "Only the contract owner can mint tokens");
+        require(_tokenId > 0, "Invalid token id");
+        require(_to != address(0), "Invalid recipient address");
+        require(_value > 0, "Invalid token value");
+
+        balances[_to] += _value;
+        tokenOwners[_tokenId] = _to;
+        tokenValues[_tokenId] = _value;
+
+        emit Transfer(address(0), _to, _value);
+    }
+
+    function transfer(address _to, uint256 _value) public {
+        require(msg.sender == address(this), "Only the contract owner can transfer tokens");
+        require(_to != address(0), "Invalid recipient address");
+        require(_value > 0, "Invalid token value");
+
+        balances[msg.sender] -= _value;
+        balances[_to] += _value;
+
+        emit Transfer(msg.sender, _to, _value);
+    }
+
+    function balanceOf(address _owner) public view returns (uint256) {
+        return balances[_owner];
+    }
+
+    function ownerOf(uint256 _tokenId) public view returns (address) {
+        return tokenOwners[_tokenId];
+    }
+
+    function valueOf(uint256 _tokenId) public view returns (uint256) {
+        return tokenValues[_tokenId];
+    }
+}

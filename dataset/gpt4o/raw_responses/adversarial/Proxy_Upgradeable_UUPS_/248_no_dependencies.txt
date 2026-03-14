@@ -1,0 +1,139 @@
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract UUPSProxy {
+    address private _implementation;
+    address private _admin;
+
+    event Upgraded(address indexed implementation);
+    event AdminChanged(address indexed previousAdmin, address indexed newAdmin);
+
+    modifier onlyAdmin() {
+        require(msg.sender == _admin, "UUPSProxy: caller is not the admin");
+        _;
+    }
+
+    constructor(address initialImplementation) {
+        _admin = msg.sender;
+        _implementation = initialImplementation;
+    }
+
+    function upgradeTo(address newImplementation) external onlyAdmin {
+        require(newImplementation != address(0), "UUPSProxy: new implementation is the zero address");
+        _implementation = newImplementation;
+        emit Upgraded(newImplementation);
+    }
+
+    function changeAdmin(address newAdmin) external onlyAdmin {
+        require(newAdmin != address(0), "UUPSProxy: new admin is the zero address");
+        emit AdminChanged(_admin, newAdmin);
+        _admin = newAdmin;
+    }
+
+    fallback() external payable {
+        _delegate(_implementation);
+    }
+
+    receive() external payable {
+        _delegate(_implementation);
+    }
+
+    function _delegate(address implementation) internal {
+        assembly {
+            // Copy msg.data. We take full control of memory in this inline assembly
+            // block because it will not return to Solidity code. We overwrite the
+            // Solidity scratch pad at memory position 0.
+            calldatacopy(0, 0, calldatasize())
+
+            // Call the implementation.
+            // out and outsize are 0 because we don't know the size yet.
+            let result := delegatecall(gas(), implementation, 0, calldatasize(), 0, 0)
+
+            // Copy the returned data.
+            returndatacopy(0, 0, returndatasize())
+
+            switch result
+            // delegatecall returns 0 on error.
+            case 0 { revert(0, returndatasize()) }
+            default { return(0, returndatasize()) }
+        }
+    }
+
+    function getImplementation() external view returns (address) {
+        return _implementation;
+    }
+
+    function getAdmin() external view returns (address) {
+        return _admin;
+    }
+}
+
+contract MyUpgradeableContract {
+    uint256 private _value;
+    address private immutable _self = address(this);
+
+    modifier onlyProxy() {
+        require(address(this) != _self, "Function must be called through delegatecall");
+        require(_getImplementation() == _self, "Function must be called through active proxy");
+        _;
+    }
+
+    function initialize(uint256 initialValue) external onlyProxy {
+        _value = initialValue;
+    }
+
+    function upgradeTo(address newImplementation) external {
+        require(msg.sender == _admin(), "Only admin can upgrade");
+        require(Address.isContract(newImplementation), "New implementation is not a contract");
+        require(IERC1822Proxiable(newImplementation).proxiableUUID() == _IMPLEMENTATION_SLOT, "Unsupported proxiableUUID");
+        _upgradeTo(newImplementation);
+    }
+
+    function _upgradeTo(address newImplementation) internal {
+        require(newImplementation != address(0), "New implementation is the zero address");
+        StorageSlot.getAddressSlot(_IMPLEMENTATION_SLOT).value = newImplementation;
+    }
+
+    function _getImplementation() internal view returns (address) {
+        return StorageSlot.getAddressSlot(_IMPLEMENTATION_SLOT).value;
+    }
+
+    function _admin() internal view returns (address) {
+        return StorageSlot.getAddressSlot(_ADMIN_SLOT).value;
+    }
+
+    function getValue() external view returns (uint256) {
+        return _value;
+    }
+
+    function setValue(uint256 newValue) external {
+        _value = newValue;
+    }
+
+    bytes32 internal constant _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+    bytes32 internal constant _ADMIN_SLOT = 0xa3f0ed1e72a0d7c83e5c8c3b82fd283dd9a7f5b0c7d1a59f6f5edb8d0e7f5ad9;
+}
+
+interface IERC1822Proxiable {
+    function proxiableUUID() external view returns (bytes32);
+}
+
+library Address {
+    function isContract(address account) internal view returns (bool) {
+        uint256 size;
+        assembly { size := extcodesize(account) }
+        return size > 0;
+    }
+}
+
+library StorageSlot {
+    struct AddressSlot {
+        address value;
+    }
+
+    function getAddressSlot(bytes32 slot) internal pure returns (AddressSlot storage r) {
+        assembly { r.slot := slot }
+    }
+}
+```

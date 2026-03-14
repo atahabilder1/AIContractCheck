@@ -1,0 +1,148 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract Staking is Ownable {
+    using SafeMath for uint256;
+
+    IERC20 public stakingToken;
+    uint256 public stakingStartTime;
+    uint256 public stakingEndTime;
+    uint256 public totalStakedAmount;
+    uint256 public totalRewardsDistributed;
+
+    struct StakeInfo {
+        uint256 amount;
+        uint256 stakedAt;
+    }
+
+    mapping(address => StakeInfo) public userStakes;
+    mapping(address => uint256) public userRewards;
+
+    event Staked(address indexed user, uint256 amount);
+    event Unstaked(address indexed user, uint256 amount);
+    event RewardsClaimed(address indexed user, uint256 amount);
+    event RewardsDistributed(uint256 amount);
+
+    constructor(address _stakingTokenAddress) {
+        stakingToken = IERC20(_stakingTokenAddress);
+        stakingStartTime = block.timestamp;
+        stakingEndTime = block.timestamp.add(30 days); // Example: Staking duration of 30 days
+    }
+
+    function stake(uint256 _amount) external {
+        require(_amount > 0, "Staking: Amount must be greater than 0");
+        require(block.timestamp >= stakingStartTime && block.timestamp <= stakingEndTime, "Staking: Staking period has ended or not started");
+
+        uint256 balance = stakingToken.balanceOf(msg.sender);
+        require(balance >= _amount, "Staking: Insufficient token balance");
+
+        require(stakingToken.transferFrom(msg.sender, address(this), _amount), "Staking: Token transfer failed");
+
+        if (userStakes[msg.sender].amount > 0) {
+            claimRewards(); // Automatically claim rewards if already staked
+        }
+
+        userStakes[msg.sender].amount = userStakes[msg.sender].amount.add(_amount);
+        userStakes[msg.sender].stakedAt = block.timestamp;
+        totalStakedAmount = totalStakedAmount.add(_amount);
+
+        emit Staked(msg.sender, _amount);
+    }
+
+    function unstake(uint256 _amount) external {
+        require(_amount > 0, "Staking: Amount must be greater than 0");
+        require(userStakes[msg.sender].amount >= _amount, "Staking: Insufficient staked amount");
+
+        // Calculate and distribute rewards before unstaking
+        _calculateAndDistributeRewards(msg.sender);
+
+        userStakes[msg.sender].amount = userStakes[msg.sender].amount.sub(_amount);
+        totalStakedAmount = totalStakedAmount.sub(_amount);
+
+        if (userStakes[msg.sender].amount == 0) {
+            delete userStakes[msg.sender];
+        } else {
+            userStakes[msg.sender].stakedAt = block.timestamp; // Reset stakedAt if partially unstaked
+        }
+
+        require(stakingToken.transfer(msg.sender, _amount), "Staking: Token transfer failed");
+
+        emit Unstaked(msg.sender, _amount);
+    }
+
+    function claimRewards() public {
+        _calculateAndDistributeRewards(msg.sender);
+        uint256 rewardsToClaim = userRewards[msg.sender];
+
+        require(rewardsToClaim > 0, "Staking: No rewards to claim");
+
+        userRewards[msg.sender] = 0;
+        totalRewardsDistributed = totalRewardsDistributed.add(rewardsToClaim);
+
+        require(stakingToken.transfer(msg.sender, rewardsToClaim), "Staking: Reward transfer failed");
+
+        emit RewardsClaimed(msg.sender, rewardsToClaim);
+    }
+
+    function _calculateAndDistributeRewards(address _user) internal {
+        if (userStakes[_user].amount == 0) {
+            return;
+        }
+
+        // Simple reward calculation based on time and staked amount.
+        // This is a very basic example. Real-world scenarios might use more complex APY calculations.
+        // Assume a fixed APY for simplicity. Let's say 10% APY for a 30-day period.
+        // APY = 10% => Daily rate = (1 + 0.10)^(1/365) - 1
+        // For a 30-day period, total rewards = staked_amount * ( (1 + APY)^((days_staked)/365) - 1 )
+        // A simpler approach for demonstration:
+        // Let's assume a fixed rate per second for simplicity.
+        // Example: 0.00000001 tokens per token per second.
+        uint256 rewardRatePerSecond = 0.00000001 ether; // Example rate
+
+        uint256 timeElapsed = block.timestamp.sub(userStakes[_user].stakedAt);
+        uint256 calculatedRewards = userStakes[_user].amount.mul(timeElapsed).mul(rewardRatePerSecond) / 1 ether;
+
+        userRewards[_user] = userRewards[_user].add(calculatedRewards);
+    }
+
+    function getStakedAmount(address _user) external view returns (uint256) {
+        return userStakes[_user].amount;
+    }
+
+    function getPendingRewards(address _user) external view returns (uint256) {
+        if (userStakes[_user].amount == 0) {
+            return 0;
+        }
+
+        uint256 rewardRatePerSecond = 0.00000001 ether; // Example rate
+        uint256 timeElapsed = block.timestamp.sub(userStakes[_user].stakedAt);
+        uint256 calculatedRewards = userStakes[_user].amount.mul(timeElapsed).mul(rewardRatePerSecond) / 1 ether;
+
+        return userRewards[_user].add(calculatedRewards);
+    }
+
+    // Owner can add more tokens to the staking contract to be distributed as rewards
+    function addRewardsToPool() external onlyOwner {
+        uint256 balance = stakingToken.balanceOf(msg.sender);
+        require(balance > 0, "Staking: Insufficient balance to add rewards");
+        require(stakingToken.transferFrom(msg.sender, address(this), balance), "Staking: Token transfer failed");
+        emit RewardsDistributed(balance);
+    }
+
+    // Owner can set new staking start and end times
+    function setStakingPeriod(uint256 _startTime, uint256 _endTime) external onlyOwner {
+        require(_startTime < _endTime, "Staking: Start time must be before end time");
+        stakingStartTime = _startTime;
+        stakingEndTime = _endTime;
+    }
+
+    // Owner can change the staking token address
+    function setStakingToken(address _stakingTokenAddress) external onlyOwner {
+        require(_stakingTokenAddress != address(0), "Staking: Invalid staking token address");
+        stakingToken = IERC20(_stakingTokenAddress);
+    }
+}

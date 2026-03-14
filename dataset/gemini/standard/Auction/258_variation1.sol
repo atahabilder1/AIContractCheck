@@ -1,0 +1,86 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DutchAuction {
+    address payable public seller;
+    uint256 public startTime;
+    uint256 public startPrice;
+    uint256 public priceDecrement;
+    uint256 public auctionDuration; // In seconds
+    bool public auctionEnded;
+    address public buyer;
+
+    event AuctionStarted(uint256 startTime, uint256 startPrice, uint256 priceDecrement, uint256 auctionDuration);
+    event AuctionBought(address buyer, uint256 price, uint256 timeBought);
+    event AuctionEnded(uint256 endTime);
+
+    constructor(
+        uint256 _startPrice,
+        uint256 _priceDecrement,
+        uint256 _auctionDuration
+    ) {
+        seller = payable(msg.sender);
+        startPrice = _startPrice;
+        priceDecrement = _priceDecrement;
+        auctionDuration = _auctionDuration;
+        startTime = block.timestamp;
+        auctionEnded = false;
+
+        emit AuctionStarted(startTime, startPrice, priceDecrement, auctionDuration);
+    }
+
+    function getCurrentPrice() public view returns (uint256) {
+        if (auctionEnded) {
+            return 0; // Auction is over, no price
+        }
+
+        uint256 timeElapsed = block.timestamp - startTime;
+        if (timeElapsed >= auctionDuration) {
+            return 0; // Auction duration has passed
+        }
+
+        uint256 priceDrop = timeElapsed * priceDecrement;
+        if (priceDrop >= startPrice) {
+            return 0; // Price has dropped to zero or below
+        }
+
+        return startPrice - priceDrop;
+    }
+
+    function buy() public payable {
+        require(!auctionEnded, "Auction has already ended.");
+        require(block.timestamp < startTime + auctionDuration, "Auction has expired.");
+
+        uint256 currentPrice = getCurrentPrice();
+        require(msg.value >= currentPrice, "Insufficient payment.");
+
+        buyer = msg.sender;
+        auctionEnded = true;
+
+        // Refund any excess payment
+        if (msg.value > currentPrice) {
+            payable(msg.sender).transfer(msg.value - currentPrice);
+        }
+
+        // Transfer funds to seller
+        (bool success, ) = seller.call{value: currentPrice}("");
+        require(success, "Transfer to seller failed.");
+
+        emit AuctionBought(msg.sender, currentPrice, block.timestamp);
+    }
+
+    function endAuction() public {
+        require(msg.sender == seller, "Only the seller can end the auction.");
+        require(!auctionEnded, "Auction has already ended.");
+
+        if (block.timestamp >= startTime + auctionDuration) {
+            auctionEnded = true;
+            emit AuctionEnded(block.timestamp);
+        }
+    }
+
+    // Fallback function to receive Ether, can be used to end auction if duration passes
+    receive() external payable {
+        endAuction();
+    }
+}

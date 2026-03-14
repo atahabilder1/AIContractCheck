@@ -1,0 +1,76 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Crowdfunding {
+    address public owner;
+    uint public goal;
+    uint public deadline;
+    uint public raisedAmount;
+    uint public investorCount;
+    mapping(address => uint) public investors;
+    bool public isFunding;
+    bool public isGoalReached;
+
+    event InvestmentReceived(address investor, uint amount);
+    event GoalReached();
+    event FundingClosed();
+
+    constructor(uint _goal, uint _durationInMinutes) {
+        owner = msg.sender;
+        goal = _goal;
+        deadline = block.timestamp + _durationInMinutes * 1 minutes;
+        isFunding = true;
+    }
+
+    receive() external payable {
+        require(isFunding, "Funding is closed");
+        require(block.timestamp < deadline, "Deadline has passed");
+        require(msg.value > 0, "Amount must be greater than 0");
+
+        investors[msg.sender] += msg.value;
+        raisedAmount += msg.value;
+
+        investorCount++;
+
+        emit InvestmentReceived(msg.sender, msg.value);
+
+        if (raisedAmount >= goal) {
+            isGoalReached = true;
+            emit GoalReached();
+        }
+    }
+
+    function checkGoalReached() public {
+        require(block.timestamp >= deadline, "Deadline has not passed yet");
+        if (raisedAmount >= goal) {
+            isGoalReached = true;
+            emit GoalReached();
+        }
+    }
+
+    function closeFunding() public {
+        require(msg.sender == owner, "Only owner can close funding");
+        require(block.timestamp >= deadline, "Deadline has not passed yet");
+        require(!isGoalReached, "Goal has been reached");
+
+        isFunding = false;
+        emit FundingClosed();
+    }
+
+    function withdraw() public {
+        require(msg.sender == owner, "Only owner can withdraw funds");
+        require(isGoalReached, "Goal has not been reached");
+
+        payable(owner).transfer(raisedAmount);
+    }
+
+    function refund() public {
+        require(block.timestamp >= deadline, "Deadline has not passed yet");
+        require(!isGoalReached, "Goal has been reached");
+        require(investors[msg.sender] > 0, "No investment found");
+
+        uint amount = investors[msg.sender];
+        investors[msg.sender] = 0;
+        payable(msg.sender).transfer(amount);
+    }
+}

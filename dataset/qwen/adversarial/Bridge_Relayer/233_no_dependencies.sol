@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    address public owner;
+    mapping(address => bool) public isRelayer;
+    uint256 public transactionCount;
+
+    event RelayerAdded(address indexed relayer);
+    event RelayerRemoved(address indexed relayer);
+    event TransactionProcessed(uint256 indexed transactionId, address indexed from, address indexed to, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the owner");
+        _;
+    }
+
+    modifier onlyRelayer() {
+        require(isRelayer[msg.sender], "Not a relayer");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function addRelayer(address _relayer) external onlyOwner {
+        require(_relayer != address(0), "Invalid address");
+        require(!isRelayer[_relayer], "Already a relayer");
+        isRelayer[_relayer] = true;
+        emit RelayerAdded(_relayer);
+    }
+
+    function removeRelayer(address _relayer) external onlyOwner {
+        require(isRelayer[_relayer], "Not a relayer");
+        isRelayer[_relayer] = false;
+        emit RelayerRemoved(_relayer);
+    }
+
+    function processTransaction(address _to, uint256 _amount) external onlyRelayer {
+        require(_to != address(0), "Invalid recipient address");
+        require(_amount > 0, "Amount must be greater than zero");
+        require(address(this).balance >= _amount, "Insufficient balance");
+
+        payable(_to).transfer(_amount);
+        transactionCount++;
+        emit TransactionProcessed(transactionCount, msg.sender, _to, _amount);
+    }
+
+    function getBalance() external view returns (uint256) {
+        return address(this).balance;
+    }
+
+    receive() external payable {}
+}
