@@ -50,35 +50,35 @@ Access control contracts have the lowest mean vulnerability rate (0.74), likely 
 \label{sec:appendix_figures}
 %======================================================================
 
-\begin{figure}[t]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\columnwidth]{../visualization/figures/fig10_compilation_rates.pdf}
     \caption{Compilation success rate by LLM. GPT-5 and GPT-4o achieve $>$90\%, while code-specialized models CodeLlama and Codestral compile fewer than half their outputs.}
     \label{fig:compilation}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\columnwidth]{../visualization/figures/fig4_severity_distribution.pdf}
     \caption{Vulnerability severity distribution by LLM. Codestral has the highest proportion of high-severity findings (29.5\%), while CodeLlama has the lowest (8.6\%). Low-severity findings dominate across all models.}
     \label{fig:severity}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\columnwidth]{../visualization/figures/fig9_loc_vs_vulns_scatter.pdf}
     \caption{Contract size (LOC) vs.\ vulnerability count with per-LLM regression lines. Larger contracts contain more vulnerabilities, but the slope varies by model---Claude generates the largest contracts with correspondingly more findings.}
     \label{fig:loc_scatter}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\columnwidth]{../visualization/figures/fig7_tool_agreement.pdf}
     \caption{Pairwise tool agreement scatter plots. Low Spearman correlations across all three tool pairs confirm complementary detection capabilities.}
     \label{fig:tool_agreement}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\columnwidth]{../visualization/figures/fig5_adversarial_triggers.pdf}
     \caption{Vulnerability induction by adversarial trigger category. Misleading context produces the widest spread, but no category significantly outperforms others ($H = 5.04$, $p = 0.656$).}

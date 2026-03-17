@@ -316,6 +316,9 @@ def fig7_tool_agreement(df: pd.DataFrame, output_dir: str = "visualization/figur
         from scipy.stats import spearmanr
         rho, p = spearmanr(df[col1], df[col2])
         ax.set_title(f'{name1} vs {name2}\n(rho={rho:.3f}, p={p:.2e})')
+        # Scatter plots need both-axis grid to read point positions
+        ax.xaxis.grid(True)
+        ax.yaxis.grid(True)
 
     plt.tight_layout()
     _save(fig, output_dir, "fig7_tool_agreement")
@@ -372,6 +375,9 @@ def fig9_loc_vs_vulns_scatter(df: pd.DataFrame, output_dir: str = "visualization
     ax.set_ylabel("Total Vulnerabilities")
     ax.set_title("Contract Size vs Vulnerability Count")
     ax.legend(title="LLM", bbox_to_anchor=(1.02, 1), loc="upper left")
+    # Scatter plots need both-axis grid to read point positions
+    ax.xaxis.grid(True)
+    ax.yaxis.grid(True)
 
     plt.tight_layout()
     _save(fig, output_dir, "fig9_loc_vs_vulns_scatter")
