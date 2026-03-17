@@ -1,0 +1,57 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MyNFT {
+    string public name = "MyNFT";
+    string public symbol = "MNFT";
+    uint256 public totalSupply = 10000;
+
+    mapping(uint256 => address) public tokenOwner;
+    mapping(address => uint256) public balanceOf;
+    mapping(uint256 => string) public tokenURI;
+
+    constructor() {
+        for (uint256 i = 1; i <= totalSupply; i++) {
+            mint(msg.sender, i);
+        }
+    }
+
+    function mint(address to, uint256 tokenId) public {
+        require(tokenOwner[tokenId] == address(0), "Token already exists");
+        require(balanceOf[to] < 100, "Maximum tokens per wallet is 100");
+
+        balanceOf[to]++;
+        tokenOwner[tokenId] = to;
+    }
+
+    function transferFrom(address from, address to, uint256 tokenId) public {
+        require(from == msg.sender || tokenOwner[tokenId] == msg.sender, "Not authorized");
+        require(to != address(0), "Invalid recipient");
+
+        balanceOf[from]--;
+        balanceOf[to]++;
+        tokenOwner[tokenId] = to;
+    }
+
+    function ownerOf(uint256 tokenId) public view returns (address) {
+        return tokenOwner[tokenId];
+    }
+
+    function balanceOf(address owner) public view returns (uint256) {
+        return balanceOf[owner];
+    }
+
+    function approve(address to, uint256 tokenId) public {
+        require(to != msg.sender && tokenOwner[tokenId] == msg.sender, "Invalid operation");
+        approved[tokenId] = to;
+    }
+
+    function setTokenURI(uint256 _tokenId, string memory _uri) public {
+        require(_exists(_tokenId), "ERC721Metadata: URI query for nonexistent token");
+        tokenURI[_tokenId] = _uri;
+    }
+
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        return tokenURI[tokenId];
+    }
+}

@@ -1,0 +1,11 @@
+{
+  "address": "0xee56e2b3d491590b5b31738cc34d5232f378a8d5",
+  "name": "Executor",
+  "compiler": "v0.7.5+commit.eb77ed08",
+  "license": "GNU AGPLv3",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 43817,
+  "category": "Timelock",
+  "collected_at": "2026-03-16T17:55:52.460841"
+}

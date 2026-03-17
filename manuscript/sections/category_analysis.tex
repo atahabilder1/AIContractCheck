@@ -3,52 +3,44 @@
 \label{sec:category}
 %======================================================================
 
-Vulnerability rates vary substantially across contract categories. Table~\ref{tab:categories} presents the per-category analysis for the top 10 categories ranked by mean vulnerability count, and Fig.~\ref{fig:category_radar} visualizes the vulnerability profiles across categories and LLMs.
+Vulnerability rates vary substantially across contract categories (Kruskal-Wallis $H = 466.5$, $p < 10^{-87}$). Table~\ref{tab:categories} presents the per-category analysis for the top 10 categories ranked by mean vulnerability count.
 
 \begin{table}[t]
 \caption{Vulnerability Rates by Contract Category (Top 10, Compiled Only)}
 \label{tab:categories}
 \centering
-\footnotesize
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}lrrc@{}}
 \toprule
 \textbf{Category} & \textbf{Mean Vulns} & \textbf{\% High} & \textbf{Most Common CWE} \\
 \midrule
-DeFi Staking & 7.15 & 40.0\% & CWE-841 \\
-Crowdfunding/ICO & 6.80 & 24.0\% & CWE-829 \\
-Yield Aggregator & 6.51 & 46.2\% & CWE-841 \\
-DEX/AMM & 6.43 & 49.1\% & CWE-841 \\
-Auction & 6.36 & 19.4\% & CWE-829 \\
-Timelock & 6.29 & 21.7\% & CWE-829 \\
-DeFi Lending & 5.61 & 31.2\% & CWE-841 \\
-Governance/DAO & 4.23 & 16.7\% & CWE-829 \\
-ERC721 NFT & 4.00 & 65.4\% & CWE-841 \\
-Proxy/Upgradeable & 3.87 & 60.5\% & CWE-284 \\
+DeFi Staking & 6.77 & 46.2\% & CWE-841 \\
+Timelock & 6.31 & 25.9\% & CWE-829 \\
+Auction & 6.05 & 24.1\% & CWE-829 \\
+Crowdfunding/ICO & 5.51 & 17.6\% & CWE-829 \\
+Yield Aggregator & 4.94 & 35.2\% & CWE-841 \\
+DEX/AMM & 4.73 & 37.8\% & CWE-841 \\
+DeFi Lending & 4.20 & 25.3\% & CWE-841 \\
+Governance/DAO & 3.49 & 11.4\% & CWE-829 \\
+ERC721 NFT & 3.36 & 64.4\% & CWE-841 \\
+Proxy/Upgradeable & 3.30 & 50.0\% & CWE-829 \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
-
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=\columnwidth]{../visualization/figures/fig4_severity_distribution.pdf}
-    \caption{Vulnerability severity distribution by LLM. High-severity vulnerabilities are most prevalent in Claude and GPT-4o contracts.}
-    \label{fig:category_radar}
-\end{figure}
 
 \subsection{DeFi Contracts: Highest Vulnerability Rates}
 
-DeFi staking contracts exhibit the highest mean vulnerability rate (7.15 per contract), followed by crowdfunding/ICO contracts (6.80) and yield aggregators (6.51). These categories involve complex state management, token transfer logic, and reward calculation---areas where LLMs consistently introduce reentrancy and timestamp dependence vulnerabilities.
+DeFi staking contracts exhibit the highest mean vulnerability rate (6.77 per contract), followed by timelock contracts (6.31) and auctions (6.05). These categories involve complex state management, token transfer logic, and reward calculation---areas where LLMs consistently introduce reentrancy and timestamp dependence vulnerabilities. DeFi staking also has the highest high-severity rate among DeFi categories (46.2\%).
 
-DEX/AMM contracts have both high vulnerability rates (6.43) and the highest proportion of high-severity vulnerabilities among DeFi categories (49.1\%), making them the most dangerous category for direct financial loss. LLMs frequently generate AMM contracts with unprotected swap functions and missing slippage checks.
+DEX/AMM contracts have both high vulnerability rates (4.73) and a substantial proportion of high-severity vulnerabilities (37.8\%), making them a particularly dangerous category for direct financial loss. LLMs frequently generate AMM contracts with unprotected swap functions and missing slippage checks.
 
-\subsection{ERC721 and Proxy Contracts: High-Severity Concentration}
+\subsection{ERC721, Flash Loan, and Proxy Contracts: High-Severity Concentration}
 
-While ERC721 NFT contracts have a moderate mean vulnerability count (4.00), they exhibit the highest high-severity rate (65.4\%) among all categories. This is driven by access control vulnerabilities in minting and transfer functions. Similarly, proxy/upgradeable contracts show a 60.5\% high-severity rate, primarily from unprotected initializer functions and missing upgrade authorization checks.
-
-Flash loan contracts (3.46 mean vulns) also concentrate high-severity issues (66.1\%), reflecting the critical nature of callback validation and reentrancy prevention in flash loan architectures~\cite{qin2021attacking}.
+While ERC721 NFT contracts have a moderate mean vulnerability count (3.36), they exhibit the second-highest high-severity rate (64.4\%) among all categories. This is driven by access control vulnerabilities in minting and transfer functions. Flash loan contracts (3.06 mean vulns) show the highest high-severity concentration (69.2\%), reflecting the critical nature of callback validation and reentrancy prevention in flash loan architectures~\cite{qin2021attacking}. Proxy/upgradeable contracts show a 50.0\% high-severity rate, primarily from unprotected initializer functions and missing upgrade authorization checks.
 
 \subsection{Standard Contracts: Lower but Non-Zero Risk}
 
-The relatively lower vulnerability rates in ERC20 tokens (0.47) and ERC1155 multi-tokens (0.77) suggest that LLMs have been trained on sufficient examples of these well-established patterns. However, even these ``simple'' contracts exhibit high-severity vulnerabilities in 3.4\% and 10.4\% of cases respectively, indicating that no contract category should be considered safe by default.
+The relatively lower vulnerability rates in ERC20 tokens (0.41) and ERC1155 multi-tokens (0.65) suggest that LLMs have been trained on sufficient examples of these well-established patterns. However, even these ``simple'' contracts exhibit high-severity vulnerabilities in 3.8\% and 9.1\% of cases respectively, indicating that no contract category should be considered safe by default.
 
-Access control contracts have the lowest mean vulnerability rate (0.96), likely because their focused scope limits the attack surface. Cross-chain messaging contracts are similarly low (1.76) but with a very low high-severity rate (2.8\%), suggesting that LLMs handle message-passing patterns reasonably well when the contracts are simple enough to compile.
+Access control contracts have the lowest mean vulnerability rate (0.74), likely because their focused scope limits the attack surface. Cross-chain messaging contracts are similarly low (1.52) with a very low high-severity rate (3.2\%), suggesting that LLMs handle message-passing patterns reasonably well when the contracts are simple enough to compile.

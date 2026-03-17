@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+interface IFlashLoanProvider {
+    function flashLoan(address token, uint amount) external returns (bool);
+}
+
+contract FlashLoanPool {
+    mapping(address => uint) private _liquidity;
+    IERC20 private _token;
+    address payable[] private _providers;
+
+    constructor(IERC20 token, address payable[] memory providers) {
+        _token = token;
+        _providers = providers;
+    }
+
+    function addLiquidity(uint amount) public {
+        _token.transferFrom(msg.sender, address(this), amount);
+        _liquidity[msg.sender] += amount;
+    }
+
+    function flashLoan(address token, uint amount) external returns (bool) {
+        require(token == address(_token), "Invalid token");
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
+        distributeFees(amount);
+        IERC20(token).transfer(msg.sender, amount);
+        return true;
+    }
+
+    function distributeFees(uint amount) private {
+        for (uint i = 0; i < _providers.length; i++) {
+            uint fee = amount * _liquidity[_providers[i]] / totalLiquidity();
+            _token.transfer(_providers[i], fee);
+        }
+    }
+
+    function totalLiquidity() private view returns (uint) {
+        uint total = 0;
+        for (uint i = 0; i < _providers.length; i++) {
+            total += _liquidity[_providers[i]];
+        }
+        return total;
+    }
+}

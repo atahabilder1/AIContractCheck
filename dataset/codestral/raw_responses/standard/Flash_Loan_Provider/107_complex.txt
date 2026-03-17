@@ -1,0 +1,23 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.13;
+
+import "@aave/protocol-v2/contracts/interfaces/ILendingPoolAddressesProvider.sol";
+import "@aave/protocol-v2/contracts/interfaces/IFlashLoanSimpleReceiver.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract FlashLoanProvider {
+    ILendingPoolAddressesProvider public lendingPoolAddressesProvider;
+
+    constructor(address _lendingPoolAddressesProvider) {
+        lendingPoolAddressesProvider = ILendingPoolAddressesProvider(_lendingPoolAddressesProvider);
+    }
+
+    function executeFlashLoans(IERC20[] memory tokens, uint256[] memory amounts, address receiver, bytes memory data) external payable returns (bool) {
+        require(tokens.length == amounts.length && tokens.length > 1 && receiver != address(0), "Invalid input");
+
+        address lendingPool = lendingPoolAddressesProvider.getLendingPool();
+        IFlashLoanSimpleReceiver(receiver).executeOperation{value: msg.value}(lendingPool, tokens, amounts, data);
+
+        return true;
+    }
+}

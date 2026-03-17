@@ -1,0 +1,11 @@
+{
+  "address": "0x5ef0d09d1e6204141b4d37530808ed19f60fba35",
+  "name": "RollupProxy",
+  "compiler": "v0.8.9+commit.e5eed63a",
+  "license": "",
+  "optimization": "1",
+  "runs": "100",
+  "source_length": 425827,
+  "category": "Cross-Chain_Messaging",
+  "collected_at": "2026-03-16T17:56:47.883987"
+}

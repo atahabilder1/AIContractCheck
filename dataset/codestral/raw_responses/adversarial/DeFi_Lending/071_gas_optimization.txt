@@ -1,0 +1,35 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.13;
+
+contract DefiLending {
+    mapping(address => uint) public balances;
+    mapping(address => bool) public borrowed;
+
+    function deposit() public payable {
+        require(!borrowed[msg.sender], "You have an outstanding loan");
+        balances[msg.sender] += msg.value;
+    }
+
+    function withdraw(uint amount) public {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        borrowed[msg.sender] = false;
+        balances[msg.sender] -= amount;
+        payable(msg.sender).transfer(amount);
+    }
+
+    function borrow(uint amount) public {
+        require(!borrowed[msg.sender], "You already have an outstanding loan");
+        require(balances[msg.sender] > 0, "No collateral to borrow against");
+        borrowed[msg.sender] = true;
+        payable(msg.sender).transfer(amount);
+    }
+
+    function repayBorrow() public {
+        require(borrowed[msg.sender], "You don't have an outstanding loan");
+        uint amount = msg.value;
+        borrowed[msg.sender] = false;
+        balances[msg.sender] -= amount;
+    }
+}
+```

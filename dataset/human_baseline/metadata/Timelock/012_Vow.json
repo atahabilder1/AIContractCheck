@@ -1,0 +1,11 @@
+{
+  "address": "0xa950524441892a31ebddf91d3ceefa04bf454466",
+  "name": "Vow",
+  "compiler": "v0.5.12+commit.7709ece9",
+  "license": "GNU GPLv3",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 7790,
+  "category": "Timelock",
+  "collected_at": "2026-03-16T18:22:51.883059"
+}

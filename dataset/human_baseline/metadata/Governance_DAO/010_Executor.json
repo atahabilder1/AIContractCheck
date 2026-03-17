@@ -1,0 +1,11 @@
+{
+  "address": "0x5300a1a15135ea4dc7ad5a167152c01efc9b192a",
+  "name": "Executor",
+  "compiler": "v0.8.19+commit.7dd6d404",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 16740,
+  "category": "Governance_DAO",
+  "collected_at": "2026-03-16T17:55:37.614097"
+}

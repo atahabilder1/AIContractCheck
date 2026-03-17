@@ -1,0 +1,11 @@
+{
+  "address": "0x5dbcf33d8c2e976c6b560249878e6f1491bca25c",
+  "name": "yVault",
+  "compiler": "v0.5.17+commit.d19bba13",
+  "license": "MIT",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 13771,
+  "category": "Yield_Aggregator",
+  "collected_at": "2026-03-16T17:56:27.719135"
+}

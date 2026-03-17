@@ -1,0 +1,11 @@
+{
+  "address": "0xbe8e3e3618f7474f8cb1d074a26affef007e98fb",
+  "name": "DSPauseProxy",
+  "compiler": "v0.5.12+commit.7709ece9",
+  "license": "GNU GPLv3",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 7621,
+  "category": "Timelock",
+  "collected_at": "2026-03-16T18:22:51.882477"
+}

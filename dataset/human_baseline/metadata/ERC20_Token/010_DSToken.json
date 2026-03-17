@@ -1,0 +1,11 @@
+{
+  "address": "0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2",
+  "name": "DSToken",
+  "compiler": "v0.4.18+commit.9cf6e910",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 15513,
+  "category": "ERC20_Token",
+  "collected_at": "2026-03-16T17:54:41.456318"
+}

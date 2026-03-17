@@ -1,0 +1,44 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.16;
+
+contract DefiStaking {
+    address public stakingToken;
+    mapping(address => uint) public stakedAmounts;
+    uint public totalStaked;
+    uint public rewardRate;
+    mapping(address => uint) public rewards;
+    uint public lastUpdateTime;
+
+    constructor(address _stakingToken, uint _rewardRate) {
+        stakingToken = _stakingToken;
+        rewardRate = _rewardRate;
+        lastUpdateTime = block.timestamp;
+    }
+
+    function stake(uint amount) public {
+        require(amount > 0, "Amount must be greater than zero.");
+        IERC20(stakingToken).transferFrom(msg.sender, address(this), amount);
+        stakedAmounts[msg.sender] += amount;
+        totalStaked += amount;
+    }
+
+    function withdraw(uint amount) public {
+        require(amount > 0, "Amount must be greater than zero.");
+        require(stakedAmounts[msg.sender] >= amount, "Insufficient staked amount.");
+        IERC20(stakingToken).transfer(msg.sender, amount);
+        stakedAmounts[msg.sender] -= amount;
+        totalStaked -= amount;
+    }
+
+    function claimRewards() public {
+        uint currentTime = block.timestamp;
+        uint timeElapsed = currentTime - lastUpdateTime;
+        rewards[msg.sender] += (stakedAmounts[msg.sender] * rewardRate * timeElapsed) / (365 days * 24 hours);
+        lastUpdateTime = currentTime;
+    }
+}
+
+interface IERC20 {
+    function transferFrom(address _from, address _to, uint256 _value) external returns (bool success);
+    function transfer(address _to, uint256 _value) external returns (bool success);
+}

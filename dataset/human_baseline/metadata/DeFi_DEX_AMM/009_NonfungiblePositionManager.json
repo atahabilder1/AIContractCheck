@@ -1,0 +1,11 @@
+{
+  "address": "0xc36442b4a4522e871399cd717abdd847ab11fe88",
+  "name": "NonfungiblePositionManager",
+  "compiler": "v0.7.6+commit.7338295f",
+  "license": "",
+  "optimization": "1",
+  "runs": "2000",
+  "source_length": 179322,
+  "category": "DeFi_DEX_AMM",
+  "collected_at": "2026-03-16T18:22:36.549292"
+}

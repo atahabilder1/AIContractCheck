@@ -1,0 +1,26 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.13;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract FeeOnTransferToken is ERC20 {
+    using SafeMath for uint256;
+
+    address public treasuryAddress;
+    uint256 private constant feePercentage = 2; // 2% fee on transfer
+
+    constructor(address _treasury, string memory name_, string memory symbol_) ERC20(name_, symbol_) {
+        treasuryAddress = _treasury;
+    }
+
+    function _transfer(address sender, address recipient, uint256 amount) internal override {
+        super._transfer(sender, recipient, amount);
+
+        // Calculate fee
+        uint256 feeAmount = (amount * feePercentage) / 100;
+
+        // Send fee to treasury
+        _transfer(sender, treasuryAddress, feeAmount);
+    }
+}

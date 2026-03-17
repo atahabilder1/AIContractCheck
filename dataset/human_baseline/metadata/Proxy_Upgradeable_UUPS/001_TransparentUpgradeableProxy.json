@@ -1,0 +1,11 @@
+{
+  "address": "0xe140bb5f424a53e0687bfc10f6845a5672d7e242",
+  "name": "TransparentUpgradeableProxy",
+  "compiler": "v0.8.11+commit.d7f03943",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "565",
+  "source_length": 28625,
+  "category": "Proxy_Upgradeable_UUPS",
+  "collected_at": "2026-03-16T17:55:58.690938"
+}

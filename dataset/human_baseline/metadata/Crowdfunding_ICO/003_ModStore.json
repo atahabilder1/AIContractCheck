@@ -1,0 +1,11 @@
+{
+  "address": "0xb9e4b658298c7a36bdf4c2832042a5d6700c3ab8",
+  "name": "ModStore",
+  "compiler": "v0.8.6+commit.11564f7e",
+  "license": "",
+  "optimization": "1",
+  "runs": "10000",
+  "source_length": 27574,
+  "category": "Crowdfunding_ICO",
+  "collected_at": "2026-03-16T17:56:12.563842"
+}

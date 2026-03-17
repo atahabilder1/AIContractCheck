@@ -1,0 +1,30 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts@4.7.3/token/ERC20/IERC20.sol";
+
+interface IFlashLoanReceiver {
+    function executeOperation(address token, uint amount) external returns (bool);
+}
+
+contract FlashLoanProvider {
+    address private tokenAddress;
+    IERC20 private token;
+
+    constructor(address _tokenAddress) {
+        token = IERC20(_tokenAddress);
+        tokenAddress = _tokenAddress;
+    }
+
+    function flashLoan(address receiver, uint amount) external returns (bool) {
+        require(amount > 0, "Amount should be greater than zero");
+
+        uint balanceBefore = token.balanceOf(address(this));
+        token.transferFrom(msg.sender, address(this), amount);
+
+        IFlashLoanReceiver(receiver).executeOperation{value: amount}(tokenAddress, amount);
+
+        require(token.balanceOf(address(this)) >= balanceBefore + amount, "Insufficient funds returned");
+        token.transfer(msg.sender, token.balanceOf(address(this)) - balanceBefore);
+    }
+}

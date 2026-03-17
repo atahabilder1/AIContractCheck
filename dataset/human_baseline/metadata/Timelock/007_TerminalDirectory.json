@@ -1,0 +1,11 @@
+{
+  "address": "0x46c9999a2edcd5aa177ed7e8af90c68b7d75ba46",
+  "name": "TerminalDirectory",
+  "compiler": "v0.8.6+commit.11564f7e",
+  "license": "",
+  "optimization": "1",
+  "runs": "10000",
+  "source_length": 23970,
+  "category": "Timelock",
+  "collected_at": "2026-03-16T17:55:52.461878"
+}

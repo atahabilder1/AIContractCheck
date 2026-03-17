@@ -1,0 +1,11 @@
+{
+  "address": "0x5870700f1272a1adbb87c3140bd770880a95e55d",
+  "name": "AnyswapV6ERC20",
+  "compiler": "v0.8.14+commit.80d49f37",
+  "license": "None",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 14735,
+  "category": "Crowdfunding_ICO",
+  "collected_at": "2026-03-16T17:56:12.567805"
+}

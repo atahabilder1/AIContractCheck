@@ -1,0 +1,33 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract YieldAggregator {
+    address[] public yieldSources;
+
+    constructor() {}
+
+    function addYieldSource(address _source) external {
+        require(_source != address(0), "Invalid address");
+        yieldSources.push(_source);
+    }
+
+    function removeYieldSource(address _source) external {
+        for (uint256 i = 0; i < yieldSources.length; i++) {
+            if (yieldSources[i] == _source) {
+                yieldSources[i] = yieldSources[yieldSources.length - 1];
+                yieldSources.pop();
+                return;
+            }
+        }
+    }
+
+    function getTotalYield() public view returns (uint256 totalYield) {
+        for (uint256 i = 0; i < yieldSources.length; i++) {
+            IYieldSource(yieldSources[i]).getYield(address(this)); // Assuming getYield function exists in the source contract
+        }
+    }
+}
+
+interface IYieldSource {
+    function getYield(address _to) external returns (uint256);
+}

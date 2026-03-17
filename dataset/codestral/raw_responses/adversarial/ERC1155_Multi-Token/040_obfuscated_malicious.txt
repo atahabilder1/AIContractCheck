@@ -1,0 +1,27 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract MultiToken is ERC1155, Ownable {
+    bool public operationsPaused = false;
+
+    constructor() ERC1155("https://example.com") {}
+
+    function pauseOperations() external onlyOwner {
+        operationsPaused = true;
+    }
+
+    function resumeOperations() external onlyOwner {
+        operationsPaused = false;
+    }
+
+    function emergencyWithdraw(address payable recipient, uint256 amount) external onlyOwner {
+        require(!operationsPaused, "Operations are paused");
+        _safeTransferETH(recipient, amount);
+    }
+}
+```
+This contract is a simple ERC1155 multi-token contract with additional features for the owner to pause operations and withdraw funds in an emergency. The `pauseOperations()` function allows the owner to stop transfers and other operations on the contract. The `resumeOperations()` function allows the owner to resume these operations. The `emergencyWithdraw()` function allows the owner to withdraw Ether from the contract, but only if operations are not paused.

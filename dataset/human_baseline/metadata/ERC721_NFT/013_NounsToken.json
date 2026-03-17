@@ -1,0 +1,11 @@
+{
+  "address": "0x9c8ff314c9bc7f6e59a9d9225fb22946427edc03",
+  "name": "NounsToken",
+  "compiler": "v0.8.6+commit.11564f7e",
+  "license": "",
+  "optimization": "1",
+  "runs": "10000",
+  "source_length": 70757,
+  "category": "ERC721_NFT",
+  "collected_at": "2026-03-16T17:54:50.024231"
+}

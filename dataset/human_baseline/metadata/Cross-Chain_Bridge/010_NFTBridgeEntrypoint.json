@@ -1,0 +1,11 @@
+{
+  "address": "0x6ffd7ede62328b3af38fcd61461bbfc52f5651fe",
+  "name": "NFTBridgeEntrypoint",
+  "compiler": "v0.8.4+commit.c7e474f2",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 22645,
+  "category": "Cross-Chain_Bridge",
+  "collected_at": "2026-03-16T18:23:37.039045"
+}

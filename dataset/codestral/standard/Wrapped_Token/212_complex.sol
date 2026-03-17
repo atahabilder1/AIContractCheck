@@ -1,0 +1,45 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract BridgeAsset is Ownable {
+    using SafeMath for uint256;
+
+    IERC20 private _canonicalToken;
+    mapping(address => uint256) public bridgedBalances;
+
+    constructor(IERC20 canonicalToken_) {
+        _canonicalToken = canonicalToken_;
+    }
+
+    function depositCanonical(uint256 amount) external {
+        require(_canonicalToken.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        bridgedBalances[msg.sender] = bridgedBalances[msg.sender].add(amount);
+    }
+
+    function withdrawCanonical(uint256 amount) external {
+        require(bridgedBalances[msg.sender] >= amount, "Insufficient balance");
+        _canonicalToken.transfer(msg.sender, amount);
+        bridgedBalances[msg.sender] = bridgedBalances[msg.sender].sub(amount);
+    }
+
+    function bridgeToChain(address chainAddress, uint256 amount) external onlyOwner {
+        require(bridgedBalances[msg.sender] >= amount, "Insufficient balance");
+        // Implementation of the bridging process to the specified chain address
+        bridgedBalances[msg.sender] = bridgedBalances[msg.sender].sub(amount);
+    }
+
+    function mintBridgedToken(address recipient, uint256 amount) external onlyOwner {
+        // Implementation of minting the bridged token representation on this chain
+        bridgedBalances[recipient] = bridgedBalances[recipient].add(amount);
+    }
+
+    function burnBridgedToken(uint256 amount) external {
+        require(bridgedBalances[msg.sender] >= amount, "Insufficient balance");
+        // Implementation of burning the bridged token representation on this chain
+        bridgedBalances[msg.sender] = bridgedBalances[msg.sender].sub(amount);
+    }
+}

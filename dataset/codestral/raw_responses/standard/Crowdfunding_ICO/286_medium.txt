@@ -1,0 +1,67 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract CrowdfundingPlatform is Ownable {
+    IERC20 private token;
+
+    struct Campaign {
+        uint256 goal;
+        uint256 deadline;
+        mapping(address => uint256) contributions;
+        uint256 stretchGoal;
+        bool reachedStretchGoal;
+    }
+
+    mapping(uint256 => Campaign) campaigns;
+    uint256 public campaignCount;
+
+    constructor(IERC20 _token) {
+        token = _token;
+    }
+
+    function createCampaign(uint256 _goal, uint256 _deadline, uint256 _stretchGoal) external onlyOwner {
+        campaignCount++;
+        campaigns[campaignCount] = Campaign(_goal, _deadline, mapping(address => uint256)(), _stretchGoal, false);
+    }
+
+    function contributeToCampaign(uint256 _campaignId, uint256 _amount) external {
+        require(_campaignId <= campaignCount, "Invalid campaign ID");
+        Campaign storage campaign = campaigns[_campaignId];
+        require(block.timestamp < campaign.deadline, "Funding deadline has passed");
+
+        token.transferFrom(msg.sender, address(this), _amount);
+        campaign.contributions[msg.sender] += _amount;
+
+        if (getTotalContributed(_campaignId) >= campaign.stretchGoal && !campaign.reachedStretchGoal) {
+            campaign.reachedStretchGoal = true;
+            // Add stretch goal rewards logic here
+        }
+    }
+
+    function getTotalContributed(uint256 _campaignId) public view returns (uint256) {
+        Campaign memory campaign = campaigns[_campaignId];
+        uint256 total = 0;
+        for (address contributor in campaign.contributions) {
+            total += campaign.contributions[contributor];
+        }
+        return total;
+    }
+
+    function claimTokens(uint256 _campaignId) external {
+        Campaign storage campaign = campaigns[_campaignId];
+        require(block.timestamp > campaign.deadline, "Funding period is still active");
+        uint256 contributedAmount = campaign.contributions[msg.sender];
+        require(contributedAmount > 0, "No contribution found for this address");
+
+        // Distribute tokens based on the contribution percentage and stretch goal rewards
+    }
+}
+```
+
+This basic smart contract provides a foundation for a crowdfunding platform with multiple campaigns. Each campaign has a funding deadline, stretch goals, and automatic token distribution upon completion of the funding period. Contributors can contribute to campaigns within their funding periods, and tokens are distributed based on their contribution percentage and any rewards they have earned from reaching stretch goals.
+
+Please note that this code is a simplified version and may need additional logic or considerations for a production-grade smart contract, such as handling of refunds in case of failed campaigns, gas optimization, and security measures against potential attacks.

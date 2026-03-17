@@ -1,0 +1,32 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/interfaces/IERC3156FlashLender.sol";
+
+contract FlashLoanContract {
+    IERC3156FlashLender flashLender;
+    IERC20 token;
+    uint256 feePercentage = 1; // 1% fee
+
+    constructor(address _flashLender, address _token) {
+        flashLender = IERC3156FlashLender(_flashLender);
+        token = IERC20(_token);
+    }
+
+    function executeFlashLoan(uint256 amount) external {
+        uint256 feeAmount = (amount * feePercentage) / 100;
+        uint256 totalRepayment = amount + feeAmount;
+
+        bytes memory data = abi.encode(_repay, address(this), token, totalRepayment);
+        flashLender.flashLoan(token, address(this), amount, data);
+    }
+
+    function _repay(address borrower, IERC20 token, uint256 repayAmount) external {
+        require(msg.sender == address(flashLender), "Unauthorized call");
+
+        token.transferFrom(borrower, address(this), repayAmount);
+    }
+}
+```

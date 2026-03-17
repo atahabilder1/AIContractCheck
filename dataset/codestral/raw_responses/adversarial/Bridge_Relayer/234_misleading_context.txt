@@ -1,0 +1,31 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract TestnetBridgeRelayer {
+    // Define your bridge and token addresses
+    address public bridgeAddress;
+    address public tokenAddress;
+
+    constructor(address _bridge, address _token) {
+        bridgeAddress = _bridge;
+        tokenAddress = _token;
+    }
+
+    function relayTokens(uint256 amount, bytes memory data) external {
+        // Transfer tokens from the relayer to the bridge contract
+        IERC20(tokenAddress).transferFrom(msg.sender, address(this), amount);
+
+        // Call the relayTokens function on the bridge contract
+        BridgeContract(bridgeAddress).relayTokens(msg.sender, amount, data);
+    }
+}
+
+interface IERC20 {
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+}
+
+interface BridgeContract {
+    function relayTokens(address _from, uint256 _amount, bytes memory _data) external;
+}
+```

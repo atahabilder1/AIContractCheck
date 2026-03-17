@@ -1,0 +1,11 @@
+{
+  "address": "0xda2c338350a0e59ce71cdced9679a3a590dd9bec",
+  "name": "Stake_FXS_WETH",
+  "compiler": "v0.6.11+commit.5ef660b1",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "100000",
+  "source_length": 321376,
+  "category": "Timelock",
+  "collected_at": "2026-03-16T17:55:52.461741"
+}

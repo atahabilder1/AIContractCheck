@@ -1,0 +1,61 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract MultiSigGovernance is Ownable {
+    using SafeMath for uint256;
+
+    IERC20 public token;
+    address[] public council;
+    mapping(address => bool) public delegates;
+    mapping(uint256 => bool) public proposals;
+    mapping(uint256 => uint256) public voteCount;
+    uint256 public totalSupply;
+    uint256 public quorum;
+    uint256 public proposalThreshold;
+    uint256 private nextProposalId;
+
+    constructor(address _token, address[] memory _council, uint256 _quorum, uint256 _proposalThreshold) {
+        token = IERC20(_token);
+        council = _council;
+        quorum = _quorum;
+        proposalThreshold = _proposalThreshold;
+        totalSupply = token.totalSupply();
+
+        for (uint256 i = 0; i < _council.length; i++) {
+            delegates[_council[i]] = true;
+        }
+    }
+
+    function createProposal(string memory _description) public returns (uint256) {
+        uint256 proposalId = nextProposalId++;
+        proposals[proposalId] = false;
+        voteCount[proposalId] = 0;
+        return proposalId;
+    }
+
+    function vote(uint256 _proposalId, bool _support) public {
+        require(_proposalId < nextProposalId, "Invalid proposal ID");
+        require(!proposals[_proposalId], "Proposal already executed or cancelled");
+
+        uint256 balance = token.balanceOf(msg.sender);
+        require(balance > 0, "Insufficient voting power");
+
+        voteCount[_proposalId] += _support ? balance : totalSupply - balance;
+    }
+
+    function executeProposal(uint256 _proposalId) public {
+        require(_proposalId < nextProposalId, "Invalid proposal ID");
+        require(!proposals[_proposalId], "Proposal already executed or cancelled");
+        require(voteCount[_proposalId] >= totalSupply.mul(quorum).div(100), "Quorum not reached");
+        require(voteCount[_proposalId] > totalSupply.mul(proposalThreshold).div(100), "Proposal threshold not met");
+        require(delegates[msg.sender], "Only council members can execute proposals");
+
+        // Execute the proposal here
+
+        proposals[_proposalId] = true;
+    }
+}

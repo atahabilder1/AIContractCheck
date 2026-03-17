@@ -1,0 +1,11 @@
+{
+  "address": "0x5e8422345238f34275888049021821e8e08caa1f",
+  "name": "frxETH",
+  "compiler": "v0.8.16+commit.07a7930e",
+  "license": "GNU GPLv2",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 59965,
+  "category": "Wrapped_Token",
+  "collected_at": "2026-03-16T18:23:33.837873"
+}

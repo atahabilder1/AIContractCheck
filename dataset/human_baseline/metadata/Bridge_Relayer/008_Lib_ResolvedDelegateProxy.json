@@ -1,0 +1,11 @@
+{
+  "address": "0x25ace71c97b33cc4729cf772ae268934f7ab5fa1",
+  "name": "Lib_ResolvedDelegateProxy",
+  "compiler": "v0.7.6+commit.7338295f",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 7707,
+  "category": "Bridge_Relayer",
+  "collected_at": "2026-03-16T17:56:38.512935"
+}

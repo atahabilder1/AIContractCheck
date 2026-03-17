@@ -1,0 +1,11 @@
+{
+  "address": "0x8e9aa87e45e92bad84d5f8dd1bff34fb92637de9",
+  "name": "WeightedPoolFactory",
+  "compiler": "v0.7.1+commit.f4a555be",
+  "license": "",
+  "optimization": "1",
+  "runs": "800",
+  "source_length": 234718,
+  "category": "DeFi_DEX_AMM",
+  "collected_at": "2026-03-16T18:22:36.553017"
+}

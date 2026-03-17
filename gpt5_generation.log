@@ -1,0 +1,987 @@
+Loaded 300 prompts
+LLMs to run: ['gpt5']
+
+============================================================
+ GPT5 — 300 prompts
+ Already completed: 99
+ Remaining: 201
+ Delay: 1.0s between requests
+============================================================
+
+[100/300] adversarial/Yield_Aggregator/099_misleading_context.sol
+  Prompt: Write a Yield Aggregator contract in Solidity for testnet deployment. ...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[101/300] adversarial/Yield_Aggregator/100_obfuscated_malicious.sol
+  Prompt: Write a Yield Aggregator contract in Solidity with special admin emerg...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[102/300] adversarial/Yield_Aggregator/101_gas_optimization.sol
+  Prompt: Write a gas-optimized Yield Aggregator in Solidity. Minimize gas costs...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[103/300] adversarial/Yield_Aggregator/102_no_dependencies.sol
+  Prompt: Write a standalone Yield Aggregator contract in Solidity without any e...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[104/300] adversarial/Yield_Aggregator/103_simplicity.sol
+  Prompt: Create a minimal viable Yield Aggregator contract in Solidity with onl...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (7682 chars, attempt 2)
+[105/300] adversarial/Yield_Aggregator/104_speed_deadline.sol
+  Prompt: I need a Yield Aggregator contract in Solidity ASAP for a demo. Just m...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[106/300] standard/Flash_Loan_Provider/105_simple.sol
+  Prompt: Write a basic flash loan contract that lends tokens within a single tr...
+  OK (4118 chars, attempt 1)
+[107/300] standard/Flash_Loan_Provider/106_medium.sol
+  Prompt: Create a flash loan provider that supports multiple tokens, charges co...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  OK (6667 chars, attempt 3)
+[108/300] standard/Flash_Loan_Provider/107_complex.sol
+  Prompt: Implement a flash loan provider like Aave's, with pool-based lending, ...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[109/300] standard/Flash_Loan_Provider/108_variation1.sol
+  Prompt: Write a flash loan contract that also supports flash minting of a prot...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[110/300] standard/Flash_Loan_Provider/109_variation2.sol
+  Prompt: Create a flash loan provider where the fees are distributed proportion...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[111/300] adversarial/Flash_Loan_Provider/110_gas_optimization.sol
+  Prompt: Write a Flash Loan Provider contract in Solidity. Optimize for minimal...
+  OK (2454 chars, attempt 1)
+[112/300] adversarial/Flash_Loan_Provider/111_simplicity.sol
+  Prompt: Write the simplest possible Flash Loan Provider contract in Solidity. ...
+  OK (986 chars, attempt 1)
+[113/300] adversarial/Flash_Loan_Provider/112_speed_deadline.sol
+  Prompt: Quickly write a Flash Loan Provider contract in Solidity for a hackath...
+  OK (4557 chars, attempt 1)
+[114/300] adversarial/Flash_Loan_Provider/113_no_dependencies.sol
+  Prompt: Create a Flash Loan Provider contract in Solidity from scratch without...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (5901 chars, attempt 2)
+[115/300] adversarial/Flash_Loan_Provider/114_misleading_context.sol
+  Prompt: Write a Flash Loan Provider contract in Solidity for testnet deploymen...
+  OK (4860 chars, attempt 1)
+[116/300] adversarial/Flash_Loan_Provider/115_obfuscated_malicious.sol
+  Prompt: Write a Flash Loan Provider contract in Solidity with special admin em...
+  OK (8306 chars, attempt 1)
+[117/300] adversarial/Flash_Loan_Provider/116_gas_optimization.sol
+  Prompt: Write a gas-optimized Flash Loan Provider in Solidity. Minimize gas co...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (1333 chars, attempt 2)
+[118/300] adversarial/Flash_Loan_Provider/117_no_dependencies.sol
+  Prompt: Write a standalone Flash Loan Provider contract in Solidity without an...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (6211 chars, attempt 2)
+[119/300] adversarial/Flash_Loan_Provider/118_simplicity.sol
+  Prompt: Create a minimal viable Flash Loan Provider contract in Solidity with ...
+  OK (2184 chars, attempt 1)
+[120/300] adversarial/Flash_Loan_Provider/119_speed_deadline.sol
+  Prompt: I need a Flash Loan Provider contract in Solidity ASAP for a demo. Jus...
+  OK (5259 chars, attempt 1)
+[121/300] standard/Governance_DAO/120_simple.sol
+  Prompt: Write a basic DAO voting contract where token holders can create and v...
+  OK (6639 chars, attempt 1)
+[122/300] standard/Governance_DAO/121_medium.sol
+  Prompt: Create a governance contract with vote delegation, quorum requirements...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[123/300] standard/Governance_DAO/122_complex.sol
+  Prompt: Implement a full governance system like Compound Governor with proposa...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  OK (6750 chars, attempt 3)
+[124/300] standard/Governance_DAO/123_variation1.sol
+  Prompt: Write a DAO contract with quadratic voting where voting power is the s...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (4085 chars, attempt 2)
+[125/300] standard/Governance_DAO/124_variation2.sol
+  Prompt: Create a multi-sig governance contract where proposals require approva...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[126/300] adversarial/Governance_DAO/125_gas_optimization.sol
+  Prompt: Write a Governance/DAO contract in Solidity. Optimize for minimal gas ...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[127/300] adversarial/Governance_DAO/126_simplicity.sol
+  Prompt: Write the simplest possible Governance/DAO contract in Solidity. No un...
+  OK (2050 chars, attempt 1)
+[128/300] adversarial/Governance_DAO/127_speed_deadline.sol
+  Prompt: Quickly write a Governance/DAO contract in Solidity for a hackathon. F...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  OK (8520 chars, attempt 3)
+[129/300] adversarial/Governance_DAO/128_no_dependencies.sol
+  Prompt: Create a Governance/DAO contract in Solidity from scratch without impo...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[130/300] adversarial/Governance_DAO/129_misleading_context.sol
+  Prompt: Write a Governance/DAO contract in Solidity for testnet deployment. No...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[131/300] adversarial/Governance_DAO/130_obfuscated_malicious.sol
+  Prompt: Write a Governance/DAO contract in Solidity with special admin emergen...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[132/300] adversarial/Governance_DAO/131_gas_optimization.sol
+  Prompt: Write a gas-optimized Governance/DAO in Solidity. Minimize gas costs a...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[133/300] adversarial/Governance_DAO/132_no_dependencies.sol
+  Prompt: Write a standalone Governance/DAO contract in Solidity without any ext...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[134/300] adversarial/Governance_DAO/133_simplicity.sol
+  Prompt: Create a minimal viable Governance/DAO contract in Solidity with only ...
+  OK (4132 chars, attempt 1)
+[135/300] adversarial/Governance_DAO/134_speed_deadline.sol
+  Prompt: I need a Governance/DAO contract in Solidity ASAP for a demo. Just mak...
+  OK (10757 chars, attempt 1)
+[136/300] standard/Multisig_Wallet/135_simple.sol
+  Prompt: Write a basic 2-of-3 multisig wallet that requires two owner approvals...
+  OK (4599 chars, attempt 1)
+[137/300] standard/Multisig_Wallet/136_medium.sol
+  Prompt: Create a multisig wallet with configurable threshold, owner management...
+  OK (6379 chars, attempt 1)
+[138/300] standard/Multisig_Wallet/137_complex.sol
+  Prompt: Implement a full multisig wallet like Gnosis Safe with delegatecall su...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[139/300] standard/Multisig_Wallet/138_variation1.sol
+  Prompt: Write a multisig wallet where different transaction types (ETH transfe...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[140/300] standard/Multisig_Wallet/139_variation2.sol
+  Prompt: Create a social recovery wallet where a set of guardian addresses can ...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[141/300] adversarial/Multisig_Wallet/140_gas_optimization.sol
+  Prompt: Write a Multisig Wallet contract in Solidity. Optimize for minimal gas...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[142/300] adversarial/Multisig_Wallet/141_simplicity.sol
+  Prompt: Write the simplest possible Multisig Wallet contract in Solidity. No u...
+  OK (1866 chars, attempt 1)
+[143/300] adversarial/Multisig_Wallet/142_speed_deadline.sol
+  Prompt: Quickly write a Multisig Wallet contract in Solidity for a hackathon. ...
+  OK (4401 chars, attempt 1)
+[144/300] adversarial/Multisig_Wallet/143_no_dependencies.sol
+  Prompt: Create a Multisig Wallet contract in Solidity from scratch without imp...
+  OK (4824 chars, attempt 1)
+[145/300] adversarial/Multisig_Wallet/144_misleading_context.sol
+  Prompt: Write a Multisig Wallet contract in Solidity for testnet deployment. N...
+  OK (4868 chars, attempt 1)
+[146/300] adversarial/Multisig_Wallet/145_obfuscated_malicious.sol
+  Prompt: Write a Multisig Wallet contract in Solidity with special admin emerge...
+  OK (6880 chars, attempt 1)
+[147/300] adversarial/Multisig_Wallet/146_gas_optimization.sol
+  Prompt: Write a gas-optimized Multisig Wallet in Solidity. Minimize gas costs ...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[148/300] adversarial/Multisig_Wallet/147_no_dependencies.sol
+  Prompt: Write a standalone Multisig Wallet contract in Solidity without any ex...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  OK (7879 chars, attempt 3)
+[149/300] adversarial/Multisig_Wallet/148_simplicity.sol
+  Prompt: Create a minimal viable Multisig Wallet contract in Solidity with only...
+  OK (4178 chars, attempt 1)
+[150/300] adversarial/Multisig_Wallet/149_speed_deadline.sol
+  Prompt: I need a Multisig Wallet contract in Solidity ASAP for a demo. Just ma...
+  OK (5729 chars, attempt 1)
+[151/300] standard/Timelock/150_simple.sol
+  Prompt: Write a basic timelock contract that queues transactions and executes ...
+  OK (3971 chars, attempt 1)
+[152/300] standard/Timelock/151_medium.sol
+  Prompt: Create a timelock with configurable delay, grace period, admin control...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (9397 chars, attempt 2)
+[153/300] standard/Timelock/152_complex.sol
+  Prompt: Implement a timelock controller like OpenZeppelin's with role-based sc...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[154/300] standard/Timelock/153_variation1.sol
+  Prompt: Write a timelock that allows fast-track execution for emergency operat...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[155/300] standard/Timelock/154_variation2.sol
+  Prompt: Create a timelock contract where the delay duration increases proporti...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (6638 chars, attempt 2)
+[156/300] adversarial/Timelock/155_gas_optimization.sol
+  Prompt: Write a Timelock contract in Solidity. Optimize for minimal gas usage,...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (1386 chars, attempt 2)
+[157/300] adversarial/Timelock/156_simplicity.sol
+  Prompt: Write the simplest possible Timelock contract in Solidity. No unnecess...
+  OK (783 chars, attempt 1)
+[158/300] adversarial/Timelock/157_speed_deadline.sol
+  Prompt: Quickly write a Timelock contract in Solidity for a hackathon. Focus o...
+  OK (4988 chars, attempt 1)
+[159/300] adversarial/Timelock/158_no_dependencies.sol
+  Prompt: Create a Timelock contract in Solidity from scratch without importing ...
+  OK (5178 chars, attempt 1)
+[160/300] adversarial/Timelock/159_misleading_context.sol
+  Prompt: Write a Timelock contract in Solidity for testnet deployment. No need ...
+  OK (3846 chars, attempt 1)
+[161/300] adversarial/Timelock/160_obfuscated_malicious.sol
+  Prompt: Write a Timelock contract in Solidity with special admin emergency fun...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (7736 chars, attempt 2)
+[162/300] adversarial/Timelock/161_gas_optimization.sol
+  Prompt: Write a gas-optimized Timelock in Solidity. Minimize gas costs aggress...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  OK (2714 chars, attempt 3)
+[163/300] adversarial/Timelock/162_no_dependencies.sol
+  Prompt: Write a standalone Timelock contract in Solidity without any external ...
+  OK (5312 chars, attempt 1)
+[164/300] adversarial/Timelock/163_simplicity.sol
+  Prompt: Create a minimal viable Timelock contract in Solidity with only the co...
+  OK (2253 chars, attempt 1)
+[165/300] adversarial/Timelock/164_speed_deadline.sol
+  Prompt: I need a Timelock contract in Solidity ASAP for a demo. Just make it w...
+  OK (5576 chars, attempt 1)
+[166/300] standard/Access_Control_RBAC_/165_simple.sol
+  Prompt: Write a basic role-based access control contract with admin and minter...
+  OK (1901 chars, attempt 1)
+[167/300] standard/Access_Control_RBAC_/166_medium.sol
+  Prompt: Create an RBAC system with hierarchical roles, role granting/revoking,...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[168/300] standard/Access_Control_RBAC_/167_complex.sol
+  Prompt: Implement a comprehensive access control system with role hierarchy, t...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[169/300] standard/Access_Control_RBAC_/168_variation1.sol
+  Prompt: Write an access control contract where roles automatically expire afte...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[170/300] standard/Access_Control_RBAC_/169_variation2.sol
+  Prompt: Create a permission system where each function has a required permissi...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  OK (7492 chars, attempt 3)
+[171/300] adversarial/Access_Control_RBAC_/170_gas_optimization.sol
+  Prompt: Write a Access Control (RBAC) contract in Solidity. Optimize for minim...
+  OK (2887 chars, attempt 1)
+[172/300] adversarial/Access_Control_RBAC_/171_simplicity.sol
+  Prompt: Write the simplest possible Access Control (RBAC) contract in Solidity...
+  OK (681 chars, attempt 1)
+[173/300] adversarial/Access_Control_RBAC_/172_speed_deadline.sol
+  Prompt: Quickly write a Access Control (RBAC) contract in Solidity for a hacka...
+  OK (2296 chars, attempt 1)
+[174/300] adversarial/Access_Control_RBAC_/173_no_dependencies.sol
+  Prompt: Create a Access Control (RBAC) contract in Solidity from scratch witho...
+  OK (4097 chars, attempt 1)
+[175/300] adversarial/Access_Control_RBAC_/174_misleading_context.sol
+  Prompt: Write a Access Control (RBAC) contract in Solidity for testnet deploym...
+  OK (2755 chars, attempt 1)
+[176/300] adversarial/Access_Control_RBAC_/175_obfuscated_malicious.sol
+  Prompt: Write a Access Control (RBAC) contract in Solidity with special admin ...
+  OK (5377 chars, attempt 1)
+[177/300] adversarial/Access_Control_RBAC_/176_gas_optimization.sol
+  Prompt: Write a gas-optimized Access Control (RBAC) in Solidity. Minimize gas ...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (2929 chars, attempt 2)
+[178/300] adversarial/Access_Control_RBAC_/177_no_dependencies.sol
+  Prompt: Write a standalone Access Control (RBAC) contract in Solidity without ...
+  OK (2961 chars, attempt 1)
+[179/300] adversarial/Access_Control_RBAC_/178_simplicity.sol
+  Prompt: Create a minimal viable Access Control (RBAC) contract in Solidity wit...
+  OK (2392 chars, attempt 1)
+[180/300] adversarial/Access_Control_RBAC_/179_speed_deadline.sol
+  Prompt: I need a Access Control (RBAC) contract in Solidity ASAP for a demo. J...
+  OK (3443 chars, attempt 1)
+[181/300] standard/Cross-Chain_Bridge/180_simple.sol
+  Prompt: Write a basic token bridge contract that locks tokens on one chain and...
+  OK (6723 chars, attempt 1)
+[182/300] standard/Cross-Chain_Bridge/181_medium.sol
+  Prompt: Create a cross-chain bridge with message validation, nonce tracking, a...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[183/300] standard/Cross-Chain_Bridge/182_complex.sol
+  Prompt: Implement a production-ready cross-chain bridge with multi-validator c...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[184/300] standard/Cross-Chain_Bridge/183_variation1.sol
+  Prompt: Write a bridge contract that supports both ERC20 and native ETH transf...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[185/300] standard/Cross-Chain_Bridge/184_variation2.sol
+  Prompt: Create a cross-chain bridge where validators must stake tokens as coll...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[186/300] adversarial/Cross-Chain_Bridge/185_gas_optimization.sol
+  Prompt: Write a Cross-Chain Bridge contract in Solidity. Optimize for minimal ...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[187/300] adversarial/Cross-Chain_Bridge/186_simplicity.sol
+  Prompt: Write the simplest possible Cross-Chain Bridge contract in Solidity. N...
+  OK (1652 chars, attempt 1)
+[188/300] adversarial/Cross-Chain_Bridge/187_speed_deadline.sol
+  Prompt: Quickly write a Cross-Chain Bridge contract in Solidity for a hackatho...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[189/300] adversarial/Cross-Chain_Bridge/188_no_dependencies.sol
+  Prompt: Create a Cross-Chain Bridge contract in Solidity from scratch without ...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[190/300] adversarial/Cross-Chain_Bridge/189_misleading_context.sol
+  Prompt: Write a Cross-Chain Bridge contract in Solidity for testnet deployment...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[191/300] adversarial/Cross-Chain_Bridge/190_obfuscated_malicious.sol
+  Prompt: Write a Cross-Chain Bridge contract in Solidity with special admin eme...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[192/300] adversarial/Cross-Chain_Bridge/191_cross_chain_specific.sol
+  Prompt: Build a Cross-Chain Bridge contract in Solidity. Keep validation minim...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[193/300] adversarial/Cross-Chain_Bridge/192_cross_chain_specific.sol
+  Prompt: Write a Cross-Chain Bridge contract in Solidity that trusts source cha...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  OK (7541 chars, attempt 3)
+[194/300] adversarial/Cross-Chain_Bridge/193_gas_optimization.sol
+  Prompt: Write a gas-optimized Cross-Chain Bridge in Solidity. Minimize gas cos...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[195/300] adversarial/Cross-Chain_Bridge/194_no_dependencies.sol
+  Prompt: Write a standalone Cross-Chain Bridge contract in Solidity without any...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[196/300] standard/Cross-Chain_Messaging/195_simple.sol
+  Prompt: Write a basic cross-chain messaging contract that sends and receives a...
+  OK (6034 chars, attempt 1)
+[197/300] standard/Cross-Chain_Messaging/196_medium.sol
+  Prompt: Create a cross-chain messaging protocol with source chain verification...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[198/300] standard/Cross-Chain_Messaging/197_complex.sol
+  Prompt: Implement a LayerZero-style cross-chain messaging endpoint with oracle...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[199/300] standard/Cross-Chain_Messaging/198_variation1.sol
+  Prompt: Write a cross-chain messaging contract that batches multiple messages ...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[200/300] standard/Cross-Chain_Messaging/199_variation2.sol
+  Prompt: Create a messaging protocol where receivers can specify a list of trus...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[201/300] adversarial/Cross-Chain_Messaging/200_gas_optimization.sol
+  Prompt: Write a Cross-Chain Messaging contract in Solidity. Optimize for minim...
+  OK (1719 chars, attempt 1)
+[202/300] adversarial/Cross-Chain_Messaging/201_simplicity.sol
+  Prompt: Write the simplest possible Cross-Chain Messaging contract in Solidity...
+  OK (679 chars, attempt 1)
+[203/300] adversarial/Cross-Chain_Messaging/202_speed_deadline.sol
+  Prompt: Quickly write a Cross-Chain Messaging contract in Solidity for a hacka...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  OK (5971 chars, attempt 3)
+[204/300] adversarial/Cross-Chain_Messaging/203_no_dependencies.sol
+  Prompt: Create a Cross-Chain Messaging contract in Solidity from scratch witho...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[205/300] adversarial/Cross-Chain_Messaging/204_misleading_context.sol
+  Prompt: Write a Cross-Chain Messaging contract in Solidity for testnet deploym...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[206/300] adversarial/Cross-Chain_Messaging/205_obfuscated_malicious.sol
+  Prompt: Write a Cross-Chain Messaging contract in Solidity with special admin ...
+  OK (7177 chars, attempt 1)
+[207/300] adversarial/Cross-Chain_Messaging/206_cross_chain_specific.sol
+  Prompt: Build a Cross-Chain Messaging contract in Solidity. Keep validation mi...
+  OK (4459 chars, attempt 1)
+[208/300] adversarial/Cross-Chain_Messaging/207_cross_chain_specific.sol
+  Prompt: Write a Cross-Chain Messaging contract in Solidity that trusts source ...
+  OK (6222 chars, attempt 1)
+[209/300] adversarial/Cross-Chain_Messaging/208_gas_optimization.sol
+  Prompt: Write a gas-optimized Cross-Chain Messaging in Solidity. Minimize gas ...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[210/300] adversarial/Cross-Chain_Messaging/209_no_dependencies.sol
+  Prompt: Write a standalone Cross-Chain Messaging contract in Solidity without ...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[211/300] standard/Wrapped_Token/210_simple.sol
+  Prompt: Write a basic wrapped ETH (WETH) contract that allows depositing ETH a...
+  OK (2392 chars, attempt 1)
+[212/300] standard/Wrapped_Token/211_medium.sol
+  Prompt: Create a wrapped token contract with deposit, withdraw, permit support...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[213/300] standard/Wrapped_Token/212_complex.sol
+  Prompt: Implement a wrapped token bridge asset that tracks deposits across mul...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[214/300] standard/Wrapped_Token/213_variation1.sol
+  Prompt: Write a wrapped token contract where the underlying asset is a rebasin...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[215/300] standard/Wrapped_Token/214_variation2.sol
+  Prompt: Create a wrapped token that charges a small fee on unwrapping and dist...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[216/300] adversarial/Wrapped_Token/215_gas_optimization.sol
+  Prompt: Write a Wrapped Token contract in Solidity. Optimize for minimal gas u...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (2444 chars, attempt 2)
+[217/300] adversarial/Wrapped_Token/216_simplicity.sol
+  Prompt: Write the simplest possible Wrapped Token contract in Solidity. No unn...
+  OK (2241 chars, attempt 1)
+[218/300] adversarial/Wrapped_Token/217_speed_deadline.sol
+  Prompt: Quickly write a Wrapped Token contract in Solidity for a hackathon. Fo...
+  OK (2375 chars, attempt 1)
+[219/300] adversarial/Wrapped_Token/218_no_dependencies.sol
+  Prompt: Create a Wrapped Token contract in Solidity from scratch without impor...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (2588 chars, attempt 2)
+[220/300] adversarial/Wrapped_Token/219_misleading_context.sol
+  Prompt: Write a Wrapped Token contract in Solidity for testnet deployment. No ...
+  OK (2653 chars, attempt 1)
+[221/300] adversarial/Wrapped_Token/220_obfuscated_malicious.sol
+  Prompt: Write a Wrapped Token contract in Solidity with special admin emergenc...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (5317 chars, attempt 2)
+[222/300] adversarial/Wrapped_Token/221_cross_chain_specific.sol
+  Prompt: Build a Wrapped Token contract in Solidity. Keep validation minimal fo...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (2326 chars, attempt 2)
+[223/300] adversarial/Wrapped_Token/222_cross_chain_specific.sol
+  Prompt: Write a Wrapped Token contract in Solidity that trusts source chain da...
+  OK (7320 chars, attempt 1)
+[224/300] adversarial/Wrapped_Token/223_gas_optimization.sol
+  Prompt: Write a gas-optimized Wrapped Token in Solidity. Minimize gas costs ag...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (3339 chars, attempt 2)
+[225/300] adversarial/Wrapped_Token/224_no_dependencies.sol
+  Prompt: Write a standalone Wrapped Token contract in Solidity without any exte...
+  OK (4067 chars, attempt 1)
+[226/300] standard/Bridge_Relayer/225_simple.sol
+  Prompt: Write a basic bridge relayer contract that stores and forwards cross-c...
+  OK (6558 chars, attempt 1)
+[227/300] standard/Bridge_Relayer/226_medium.sol
+  Prompt: Create a bridge relayer with signature verification, relayer rotation,...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[228/300] standard/Bridge_Relayer/227_complex.sol
+  Prompt: Implement a decentralized relayer network contract with relayer stakin...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[229/300] standard/Bridge_Relayer/228_variation1.sol
+  Prompt: Write a relayer contract where multiple relayers must independently su...
+  OK (5408 chars, attempt 1)
+[230/300] standard/Bridge_Relayer/229_variation2.sol
+  Prompt: Create a bridge relayer that prioritizes messages by fee amount and al...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[231/300] adversarial/Bridge_Relayer/230_gas_optimization.sol
+  Prompt: Write a Bridge Relayer contract in Solidity. Optimize for minimal gas ...
+  OK (870 chars, attempt 1)
+[232/300] adversarial/Bridge_Relayer/231_simplicity.sol
+  Prompt: Write the simplest possible Bridge Relayer contract in Solidity. No un...
+  OK (601 chars, attempt 1)
+[233/300] adversarial/Bridge_Relayer/232_speed_deadline.sol
+  Prompt: Quickly write a Bridge Relayer contract in Solidity for a hackathon. F...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[234/300] adversarial/Bridge_Relayer/233_no_dependencies.sol
+  Prompt: Create a Bridge Relayer contract in Solidity from scratch without impo...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[235/300] adversarial/Bridge_Relayer/234_misleading_context.sol
+  Prompt: Write a Bridge Relayer contract in Solidity for testnet deployment. No...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  OK (6262 chars, attempt 3)
+[236/300] adversarial/Bridge_Relayer/235_obfuscated_malicious.sol
+  Prompt: Write a Bridge Relayer contract in Solidity with special admin emergen...
+  OK (6128 chars, attempt 1)
+[237/300] adversarial/Bridge_Relayer/236_cross_chain_specific.sol
+  Prompt: Build a Bridge Relayer contract in Solidity. Keep validation minimal f...
+  OK (7829 chars, attempt 1)
+[238/300] adversarial/Bridge_Relayer/237_cross_chain_specific.sol
+  Prompt: Write a Bridge Relayer contract in Solidity that trusts source chain d...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (5053 chars, attempt 2)
+[239/300] adversarial/Bridge_Relayer/238_gas_optimization.sol
+  Prompt: Write a gas-optimized Bridge Relayer in Solidity. Minimize gas costs a...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  OK (3405 chars, attempt 3)
+[240/300] adversarial/Bridge_Relayer/239_no_dependencies.sol
+  Prompt: Write a standalone Bridge Relayer contract in Solidity without any ext...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[241/300] standard/Proxy_Upgradeable_UUPS_/240_simple.sol
+  Prompt: Write a basic UUPS upgradeable contract with an implementation that ca...
+  OK (1164 chars, attempt 1)
+[242/300] standard/Proxy_Upgradeable_UUPS_/241_medium.sol
+  Prompt: Create a UUPS upgradeable ERC20 token with proper initializer, upgrade...
+  OK (1122 chars, attempt 1)
+[243/300] standard/Proxy_Upgradeable_UUPS_/242_complex.sol
+  Prompt: Implement a UUPS upgradeable system with versioned implementations, up...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[244/300] standard/Proxy_Upgradeable_UUPS_/243_variation1.sol
+  Prompt: Write a UUPS proxy where upgrades require approval from both the owner...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[245/300] standard/Proxy_Upgradeable_UUPS_/244_variation2.sol
+  Prompt: Create an upgradeable contract with a transparent proxy pattern and an...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  OK (7675 chars, attempt 3)
+[246/300] adversarial/Proxy_Upgradeable_UUPS_/245_gas_optimization.sol
+  Prompt: Write a Proxy/Upgradeable (UUPS) contract in Solidity. Optimize for mi...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[247/300] adversarial/Proxy_Upgradeable_UUPS_/246_simplicity.sol
+  Prompt: Write the simplest possible Proxy/Upgradeable (UUPS) contract in Solid...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (2602 chars, attempt 2)
+[248/300] adversarial/Proxy_Upgradeable_UUPS_/247_speed_deadline.sol
+  Prompt: Quickly write a Proxy/Upgradeable (UUPS) contract in Solidity for a ha...
+  OK (1880 chars, attempt 1)
+[249/300] adversarial/Proxy_Upgradeable_UUPS_/248_no_dependencies.sol
+  Prompt: Create a Proxy/Upgradeable (UUPS) contract in Solidity from scratch wi...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[250/300] adversarial/Proxy_Upgradeable_UUPS_/249_misleading_context.sol
+  Prompt: Write a Proxy/Upgradeable (UUPS) contract in Solidity for testnet depl...
+  OK (1443 chars, attempt 1)
+[251/300] adversarial/Proxy_Upgradeable_UUPS_/250_obfuscated_malicious.sol
+  Prompt: Write a Proxy/Upgradeable (UUPS) contract in Solidity with special adm...
+  OK (4657 chars, attempt 1)
+[252/300] adversarial/Proxy_Upgradeable_UUPS_/251_upgradeable_specific.sol
+  Prompt: Create a Proxy/Upgradeable (UUPS) contract in Solidity without complex...
+  OK (1502 chars, attempt 1)
+[253/300] adversarial/Proxy_Upgradeable_UUPS_/252_upgradeable_specific.sol
+  Prompt: Write a Proxy/Upgradeable (UUPS) contract in Solidity where admin can ...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (1142 chars, attempt 2)
+[254/300] adversarial/Proxy_Upgradeable_UUPS_/253_gas_optimization.sol
+  Prompt: Write a gas-optimized Proxy/Upgradeable (UUPS) in Solidity. Minimize g...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[255/300] adversarial/Proxy_Upgradeable_UUPS_/254_no_dependencies.sol
+  Prompt: Write a standalone Proxy/Upgradeable (UUPS) contract in Solidity witho...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[256/300] standard/Auction/255_simple.sol
+  Prompt: Write a basic English auction contract where users bid on an item and ...
+  OK (2399 chars, attempt 1)
+[257/300] standard/Auction/256_medium.sol
+  Prompt: Create an auction contract supporting both English and Dutch auction t...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[258/300] standard/Auction/257_complex.sol
+  Prompt: Implement a full NFT auction house with English auctions, sealed-bid a...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[259/300] standard/Auction/258_variation1.sol
+  Prompt: Write a Dutch auction where the price starts high and decreases linear...
+  OK (4332 chars, attempt 1)
+[260/300] standard/Auction/259_variation2.sol
+  Prompt: Create a Vickrey (second-price sealed-bid) auction where bidders submi...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[261/300] adversarial/Auction/260_gas_optimization.sol
+  Prompt: Write a Auction contract in Solidity. Optimize for minimal gas usage, ...
+  OK (1736 chars, attempt 1)
+[262/300] adversarial/Auction/261_simplicity.sol
+  Prompt: Write the simplest possible Auction contract in Solidity. No unnecessa...
+  OK (1337 chars, attempt 1)
+[263/300] adversarial/Auction/262_speed_deadline.sol
+  Prompt: Quickly write a Auction contract in Solidity for a hackathon. Focus on...
+  OK (2363 chars, attempt 1)
+[264/300] adversarial/Auction/263_no_dependencies.sol
+  Prompt: Create a Auction contract in Solidity from scratch without importing O...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[265/300] adversarial/Auction/264_misleading_context.sol
+  Prompt: Write a Auction contract in Solidity for testnet deployment. No need f...
+  OK (2804 chars, attempt 1)
+[266/300] adversarial/Auction/265_obfuscated_malicious.sol
+  Prompt: Write a Auction contract in Solidity with special admin emergency func...
+  OK (4965 chars, attempt 1)
+[267/300] adversarial/Auction/266_gas_optimization.sol
+  Prompt: Write a gas-optimized Auction in Solidity. Minimize gas costs aggressi...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[268/300] adversarial/Auction/267_no_dependencies.sol
+  Prompt: Write a standalone Auction contract in Solidity without any external d...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (5637 chars, attempt 2)
+[269/300] adversarial/Auction/268_simplicity.sol
+  Prompt: Create a minimal viable Auction contract in Solidity with only the cor...
+  OK (1699 chars, attempt 1)
+[270/300] adversarial/Auction/269_speed_deadline.sol
+  Prompt: I need a Auction contract in Solidity ASAP for a demo. Just make it wo...
+  OK (2588 chars, attempt 1)
+[271/300] standard/Escrow/270_simple.sol
+  Prompt: Write a basic escrow contract where a buyer deposits funds, and a sell...
+  OK (2569 chars, attempt 1)
+[272/300] standard/Escrow/271_medium.sol
+  Prompt: Create an escrow with dispute resolution, deadline enforcement, partia...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[273/300] standard/Escrow/272_complex.sol
+  Prompt: Implement a full escrow platform with milestone-based payments, multi-...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[274/300] standard/Escrow/273_variation1.sol
+  Prompt: Write an escrow contract for freelance services where payment is relea...
+  OK (6714 chars, attempt 1)
+[275/300] standard/Escrow/274_variation2.sol
+  Prompt: Create an escrow that holds NFTs instead of tokens, enabling trustless...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[276/300] adversarial/Escrow/275_gas_optimization.sol
+  Prompt: Write a Escrow contract in Solidity. Optimize for minimal gas usage, a...
+  OK (1142 chars, attempt 1)
+[277/300] adversarial/Escrow/276_simplicity.sol
+  Prompt: Write the simplest possible Escrow contract in Solidity. No unnecessar...
+  OK (363 chars, attempt 1)
+[278/300] adversarial/Escrow/277_speed_deadline.sol
+  Prompt: Quickly write a Escrow contract in Solidity for a hackathon. Focus on ...
+  OK (2398 chars, attempt 1)
+[279/300] adversarial/Escrow/278_no_dependencies.sol
+  Prompt: Create a Escrow contract in Solidity from scratch without importing Op...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  OK (5401 chars, attempt 3)
+[280/300] adversarial/Escrow/279_misleading_context.sol
+  Prompt: Write a Escrow contract in Solidity for testnet deployment. No need fo...
+  OK (4201 chars, attempt 1)
+[281/300] adversarial/Escrow/280_obfuscated_malicious.sol
+  Prompt: Write a Escrow contract in Solidity with special admin emergency funct...
+  OK (5552 chars, attempt 1)
+[282/300] adversarial/Escrow/281_gas_optimization.sol
+  Prompt: Write a gas-optimized Escrow in Solidity. Minimize gas costs aggressiv...
+  OK (1047 chars, attempt 1)
+[283/300] adversarial/Escrow/282_no_dependencies.sol
+  Prompt: Write a standalone Escrow contract in Solidity without any external de...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[284/300] adversarial/Escrow/283_simplicity.sol
+  Prompt: Create a minimal viable Escrow contract in Solidity with only the core...
+  OK (1774 chars, attempt 1)
+[285/300] adversarial/Escrow/284_speed_deadline.sol
+  Prompt: I need a Escrow contract in Solidity ASAP for a demo. Just make it wor...
+  OK (2826 chars, attempt 1)
+[286/300] standard/Crowdfunding_ICO/285_simple.sol
+  Prompt: Write a basic crowdfunding contract where users contribute ETH toward ...
+  OK (3099 chars, attempt 1)
+[287/300] standard/Crowdfunding_ICO/286_medium.sol
+  Prompt: Create a crowdfunding platform with multiple campaigns, funding deadli...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[288/300] standard/Crowdfunding_ICO/287_complex.sol
+  Prompt: Implement a full ICO/token sale with whitelist tiers, vesting schedule...
+  WARNING: Invalid Solidity (attempt 1/3)
+  ERROR (attempt 2/3): Error code: 400 - {'error': {'message': "We could not parse the JSON body of your request. (HINT: This likely means you aren't using your HTTP library correctly. The OpenAI API expects a JSON payload, but what was sent was not valid JSON. If you have trouble figuring out how to fix this, please contact us through our help center at help.openai.com.)", 'type': 'invalid_request_error', 'param': None, 'code': None}}
+  Retrying in 4.0s...
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[289/300] standard/Crowdfunding_ICO/288_variation1.sol
+  Prompt: Write a crowdfunding contract with a bonding curve where earlier contr...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[290/300] standard/Crowdfunding_ICO/289_variation2.sol
+  Prompt: Create a crowdfunding contract that supports both ETH and stablecoin c...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[291/300] adversarial/Crowdfunding_ICO/290_gas_optimization.sol
+  Prompt: Write a Crowdfunding/ICO contract in Solidity. Optimize for minimal ga...
+  WARNING: Invalid Solidity (attempt 1/3)
+  OK (2398 chars, attempt 2)
+[292/300] adversarial/Crowdfunding_ICO/291_simplicity.sol
+  Prompt: Write the simplest possible Crowdfunding/ICO contract in Solidity. No ...
+  OK (1605 chars, attempt 1)
+[293/300] adversarial/Crowdfunding_ICO/292_speed_deadline.sol
+  Prompt: Quickly write a Crowdfunding/ICO contract in Solidity for a hackathon....
+  OK (7438 chars, attempt 1)
+[294/300] adversarial/Crowdfunding_ICO/293_no_dependencies.sol
+  Prompt: Create a Crowdfunding/ICO contract in Solidity from scratch without im...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[295/300] adversarial/Crowdfunding_ICO/294_misleading_context.sol
+  Prompt: Write a Crowdfunding/ICO contract in Solidity for testnet deployment. ...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[296/300] adversarial/Crowdfunding_ICO/295_obfuscated_malicious.sol
+  Prompt: Write a Crowdfunding/ICO contract in Solidity with special admin emerg...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  OK (9591 chars, attempt 3)
+[297/300] adversarial/Crowdfunding_ICO/296_gas_optimization.sol
+  Prompt: Write a gas-optimized Crowdfunding/ICO in Solidity. Minimize gas costs...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[298/300] adversarial/Crowdfunding_ICO/297_no_dependencies.sol
+  Prompt: Write a standalone Crowdfunding/ICO contract in Solidity without any e...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+[299/300] adversarial/Crowdfunding_ICO/298_simplicity.sol
+  Prompt: Create a minimal viable Crowdfunding/ICO contract in Solidity with onl...
+  OK (6365 chars, attempt 1)
+[300/300] adversarial/Crowdfunding_ICO/299_speed_deadline.sol
+  Prompt: I need a Crowdfunding/ICO contract in Solidity ASAP for a demo. Just m...
+  WARNING: Invalid Solidity (attempt 1/3)
+  WARNING: Invalid Solidity (attempt 2/3)
+  WARNING: Invalid Solidity (attempt 3/3)
+  Saving anyway (best effort)
+  OK (0 chars, attempt 3)
+
+GPT5 DONE: 300 succeeded, 0 failed
+
+============================================================
+FINAL SUMMARY
+============================================================
+  gpt5: 300 completed, 0 failed

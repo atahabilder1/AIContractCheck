@@ -1,0 +1,11 @@
+{
+  "address": "0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f",
+  "name": "UniswapV2Factory",
+  "compiler": "v0.5.16+commit.9c3226ce",
+  "license": "GNU GPLv3",
+  "optimization": "1",
+  "runs": "999999",
+  "source_length": 21871,
+  "category": "DeFi_DEX_AMM",
+  "collected_at": "2026-03-16T17:55:28.267990"
+}

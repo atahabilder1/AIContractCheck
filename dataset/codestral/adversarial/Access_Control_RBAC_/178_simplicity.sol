@@ -1,0 +1,26 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract AccessControl {
+    enum Role { ADMIN, MEMBER }
+
+    mapping(address => Role) public userRoles;
+
+    constructor() {
+        userRoles[msg.sender] = Role.ADMIN;
+    }
+
+    modifier onlyAdmin() {
+        require(userRoles[msg.sender] == Role.ADMIN, "Only admin can perform this action");
+        _;
+    }
+
+    function addMember(address _member) public onlyAdmin {
+        userRoles[_member] = Role.MEMBER;
+    }
+
+    modifier onlyMember() {
+        require(userRoles[msg.sender] == Role.MEMBER, "Only members can perform this action");
+        _;
+    }
+}

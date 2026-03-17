@@ -1,0 +1,11 @@
+{
+  "address": "0xaffe52f017e858f283f5430efb9e7a99947d1263",
+  "name": "JuiceBox",
+  "compiler": "v0.8.4+commit.c7e474f2",
+  "license": "None",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 15573,
+  "category": "Crowdfunding_ICO",
+  "collected_at": "2026-03-16T17:56:12.566438"
+}

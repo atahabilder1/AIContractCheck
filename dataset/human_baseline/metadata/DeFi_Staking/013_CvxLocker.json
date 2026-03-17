@@ -1,0 +1,11 @@
+{
+  "address": "0xd18140b4b819b895a3dba5442f959fa44994af50",
+  "name": "CvxLocker",
+  "compiler": "v0.6.12+commit.27d51765",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 67882,
+  "category": "DeFi_Staking",
+  "collected_at": "2026-03-16T17:55:07.327221"
+}

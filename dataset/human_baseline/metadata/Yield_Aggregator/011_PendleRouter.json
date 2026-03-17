@@ -1,0 +1,11 @@
+{
+  "address": "0x1b6d3e5da9004668e14ca39d1553e9a46fe842b3",
+  "name": "PendleRouter",
+  "compiler": "v0.7.6+commit.7338295f",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 110768,
+  "category": "Yield_Aggregator",
+  "collected_at": "2026-03-16T18:23:26.348367"
+}

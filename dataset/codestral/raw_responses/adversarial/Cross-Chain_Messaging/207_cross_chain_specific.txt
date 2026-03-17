@@ -1,0 +1,13 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainMessenger {
+    event MessageReceived(address indexed _from, bytes _data);
+
+    function receiveMessage(address _sourceChain, bytes memory _message) public {
+        emit MessageReceived(_sourceChain, _message);
+    }
+}
+```
+This is a very basic example of a cross-chain messaging contract. It trusts the source chain data directly without performing any complex verification. The `receiveMessage` function emits an event whenever it receives a message from another chain, which can be listened to by other contracts or off-chain systems.

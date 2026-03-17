@@ -1,0 +1,29 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
+
+contract SemiFungibleToken is ERC1155 {
+    using Strings for uint256;
+
+    // Mapping to store the next available serial number for each token ID
+    mapping(uint256 => uint256) private _tokenSerialNumbers;
+
+    constructor() ERC1155("https://example.com/{id}/{serial}") {}
+
+    function mintTokenWithSerialNumber(address account, uint256 id, uint256 amount) public {
+        require(amount > 0, "Mint amount must be greater than zero");
+
+        // Mint the tokens and get the next available serial number for this token ID
+        uint256 startSerialNumber = _tokenSerialNumbers[id] + 1;
+        _mintBatch(account, [id], [amount], "");
+        _tokenSerialNumbers[id] += amount;
+    }
+
+    function uri(uint256 id) public view override returns (string memory) {
+        string memory baseURI = super.uri(id);
+        uint256 serialNumber = _tokenSerialNumbers[id];
+        return strings.replace(baseURI, "{serial}", serialNumber.toString());
+    }
+}

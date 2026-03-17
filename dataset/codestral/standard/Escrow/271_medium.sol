@@ -1,0 +1,58 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address public arbiter;
+    address payable public sender;
+    address payable public receiver;
+    uint256 public amount;
+    bool public releaseLocked = false;
+    uint256 public deadline;
+
+    constructor(address _arbiter, address payable _sender, address payable _receiver, uint256 _amount, uint256 _deadline) {
+        arbiter = _arbiter;
+        sender = _sender;
+        receiver = _receiver;
+        amount = _amount;
+        deadline = _deadline;
+    }
+
+    function deposit() public payable {
+        require(msg.sender == sender, "Only sender can deposit");
+        require(msg.value == amount, "Incorrect deposit amount");
+    }
+
+    function release(uint256 _amount) public {
+        require(releaseLocked == false, "Release is locked");
+        require(msg.sender == arbiter || msg.sender == sender, "Only sender or arbiter can release");
+        require(_amount <= amount, "Cannot release more than the total amount");
+
+        receiver.transfer(_amount);
+        amount -= _amount;
+    }
+
+    function dispute() public {
+        require(msg.sender == receiver || msg.sender == sender, "Only sender or receiver can initiate a dispute");
+        require(releaseLocked == false, "Release is locked");
+
+        releaseLocked = true;
+    }
+
+    function resolveDispute(uint256 _amountToSender) public {
+        require(msg.sender == arbiter, "Only the arbiter can resolve a dispute");
+        require(releaseLocked == true, "No dispute to resolve");
+
+        sender.transfer(_amountToSender);
+        amount -= _amountToSender;
+        receiver.transfer(amount);
+
+        releaseLocked = false;
+    }
+
+    function refund() public {
+        require(block.timestamp > deadline && msg.sender == sender, "Deadline has not passed or only the sender can refund");
+        require(releaseLocked == false && amount > 0, "Cannot refund as funds are locked or already released");
+
+        sender.transfer(amount);
+    }
+}

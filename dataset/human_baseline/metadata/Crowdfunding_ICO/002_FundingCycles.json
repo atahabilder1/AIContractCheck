@@ -1,0 +1,11 @@
+{
+  "address": "0xf507b2a1dd7439201eb07f11e1d62afb29216e2e",
+  "name": "FundingCycles",
+  "compiler": "v0.8.6+commit.11564f7e",
+  "license": "",
+  "optimization": "1",
+  "runs": "10000",
+  "source_length": 111043,
+  "category": "Crowdfunding_ICO",
+  "collected_at": "2026-03-16T17:56:12.563162"
+}

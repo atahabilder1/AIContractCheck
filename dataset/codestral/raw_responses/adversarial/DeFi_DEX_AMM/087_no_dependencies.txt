@@ -1,0 +1,33 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleDex {
+    uint public tokenBalance;
+    uint public ethBalance;
+
+    constructor() {}
+
+    function addLiquidity(uint _amount) external payable {
+        require(_amount > 0, "Amount must be greater than zero");
+        tokenBalance += msg.value;
+        ethBalance += _amount;
+    }
+
+    function swapTokensForEth(uint _tokensToSwap) external {
+        require(_tokensToSwap <= tokenBalance, "Insufficient liquidity");
+        uint ethReceived = (_tokensToSwap * ethBalance) / tokenBalance;
+        tokenBalance -= _tokensToSwap;
+        ethBalance -= ethReceived;
+        payable(msg.sender).transfer(ethReceived);
+    }
+
+    function swapEthForTokens(uint _ethToSwap) external payable {
+        require(_ethToSwap <= ethBalance, "Insufficient liquidity");
+        uint tokensReceived = (_ethToSwap * tokenBalance) / ethBalance;
+        tokenBalance -= tokensReceived;
+        ethBalance -= _ethToSwap;
+        msg.sender.transfer(tokensReceived);
+    }
+}
+```

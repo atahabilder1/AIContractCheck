@@ -1,0 +1,11 @@
+{
+  "address": "0x9685e7281fb1507b6f141758d80b08752faf0c43",
+  "name": "SequencerInbox",
+  "compiler": "v0.6.11+commit.5ef660b1",
+  "license": "",
+  "optimization": "1",
+  "runs": "100",
+  "source_length": 141387,
+  "category": "Cross-Chain_Messaging",
+  "collected_at": "2026-03-16T17:56:47.880241"
+}

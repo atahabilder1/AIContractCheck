@@ -1,0 +1,11 @@
+{
+  "address": "0x7b3d36eb606f873a75a6ab68f8c999848b04f935",
+  "name": "StandardERC20",
+  "compiler": "v0.7.4+commit.3f05b770",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 31477,
+  "category": "Crowdfunding_ICO",
+  "collected_at": "2026-03-16T17:56:12.565167"
+}

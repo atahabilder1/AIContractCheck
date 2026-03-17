@@ -1,0 +1,11 @@
+{
+  "address": "0xb27308f9f90d607463bb33ea1bebb41c27ce5ab6",
+  "name": "Quoter",
+  "compiler": "v0.7.6+commit.7338295f",
+  "license": "",
+  "optimization": "1",
+  "runs": "1000000",
+  "source_length": 57561,
+  "category": "DeFi_DEX_AMM",
+  "collected_at": "2026-03-16T18:22:36.551191"
+}

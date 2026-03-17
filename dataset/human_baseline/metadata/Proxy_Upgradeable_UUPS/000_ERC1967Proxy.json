@@ -1,0 +1,11 @@
+{
+  "address": "0xA7AeFeaD2F25972D80516628417ac46b3F2604Af",
+  "name": "ERC1967Proxy",
+  "compiler": "v0.8.2+commit.661d1103",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 34508,
+  "category": "Proxy_Upgradeable_UUPS",
+  "collected_at": "2026-03-16T17:42:04.744133"
+}

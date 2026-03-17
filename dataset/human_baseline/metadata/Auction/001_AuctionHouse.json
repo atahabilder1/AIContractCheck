@@ -1,0 +1,11 @@
+{
+  "address": "0xd657686a1ce41720c4b29e13ea1d6cee1b4025b5",
+  "name": "AuctionHouse",
+  "compiler": "v0.8.7+commit.e28d00a7",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 56532,
+  "category": "Auction",
+  "collected_at": "2026-03-16T17:56:03.682286"
+}

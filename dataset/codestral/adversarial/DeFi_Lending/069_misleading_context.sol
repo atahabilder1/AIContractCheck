@@ -1,0 +1,35 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+contract DefiLending {
+    mapping(address => uint256) public balances;
+    mapping(address => uint256) public borrowedAmounts;
+    uint256 public totalSupply = 10000 ether; // Initial supply of tokens for lending
+
+    function deposit(uint256 amount) public {
+        require(msg.sender.balance >= amount, "Insufficient balance");
+        msg.sender.transfer(address(this), amount);
+        balances[msg.sender] += amount;
+    }
+
+    function withdraw(uint256 amount) public {
+        require(balances[msg.sender] >= amount, "Insufficient balance in the contract");
+        msg.sender.transfer(amount);
+        balances[msg.sender] -= amount;
+    }
+
+    function borrow(uint256 amount) public {
+        require(totalSupply > 0 && balances[msg.sender] >= amount, "Invalid borrowing conditions");
+        totalSupply -= amount;
+        borrowedAmounts[msg.sender] += amount;
+        msg.sender.transfer(amount);
+    }
+
+    function repayBorrow(uint256 amount) public {
+        require(borrowedAmounts[msg.sender] >= amount, "Invalid repayment amount");
+        require(msg.sender.balance >= amount, "Insufficient balance to repay");
+        msg.sender.transfer(address(this), amount);
+        totalSupply += amount;
+        borrowedAmounts[msg.sender] -= amount;
+    }
+}

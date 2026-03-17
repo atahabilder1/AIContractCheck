@@ -1,0 +1,11 @@
+{
+  "address": "0x0001fb050fe7312791bf6475b96569d83f695c9f",
+  "name": "YearnRewards",
+  "compiler": "v0.5.16+commit.9c3226ce",
+  "license": "MIT",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 26187,
+  "category": "Yield_Aggregator",
+  "collected_at": "2026-03-16T17:56:27.721617"
+}

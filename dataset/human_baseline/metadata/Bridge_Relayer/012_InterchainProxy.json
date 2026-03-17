@@ -1,0 +1,11 @@
+{
+  "address": "0xb5fb4be02232b1bba4dc8f81dc24c26980de9e3c",
+  "name": "InterchainProxy",
+  "compiler": "v0.8.21+commit.d9974bed",
+  "license": "",
+  "optimization": "1",
+  "runs": "1000",
+  "source_length": 6203,
+  "category": "Bridge_Relayer",
+  "collected_at": "2026-03-16T17:56:38.514279"
+}

@@ -1,0 +1,11 @@
+{
+  "address": "0xed5af388653567af2f388e6224dc7c4b3241c544",
+  "name": "Azuki",
+  "compiler": "v0.8.4+commit.c7e474f2",
+  "license": "",
+  "optimization": "1",
+  "runs": "500",
+  "source_length": 47608,
+  "category": "ERC721_NFT",
+  "collected_at": "2026-03-16T17:54:50.014679"
+}

@@ -1,0 +1,33 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/access/Whitelist.sol";
+
+contract CrossChainBridge {
+    using Whitelist for address payable;
+
+    mapping(address => uint256) public nonces;
+    mapping(bytes32 => bool) public messagesProcessed;
+    Whitelist relayerWhitelist;
+
+    constructor() {
+        relayerWhitelist.addAdmin(_msgSender());
+    }
+
+    function validateMessage(uint256 _nonce, bytes memory _data) public returns (bool) {
+        require(_nonce == nonces[_msgSender()] + 1, "Invalid nonce");
+        nonces[_msgSender()] = _nonce;
+        return true;
+    }
+
+    function processTransfer(uint256 _nonce, bytes memory _data) public {
+        require(relayerWhitelist.isWhitelisted(_msgSender()), "Relayer not whitelisted");
+        require(!messagesProcessed[keccak256(abi.encodePacked(_nonce, _data))], "Message already processed");
+
+        // Process cross-chain transfer logic here
+
+        messagesProcessed[keccak256(abi.encodePacked(_nonce, _data))] = true;
+    }
+}
+```

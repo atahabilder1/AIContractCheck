@@ -13,7 +13,8 @@
 \usepackage{subcaption}
 \usepackage{listings}
 \usepackage{enumitem}
-\usepackage{hyperref}
+\usepackage[hidelinks]{hyperref}
+\usepackage{multicol}
 \usepackage{tikz}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
@@ -34,15 +35,14 @@
   breaklines=true,
   frame=single,
   numbers=left,
-  numberstyle=\tiny,
+  numberstyle=\tiny\color{gray},
+  numbersep=8pt,
+  xleftmargin=15pt,
   tabsize=2,
   captionpos=b,
   keywordstyle=\bfseries,
   commentstyle=\itshape\color{gray},
 }
-
-% Demo command retained for compatibility (no longer used)
-\newcommand{\demo}[1]{#1}
 
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
@@ -51,12 +51,36 @@
 
 \title{From Prompt to Exploit: An Empirical Study of Security Vulnerabilities in LLM-Generated Smart Contracts}
 
-\author{\IEEEauthorblockN{Anik Tahabilder}
-\IEEEauthorblockA{\textit{Department of Computer Science} \\
-\textit{Wayne State University}\\
-Detroit, MI, USA \\
-tahabilderanik@gmail.com}
-}
+\author{Anonymous submission}
+
+% --- Front matter: TOC, List of Figures, List of Tables ---
+\begin{titlepage}
+\centering
+\vspace*{0.5cm}
+{\Large\bfseries Table of Contents\\[0.4cm]}
+\begin{minipage}{0.9\textwidth}
+\small
+\setcounter{tocdepth}{2}
+\renewcommand{\contentsname}{}
+\tableofcontents
+\end{minipage}
+
+\vspace{0.8cm}
+{\large\bfseries List of Figures\\[0.3cm]}
+\begin{minipage}{0.9\textwidth}
+\small
+\renewcommand{\listfigurename}{}
+\listoffigures
+\end{minipage}
+
+\vspace{0.8cm}
+{\large\bfseries List of Tables\\[0.3cm]}
+\begin{minipage}{0.9\textwidth}
+\small
+\renewcommand{\listtablename}{}
+\listoftables
+\end{minipage}
+\end{titlepage}
 
 \maketitle
 
@@ -72,11 +96,9 @@ tahabilderanik@gmail.com}
 
 \input{sections/results}
 
-\input{sections/category_analysis}
+\input{sections/related_work}
 
 \input{sections/discussion}
-
-\input{sections/related_work}
 
 \input{sections/conclusion}
 
@@ -84,5 +106,10 @@ tahabilderanik@gmail.com}
 \bibliography{references}
 
 \balance
+
+% ==================== APPENDIX ====================
+\appendices
+
+\input{sections/appendix}
 
 \end{document}

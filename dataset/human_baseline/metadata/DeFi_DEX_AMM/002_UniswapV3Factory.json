@@ -1,0 +1,11 @@
+{
+  "address": "0x1f98431c8ad98523631ae4a59f267346ea31f984",
+  "name": "UniswapV3Factory",
+  "compiler": "v0.7.6+commit.7338295f",
+  "license": "",
+  "optimization": "1",
+  "runs": "800",
+  "source_length": 150638,
+  "category": "DeFi_DEX_AMM",
+  "collected_at": "2026-03-16T17:55:28.269749"
+}

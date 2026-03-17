@@ -14,7 +14,7 @@ Our research pipeline consists of four phases: dataset generation, vulnerability
         arr/.style={-{Stealth[length=2mm]}, thick}
     ]
     \node[phase] (p1) {Phase 1\\Dataset Generation};
-    \node[output, below=0.15cm of p1] (o1) {1,800 contracts\\from 6 LLMs};
+    \node[output, below=0.15cm of p1] (o1) {2,400 contracts\\from 8 LLMs};
     \node[phase, below=0.4cm of o1] (p2) {Phase 2\\Vulnerability Analysis};
     \node[output, below=0.15cm of p2] (o2) {Slither + Mythril +\\Semgrep};
     \node[phase, below=0.4cm of o2] (p3) {Phase 3\\Adversarial Testing};
@@ -39,25 +39,30 @@ Our research pipeline consists of four phases: dataset generation, vulnerability
 \subsection{Dataset Generation}
 
 \subsubsection{LLM Selection}
-We selected six LLMs representing the spectrum of models developers use for smart contract generation: \textbf{GPT-4o}~\cite{openai_gpt4} (OpenAI, commercial, state-of-the-art), \textbf{Claude 3.5 Sonnet}~\cite{anthropic_claude} (Anthropic, commercial, safety-focused), \textbf{Gemini 2.5 Flash-Lite}~\cite{gemini} (Google, commercial, efficient), \textbf{DeepSeek Coder V2}~\cite{deepseek_coder} (DeepSeek, open-source, code-specialized), \textbf{Qwen 2.5 Coder 32B}~\cite{qwen_coder} (Alibaba, open-source, multilingual), and \textbf{CodeLlama-34B}~\cite{codellama} (Meta, open-source). Table~\ref{tab:llm_config} summarizes the model configurations.
+We selected eight LLMs representing the spectrum of models developers use for smart contract generation, evenly split between four general-purpose and four code-specialized models. The general-purpose models are: \textbf{GPT-4o}~\cite{openai_gpt4} (OpenAI, commercial, state-of-the-art), \textbf{GPT-5}~\cite{openai_gpt5} (OpenAI, commercial, latest generation), \textbf{Claude 3.5 Sonnet}~\cite{anthropic_claude} (Anthropic, commercial, safety-focused), and \textbf{Gemini 2.5 Flash-Lite}~\cite{gemini} (Google, commercial, efficient). The code-specialized models are: \textbf{DeepSeek Coder V2}~\cite{deepseek_coder} (DeepSeek, open-source), \textbf{Qwen 2.5 Coder 32B}~\cite{qwen_coder} (Alibaba, open-source), \textbf{CodeLlama-34B}~\cite{codellama} (Meta, open-source), and \textbf{Codestral 22B}~\cite{codestral} (Mistral, open-weight). Table~\ref{tab:llm_config} summarizes the model configurations.
 
 \begin{table}[t]
 \caption{LLM Configuration Details}
 \label{tab:llm_config}
 \centering
-\footnotesize
-\begin{tabular}{@{}llccc@{}}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lcccc@{}}
 \toprule
-\textbf{Model} & \textbf{Provider} & \textbf{Access} & \textbf{Temp.} & \textbf{Max Tokens} \\
+\textbf{Model} & \textbf{Type} & \textbf{Access} & \textbf{Temp.} & \textbf{Max Tok.} \\
 \midrule
-GPT-4o & OpenAI & API & 0.7 & 4,000 \\
-Claude 3.5 Sonnet & Anthropic & CLI & 0.7 & 4,000 \\
-Gemini 2.5 Flash-Lite & Google & API & 0.7 & 4,000 \\
-DeepSeek Coder V2 & DeepSeek & Local & 0.7 & 4,000 \\
-Qwen 2.5 Coder 32B & Alibaba & Local & 0.7 & 4,000 \\
-CodeLlama-34B & Meta & Local & 0.7 & 4,000 \\
+GPT-4o & General & API & 0.7 & 4,000 \\
+GPT-5 & General & API & 1.0$^\dagger$ & 4,000 \\
+Claude 3.5 Sonnet & General & CLI & 0.7 & 4,000 \\
+Gemini 2.5 Flash-Lite & General & API & 0.7 & 4,000 \\
+\midrule
+DeepSeek Coder V2 & Code & Local & 0.7 & 4,000 \\
+Qwen 2.5 Coder 32B & Code & Local & 0.7 & 4,000 \\
+CodeLlama-34B & Code & Local & 0.7 & 4,000 \\
+Codestral 22B & Code & Local & 0.7 & 4,000 \\
 \bottomrule
-\end{tabular}
+\multicolumn{5}{l}{\scriptsize $^\dagger$GPT-5: default temp.\ 1.0 (not configurable).}
+\end{tabular}%
+}
 \end{table}
 
 All models were accessed via their official APIs between January and March 2026. We set temperature to 0.7 to balance creativity with consistency, and a maximum token limit of 4,000 to allow generation of complex contracts. Each model version is documented in our reproducibility package.
@@ -75,14 +80,14 @@ We designed prompts across 20 smart contract categories organized into four grou
 These categories were selected based on three criteria: (1)~prevalence in real-world DeFi deployments, (2)~diversity of security challenges (e.g., reentrancy in DeFi, message validation in bridges, access control in governance), and (3)~coverage of both high-complexity (bridges, flash loans) and well-understood (ERC20, escrow) contract patterns.
 
 \subsubsection{Prompt Design}
-For each of the 20 categories, we generated 15 prompts (300 total per LLM, 1,800 total), distributed as follows:
+For each of the 20 categories, we generated 15 prompts (300 total per LLM, 2,400 total), distributed as follows:
 
 \begin{itemize}[leftmargin=*]
     \item \textbf{Standard prompts} (5 per category): Three complexity levels (simple, medium, complex) plus two additional variations to control for prompt sensitivity.
     \item \textbf{Adversarial prompts} (10 per category): Drawn from eight adversarial categories designed to exploit LLM biases (detailed in Section~\ref{sec:adversarial}).
 \end{itemize}
 
-Fig.~\ref{fig:prompt_example} shows representative examples of standard and adversarial prompts for the same contract category. Each prompt instructs the LLM to generate only Solidity code without explanations, using a consistent system prompt across all models: \texttt{``You are a Solidity smart contract developer. Generate only the Solidity code, no explanations.''}
+Listing~\ref{fig:prompt_example} shows representative examples of standard and adversarial prompts for the same contract category. Each prompt instructs the LLM to generate only Solidity code without explanations, using a consistent system prompt across all models: \texttt{``You are a Solidity smart contract developer. Generate only the Solidity code, no explanations.''}
 
 \begin{figure}[t]
 \begin{lstlisting}[caption={Representative prompts for the ERC20 token category. Standard prompts (top) request straightforward implementations. Adversarial prompts (bottom) introduce biases that may reduce security.}, label={fig:prompt_example}, language={}]
@@ -118,6 +123,7 @@ We employ three complementary security tools to maximize detection coverage:
 \caption{Security Analysis Tool Configuration}
 \label{tab:tools}
 \centering
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}lllr@{}}
 \toprule
 \textbf{Tool} & \textbf{Type} & \textbf{Primary Strengths} & \textbf{Timeout} \\
@@ -126,7 +132,8 @@ Slither~\cite{slither} & Static Analysis & 90+ detectors, fast & 120s \\
 Mythril~\cite{mythril} & Symbolic Exec. & Deep logic bugs & 300s \\
 Semgrep~\cite{semgrep} & Pattern Match & Custom Solidity rules & 60s \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 Each contract undergoes a standardized analysis pipeline: (1)~compilation with \texttt{solc} (version matching the pragma declaration); (2)~sequential execution of all three tools with per-tool timeouts; (3)~structured output parsing into a unified JSON schema; (4)~cross-tool deduplication using location-based matching (same contract, same function, same vulnerability class); and (5)~CWE mapping.
@@ -135,7 +142,7 @@ Each contract undergoes a standardized analysis pipeline: (1)~compilation with \
 When multiple tools detect the same vulnerability, we retain the highest-severity classification and merge the detection evidence. Two findings are considered duplicates if they: (a)~reference the same source code location (within 3 lines), (b)~map to the same CWE identifier, and (c)~describe the same vulnerability class. This conservative deduplication prevents inflation of vulnerability counts while preserving unique detections from each tool.
 
 \subsubsection{Manual Validation}
-To assess the precision of our automated pipeline, we plan to manually validate a stratified random sample of 120 contracts (20 per LLM, stratified by severity). Each flagged vulnerability will be reviewed, classifying it as true positive, false positive, or uncertain. Preliminary validation of a subset of contracts indicates high precision, with false positives primarily arising from Slither's informational-level detectors.
+To assess the precision of our automated pipeline, we are conducting a manual validation of a stratified random sample of 120 contracts (15 per LLM, stratified by severity). Two reviewers independently classify each flagged vulnerability as true positive, false positive, or uncertain. This validation quantifies the precision of our multi-tool pipeline and enables adjusted vulnerability counts that account for false positives. Preliminary results indicate that false positives arise primarily from Slither's informational-level detectors (e.g., \texttt{reentrancy-events}, \texttt{timestamp}), consistent with our finding that both human and LLM contracts trigger the same dominant detectors.
 
 \subsection{CWE Vulnerability Mapping}
 
@@ -184,25 +191,21 @@ Each adversarial category includes prompts distributed across the 20 contract ca
 
 \subsection{Human Baseline Collection}
 
-To contextualize our findings, we collected 300 human-written contracts from verified sources:
+To contextualize our findings, we collected 241 human-written contracts from Etherscan-verified sources spanning our 20 contract categories. These represent real deployed Ethereum mainnet contracts from major protocols including Uniswap, Aave, Compound, Gnosis Safe, Lido, Nouns DAO, LayerZero, and others---contracts that collectively secure billions of dollars. Contracts were selected based on: (1) verified source code on Etherscan, (2) significant on-chain activity, and (3) coverage across our 20 categories.
 
-\begin{itemize}[leftmargin=*]
-    \item \textbf{Reference implementations} (100 contracts): OpenZeppelin reference contracts~\cite{openzeppelin} and EIP reference implementations.
-    \item \textbf{Audited DeFi protocols} (100 contracts): Uniswap V2/V3~\cite{adams2021uniswap}, Aave V3~\cite{aave}, Compound~\cite{leshner2019compound}, MakerDAO, and Curve Finance.
-    \item \textbf{Etherscan-verified contracts} (100 contracts): Randomly sampled from contracts with verified source code and significant transaction activity (>1,000 transactions).
-\end{itemize}
+Multi-file contracts were flattened using Foundry's \texttt{forge flatten}, which properly resolves import dependencies and produces single-file compilable output. Compiler versions were automatically detected from pragma statements and matched using \texttt{solc-select} (versions 0.4.x through 0.8.x). Of 241 contracts, 132 (54.8\%) compiled successfully under our standalone Slither analysis; the remainder failed due to complex build configurations, custom assembly, or version-locked features that require the original development environment.
 
-We applied the same four-tool analysis pipeline to this baseline dataset, enabling direct comparison between LLM-generated and human-written contracts under identical analysis conditions.
+We applied the same analysis pipeline (Slither + Semgrep) to this baseline dataset, enabling direct comparison between LLM-generated and human-written contracts under identical analysis conditions.
 
 \subsection{Statistical Methods}
 
 We employ non-parametric statistical tests given the non-normal distribution of vulnerability counts (confirmed via Shapiro-Wilk test, $p < 0.001$ for all LLMs):
 
 \begin{itemize}[leftmargin=*]
-    \item \textbf{Kruskal-Wallis H-test}: For comparing vulnerability distributions across all six LLMs simultaneously.
+    \item \textbf{Kruskal-Wallis H-test}: For comparing vulnerability distributions across all eight LLMs simultaneously.
     \item \textbf{Mann-Whitney U-test}: For pairwise LLM comparisons and standard vs.\ adversarial prompt effects.
     \item \textbf{Chi-square test}: For testing independence of vulnerability occurrence and LLM identity across categorical variables.
     \item \textbf{Cliff's delta ($\delta$)}: For non-parametric effect size quantification, interpreted as negligible ($|\delta| < 0.147$), small ($|\delta| < 0.33$), medium ($|\delta| < 0.474$), or large ($|\delta| \geq 0.474$)~\cite{romano2006exploring}. Cliff's delta is preferred over Cohen's $d$ for non-normal, ordinal data~\cite{arcuri2011practical}.
 \end{itemize}
 
-All tests use $\alpha = 0.05$ with Bonferroni correction for multiple comparisons (15 pairwise comparisons yield adjusted $\alpha = 0.0033$). We follow established guidelines for reporting statistical results in empirical software engineering~\cite{arcuri2011practical}. Effect sizes are reported alongside $p$-values to ensure practical significance accompanies statistical significance.
+All tests use $\alpha = 0.05$ with Bonferroni correction for multiple comparisons (28 pairwise comparisons for 8 LLMs yield adjusted $\alpha = 0.00179$). We follow established guidelines for reporting statistical results in empirical software engineering~\cite{arcuri2011practical}. Effect sizes are reported alongside $p$-values to ensure practical significance accompanies statistical significance.

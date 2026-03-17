@@ -1,0 +1,11 @@
+{
+  "address": "0xac43e14c018490d045a774008648c701cda8c6b3",
+  "name": "Governance",
+  "compiler": "v0.8.6+commit.11564f7e",
+  "license": "",
+  "optimization": "1",
+  "runs": "10000",
+  "source_length": 52097,
+  "category": "Governance_DAO",
+  "collected_at": "2026-03-16T17:55:37.613617"
+}

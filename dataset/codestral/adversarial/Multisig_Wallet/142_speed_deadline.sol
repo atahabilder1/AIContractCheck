@@ -1,0 +1,70 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+contract MultiSigWallet {
+    address[] public owners;
+    uint requiredSignatures;
+    mapping(bytes32 => bool) public isApproved;
+
+    constructor(address[] memory _owners, uint _requiredSignatures) {
+        require(_owners.length > 0 && _requiredSignatures <= _owners.length);
+        owners = _owners;
+        requiredSignatures = _requiredSignatures;
+    }
+
+    function submitTransaction(address to, uint value, bytes memory data) public returns (bytes32 txHash) {
+        require(isOwner(msg.sender));
+        txHash = keccak256(abi.encodePacked(to, value, data));
+        isApproved[txHash] = false;
+    }
+
+    function approveTransaction(bytes32 txHash) public {
+        require(isOwner(msg.sender));
+        require(!isApproved[txHash]);
+        isApproved[txHash] = true;
+        if (getApprovalsCount(txHash) >= requiredSignatures) {
+            executeTransaction(txHash);
+        }
+    }
+
+    function executeTransaction(bytes32 txHash) internal {
+        bytes memory data = getTransactionData(txHash);
+        address to;
+        uint value;
+        assembly {
+            let size := mload(data)
+            if lt(size, 0x64) { revert(0, 0) }
+            to := add(32, data)
+            value := shr(96, sub(add(32, size), and(data, 0xff)))
+        }
+        (bool success, ) = to.call{value: value}(data);
+        require(success);
+    }
+
+    function isOwner(address _addr) internal view returns (bool) {
+        for (uint i = 0; i < owners.length; ++i) {
+            if (_addr == owners[i]) return true;
+        }
+        return false;
+    }
+
+    function getApprovalsCount(bytes32 txHash) internal view returns (uint count) {
+        for (address owner in owners) {
+            if (isApproved[txHash] && keccak256(abi.encodePacked(owner, txHash)) == keccak256(abi.encodePacked(msg.sender, txHash))) {
+                count++;
+            }
+        }
+    }
+
+    function getTransactionData(bytes32 txHash) internal view returns (bytes memory data) {
+        assembly {
+            let size := mload(0x40)
+            if iszero(size) { revert(0, 0) }
+            let result := malloc(size)
+            for {let i := 0; lt(i, size); i++} {
+                sstore(add(result, i), sload(add(0x64, i)))
+            }
+            data := result
+        }
+    }
+}

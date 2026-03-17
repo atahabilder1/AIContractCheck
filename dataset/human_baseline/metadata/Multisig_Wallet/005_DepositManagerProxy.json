@@ -1,0 +1,11 @@
+{
+  "address": "0x401f6c983ea34274ec46f84d70b31c151321188b",
+  "name": "DepositManagerProxy",
+  "compiler": "v0.5.11+commit.c082d0b4",
+  "license": "GNU GPLv2",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 34641,
+  "category": "Multisig_Wallet",
+  "collected_at": "2026-03-16T17:55:45.945393"
+}

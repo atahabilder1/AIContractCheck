@@ -1,0 +1,11 @@
+{
+  "address": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+  "name": "UniswapV2Router02",
+  "compiler": "v0.6.6+commit.6c089d02",
+  "license": "GNU GPLv3",
+  "optimization": "1",
+  "runs": "999999",
+  "source_length": 33985,
+  "category": "DeFi_DEX_AMM",
+  "collected_at": "2026-03-16T17:55:28.266902"
+}

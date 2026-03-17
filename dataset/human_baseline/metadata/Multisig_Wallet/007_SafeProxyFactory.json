@@ -1,0 +1,11 @@
+{
+  "address": "0x4e1dcf7ad4e460cfd30791ccc4f9c8a4f820ec67",
+  "name": "SafeProxyFactory",
+  "compiler": "v0.7.6+commit.7338295f",
+  "license": "GNU LGPLv3",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 9408,
+  "category": "Multisig_Wallet",
+  "collected_at": "2026-03-16T18:22:48.363157"
+}

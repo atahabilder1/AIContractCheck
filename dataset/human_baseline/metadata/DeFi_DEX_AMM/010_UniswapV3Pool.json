@@ -1,0 +1,11 @@
+{
+  "address": "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+  "name": "UniswapV3Pool",
+  "compiler": "v0.7.6+commit.7338295f",
+  "license": "None",
+  "optimization": "1",
+  "runs": "800",
+  "source_length": 146291,
+  "category": "DeFi_DEX_AMM",
+  "collected_at": "2026-03-16T18:22:36.550447"
+}

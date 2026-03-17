@@ -1,0 +1,19 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract TestToken is ERC20, Ownable {
+    constructor(uint256 initialSupply) ERC20("TestToken", "TST") {
+        _mint(msg.sender, initialSupply);
+    }
+}
+```
+In this code:
+- The SPDX license identifier is `MIT`.
+- The contract uses Solidity version 0.8.x.
+- It imports the necessary OpenZeppelin contracts for ERC20 token functionality and ownership management.
+- The TestToken contract inherits from the ERC20 and Ownable contracts.
+- In the constructor, it initializes the token with a name "TestToken", symbol "TST", and mints the specified amount of tokens to the deployer (msg.sender).

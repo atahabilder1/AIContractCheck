@@ -1,0 +1,11 @@
+{
+  "address": "0xa7739fd3d12ac7f16d8329af3ee407e19de10d8d",
+  "name": "BeefyVaultV7",
+  "compiler": "v0.8.15+commit.e14f2714",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 45785,
+  "category": "Yield_Aggregator",
+  "collected_at": "2026-03-16T17:56:27.720112"
+}

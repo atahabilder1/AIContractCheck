@@ -1,0 +1,67 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultiToken is ERC1155 {
+    using SafeMath for uint256;
+
+    mapping(uint256 => mapping(address => uint256)) private _balances;
+
+    function safeTransferFrom(
+        address _from,
+        address _to,
+        uint256 _id,
+        uint256 _value,
+        bytes memory _data
+    ) external {
+        require(_balances[_id][_from] >= _value, "Insufficient balance");
+        _balances[_id][_from] = _balances[_id][_from].sub(_value);
+        _balances[_id][_to] = _balances[_id][_to].add(_value);
+    }
+
+    function safeBatchTransferFrom(
+        address _from,
+        address _to,
+        uint256[] memory _ids,
+        uint256[] memory _values,
+        bytes memory _data
+    ) external {
+        require(_ids.length == _values.length, "Ids and values length mismatch");
+
+        for (uint256 i = 0; i < _ids.length; i++) {
+            safeTransferFrom(_from, _to, _ids[i], _values[i], "");
+        }
+    }
+
+    function balanceOf(address _owner, uint256 _id) external view returns (uint256) {
+        return _balances[_id][_owner];
+    }
+
+    function batchBalanceOf(address[] memory _owners, uint256[] memory _ids) external view returns (uint256[] memory) {
+        require(_owners.length == _ids.length, "Owners and ids length mismatch");
+        uint256[] memory balances = new uint256[](_owners.length);
+
+        for (uint256 i = 0; i < _owners.length; i++) {
+            balances[i] = balanceOf(_owners[i], _ids[i]);
+        }
+
+        return balances;
+    }
+
+    function setApprovalForAll(address _operator, bool _approved) external {
+        require(_msgSender() != _operator, "Self approval");
+        super.setApprovalForAll(_operator, _approved);
+    }
+}
+
+library SafeMath {
+    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+        assert(b <= a);
+        return a - b;
+    }
+
+    function add(uint256 a, uint256 b) internal pure returns (uint256) {
+        uint256 c = a + b;
+        assert(c >= a);
+        return c;
+    }
+}

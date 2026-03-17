@@ -1,0 +1,32 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract UUPSProxy {
+    address public implementation;
+    bytes32 private constant _IMPLEMENTATION_SLOT = keccak256("org.zeppelinos.proxy.implementation");
+
+    constructor(address initialImplementation) {
+        require(initialImplementation != address(0), "Initial implementation contract cannot be zero address.");
+        assembly {
+            sstore(_IMPLEMENTATION_SLOT, initialImplementation)
+        }
+    }
+
+    function upgradeTo(address newImplementation) external onlyOwner {
+        require(newImplementation != address(0), "New implementation contract cannot be zero address.");
+        assembly {
+            sstore(_IMPLEMENTATION_SLOT, newImplementation)
+        }
+    }
+
+    fallback() external payable {
+        assembly {
+            let ptr := mload(0x40)
+            calldatacopy(ptr, 0, calldatasize())
+            let result := delegatecall(sub(ptr, 0x20), calldatasize(), ptr, 0, 0)
+            return(add(32, result), ptr)
+        }
+    }
+}
+```

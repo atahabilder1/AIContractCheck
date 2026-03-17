@@ -1,0 +1,11 @@
+{
+  "address": "0x4d73adb72bc3dd368966edd0f0b2148401a178e2",
+  "name": "UltraLightNodeV2",
+  "compiler": "v0.7.6+commit.7338295f",
+  "license": "None",
+  "optimization": "1",
+  "runs": "30000",
+  "source_length": 79283,
+  "category": "Bridge_Relayer",
+  "collected_at": "2026-03-16T17:56:38.510209"
+}

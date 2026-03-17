@@ -1,0 +1,64 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    mapping(address => uint) public stakedTokens;
+    mapping(address => bool) public validators;
+    uint public totalStaked;
+    address[] public activeValidators;
+    uint public minimumStake;
+
+    constructor(uint _minimumStake) {
+        minimumStake = _minimumStake;
+    }
+
+    function stakeTokens(uint amount) external {
+        require(amount >= minimumStake, "Insufficient stake amount");
+        stakedTokens[msg.sender] += amount;
+        totalStaked += amount;
+        if (!validators[msg.sender]) {
+            activeValidators.push(msg.sender);
+            validators[msg.sender] = true;
+        }
+    }
+
+    function unstakeTokens(uint amount) external {
+        require(stakedTokens[msg.sender] >= amount, "Insufficient staked tokens");
+        stakedTokens[msg.sender] -= amount;
+        totalStaked -= amount;
+        if (stakedTokens[msg.sender] == 0) {
+            validators[msg.sender] = false;
+            removeValidator(msg.sender);
+        }
+    }
+
+    function validateMessage(bytes32 messageHash, bytes signature) external {
+        require(isValidSignature(messageHash, signature), "Invalid signature");
+        // Process the message...
+    }
+
+    function slashValidator(address validator, uint amount) external {
+        require(validators[validator], "Validator not found");
+        require(stakedTokens[validator] >= amount, "Insufficient staked tokens for slashing");
+        stakedTokens[validator] -= amount;
+        totalStaked -= amount;
+        if (stakedTokens[validator] == 0) {
+            validators[validator] = false;
+            removeValidator(validator);
+        }
+    }
+
+    function isValidSignature(bytes32 messageHash, bytes signature) private view returns (bool) {
+        // Implementation of signature verification...
+    }
+
+    function removeValidator(address validator) private {
+        for (uint i = 0; i < activeValidators.length; i++) {
+            if (activeValidators[i] == validator) {
+                activeValidators[i] = activeValidators[activeValidators.length - 1];
+                activeValidators.pop();
+                break;
+            }
+        }
+    }
+}

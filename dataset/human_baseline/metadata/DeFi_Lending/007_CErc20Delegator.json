@@ -1,0 +1,11 @@
+{
+  "address": "0xf650c3d88d12db855b8bf7d11be6c55a4e07dcc9",
+  "name": "CErc20Delegator",
+  "compiler": "v0.5.16+commit.9c3226ce",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 33578,
+  "category": "DeFi_Lending",
+  "collected_at": "2026-03-16T17:55:17.137936"
+}

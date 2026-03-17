@@ -1,0 +1,29 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract GasOptimizedBridgeRelayer {
+    address public token;
+    address payable public relayer;
+
+    constructor(address _token, address payable _relayer) {
+        token = _token;
+        relayer = _relayer;
+    }
+
+    function relayTokens(address to, uint256 amount) external {
+        IERC20(token).transferFrom(msg.sender, this, amount);
+        unchecked {
+            IERC20(token).transfer(to, amount);
+        }
+        payRelayer();
+    }
+
+    function payRelayer() private {
+        relayer.transfer(address(this).balance);
+    }
+}
+
+interface IERC20 {
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function transfer(address to, uint256 amount) external returns (bool);
+}

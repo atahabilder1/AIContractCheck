@@ -1,0 +1,11 @@
+{
+  "address": "0x914f986a44acb623a277d6bd17368171fcbe4273",
+  "name": "L1_HOP_Bridge",
+  "compiler": "v0.6.12+commit.27d51765",
+  "license": "",
+  "optimization": "1",
+  "runs": "50000",
+  "source_length": 71891,
+  "category": "Cross-Chain_Bridge",
+  "collected_at": "2026-03-16T17:56:44.524744"
+}

@@ -1,0 +1,57 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultiSigWallet {
+    address[] public owners;
+    uint requiredSignatures;
+    mapping(address => bool) public isOwner;
+
+    constructor(uint _requiredSignatures, address[] memory _owners) {
+        require(_requiredSignatures <= _owners.length, "Required signatures exceeds number of owners.");
+        requiredSignatures = _requiredSignatures;
+        for (uint i = 0; i < _owners.length; i++) {
+            isOwner[_owners[i]] = true;
+            owners.push(_owners[i]);
+        }
+    }
+
+    struct Transaction {
+        address to;
+        uint value;
+        bytes data;
+        bool executed;
+        mapping(address => bool) approvals;
+    }
+
+    mapping(uint => Transaction) public transactions;
+    uint transactionCount;
+
+    function submitTransaction(address _to, uint _value, bytes memory _data) external {
+        require(isOwner[msg.sender], "Sender is not an owner.");
+        transactions[transactionCount] = Transaction({
+            to: _to,
+            value: _value,
+            data: _data,
+            executed: false,
+            approvals: mapping(address => bool)({})
+        });
+        transactionCount++;
+    }
+
+    function approveTransaction(uint _transactionId) external {
+        require(isOwner[msg.sender], "Sender is not an owner.");
+        Transaction memory tx = transactions[_transactionId];
+        require(!tx.executed, "Transaction already executed.");
+        tx.approvals[msg.sender] = true;
+        uint approvedCount = 0;
+        for (uint i = 0; i < owners.length; i++) {
+            if (tx.approvals[owners[i]]) {
+                approvedCount++;
+            }
+        }
+        if (approvedCount >= requiredSignatures) {
+            tx.to.call{value: tx.value}(tx.data);
+            transactions[_transactionId].executed = true;
+        }
+    }
+}

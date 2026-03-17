@@ -1,0 +1,11 @@
+{
+  "address": "0xc00e94cb662c3520282e6f5717214004a7f26888",
+  "name": "Comp",
+  "compiler": "v0.5.16+commit.9c3226ce",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 12596,
+  "category": "ERC20_Token",
+  "collected_at": "2026-03-16T17:54:41.456525"
+}

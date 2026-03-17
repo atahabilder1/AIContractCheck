@@ -1,0 +1,48 @@
+ SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    address private _timelock;
+    uint256 private _delay;
+
+    constructor(address timelock, uint256 delay) {
+        _timelock = timelock;
+        _delay = delay;
+    }
+
+    struct TimedAction {
+        address to;
+        uint256 value;
+        bytes data;
+        uint256 executionTime;
+    }
+
+    mapping(bytes32 => TimedAction) private timedActions;
+    mapping(bytes32 => bool) private executed;
+
+    function queueTransaction(address to, uint256 value, bytes memory data, string memory description) public {
+        require(_timelock == msg.sender, "Timelock: Caller is not the timelock");
+        bytes32 hash = keccak256(abi.encode(to, value, data));
+        require(!executed[hash], "Timelock: Transaction already executed");
+        timedActions[hash] = TimedAction({ to: to, value: value, data: data, executionTime: block.timestamp + _delay });
+    }
+
+    function executeTransaction(address to, uint256 value, bytes memory data) public {
+        require(_timelock == msg.sender, "Timelock: Caller is not the timelock");
+        bytes32 hash = keccak256(abi.encode(to, value, data));
+        TimedAction memory action = timedActions[hash];
+        require(action.to != address(0), "Timelock: Transaction does not exist");
+        require(!executed[hash], "Timelock: Transaction already executed");
+        require(block.timestamp >= action.executionTime, "Timelock: Transaction has not passed the delay period");
+        (bool success, bytes memory result) = to.call{value: value}(data);
+        require(success, "Timelock: Transaction execution failed");
+        executed[hash] = true;
+    }
+
+    function cancelTransaction(address to, uint256 value, bytes memory data) public {
+        require(_timelock == msg.sender, "Timelock: Caller is not the timelock");
+        bytes32 hash = keccak256(abi.encode(to, value, data));
+        delete timedActions[hash];
+    }
+}

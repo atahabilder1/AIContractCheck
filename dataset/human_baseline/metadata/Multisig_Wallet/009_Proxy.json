@@ -1,0 +1,11 @@
+{
+  "address": "0x0da0c3e52c977ed3cbc641ff02dd271c3ed55afe",
+  "name": "Proxy",
+  "compiler": "v0.5.14+commit.1f1aaa4",
+  "license": "MIT",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 1799,
+  "category": "Multisig_Wallet",
+  "collected_at": "2026-03-16T18:22:48.364280"
+}

@@ -1,0 +1,11 @@
+{
+  "address": "0x3666f603cc164936c1b87e207f36beba4ac5f18a",
+  "name": "L1_ERC20_Bridge",
+  "compiler": "v0.6.12+commit.27d51765",
+  "license": "",
+  "optimization": "1",
+  "runs": "50000",
+  "source_length": 70543,
+  "category": "Cross-Chain_Bridge",
+  "collected_at": "2026-03-16T17:56:44.524050"
+}

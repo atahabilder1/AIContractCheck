@@ -1,0 +1,11 @@
+{
+  "address": "0xaf1f5e1c19cb68b30aad73846effdf78a5863319",
+  "name": "VaultRegistry",
+  "compiler": "v0.8.17+commit.8df45f5f",
+  "license": "GNU AGPLv3",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 18165,
+  "category": "Yield_Aggregator",
+  "collected_at": "2026-03-16T17:56:27.719648"
+}

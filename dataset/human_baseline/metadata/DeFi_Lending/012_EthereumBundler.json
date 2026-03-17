@@ -1,0 +1,11 @@
+{
+  "address": "0xa7995f71aa11525db02fc2473c37dee5dbf55107",
+  "name": "EthereumBundler",
+  "compiler": "v0.8.21+commit.d9974bed",
+  "license": "",
+  "optimization": "1",
+  "runs": "80000",
+  "source_length": 168027,
+  "category": "DeFi_Lending",
+  "collected_at": "2026-03-16T17:55:17.141611"
+}

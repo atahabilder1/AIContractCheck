@@ -1,0 +1,11 @@
+{
+  "address": "0xbbbbbbbbbb9cc5e90e3b3af64bdaf62c37eeffcb",
+  "name": "Morpho",
+  "compiler": "v0.8.19+commit.7dd6d404",
+  "license": "",
+  "optimization": "1",
+  "runs": "999999",
+  "source_length": 64818,
+  "category": "DeFi_Lending",
+  "collected_at": "2026-03-16T17:55:17.139716"
+}

@@ -1,0 +1,11 @@
+{
+  "address": "0xc005dc82818d67af737725bd4bf75435d065d239",
+  "name": "TransparentUpgradeableProxy",
+  "compiler": "v0.8.19+commit.7dd6d404",
+  "license": "",
+  "optimization": "1",
+  "runs": "999999",
+  "source_length": 549711,
+  "category": "Bridge_Relayer",
+  "collected_at": "2026-03-16T17:56:38.512599"
+}

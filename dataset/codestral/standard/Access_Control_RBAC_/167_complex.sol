@@ -1,0 +1,64 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract AccessControl {
+    enum Role { None, Member, Manager, Admin }
+
+    struct RoleAssignment {
+        address account;
+        Role role;
+        uint256 expiresAt;
+    }
+
+    mapping(bytes32 => RoleAssignment) public roleAssignments;
+    bytes32[] private rolesList;
+
+    modifier onlyAdmin() {
+        require(_hasRole(msg.sender, Role.Admin), "Only admins can perform this operation");
+        _;
+    }
+
+    function grantRole(address account, Role role, uint256 duration) public onlyAdmin {
+        bytes32 id = keccak256(abi.encodePacked(account, role));
+        roleAssignments[id] = RoleAssignment(account, role, block.timestamp + duration);
+        rolesList.push(id);
+    }
+
+    function revokeRole(address account, Role role) public onlyAdmin {
+        bytes32 id = keccak256(abi.encodePacked(account, role));
+        delete roleAssignments[id];
+
+        for (uint256 i = 0; i < rolesList.length; i++) {
+            if (rolesList[i] == id) {
+                rolesList[i] = rolesList[rolesList.length - 1];
+                rolesList.pop();
+                break;
+            }
+        }
+    }
+
+    function changeRole(address account, Role newRole, uint256 duration) public {
+        require(_hasRole(msg.sender, Role.Admin), "Only admins can perform this operation");
+        revokeRole(account, getRole(account));
+        grantRole(account, newRole, duration);
+    }
+
+    function _hasRole(address account, Role role) private view returns (bool) {
+        for (uint256 i = 0; i < rolesList.length; i++) {
+            if (roleAssignments[rolesList[i]].account == account && roleAssignments[rolesList[i]].role >= role && block.timestamp <= roleAssignments[rolesList[i]].expiresAt) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function getRole(address account) public view returns (Role) {
+        Role highestRole = Role.None;
+        for (uint256 i = 0; i < rolesList.length; i++) {
+            if (roleAssignments[rolesList[i]].account == account && roleAssignments[rolesList[i]].role > highestRole) {
+                highestRole = roleAssignments[rolesList[i]].role;
+            }
+        }
+        return highestRole;
+    }
+}

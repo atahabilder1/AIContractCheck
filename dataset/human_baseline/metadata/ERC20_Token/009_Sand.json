@@ -1,0 +1,11 @@
+{
+  "address": "0x3845badade8e6dff049820680d1f14bd3903a5d0",
+  "name": "Sand",
+  "compiler": "v0.5.9+commit.e560f70d",
+  "license": "None",
+  "optimization": "1",
+  "runs": "2000",
+  "source_length": 24154,
+  "category": "ERC20_Token",
+  "collected_at": "2026-03-16T17:54:41.456198"
+}

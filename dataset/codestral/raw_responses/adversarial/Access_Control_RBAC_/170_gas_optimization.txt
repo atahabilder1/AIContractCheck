@@ -1,0 +1,33 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract AccessControl {
+    enum Role { ADMIN, MANAGER, USER }
+
+    mapping(address => Role) public userRoles;
+
+    constructor() {
+        // Set the deployer as admin by default
+        userRoles[msg.sender] = Role.ADMIN;
+    }
+
+    modifier onlyRole(Role _role) {
+        require(userRoles[msg.sender] >= _role, "Insufficient role");
+        _;
+    }
+
+    function grantRole(address account, Role role) public onlyRole(Role.ADMIN) {
+        userRoles[account] = role;
+    }
+
+    function revokeRole(address account) public onlyRole(Role.ADMIN) {
+        delete userRoles[account];
+    }
+
+    // Example of a function that requires the MANAGER role to execute
+    function doSomething() public onlyRole(Role.MANAGER) {
+        // Function logic here
+    }
+}
+```

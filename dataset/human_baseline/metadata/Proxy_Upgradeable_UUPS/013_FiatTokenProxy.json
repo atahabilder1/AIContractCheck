@@ -1,0 +1,11 @@
+{
+  "address": "0xbe9895146f7af43049ca1c1ae358b0541ea49704",
+  "name": "FiatTokenProxy",
+  "compiler": "v0.6.12+commit.27d51765",
+  "license": "",
+  "optimization": "1",
+  "runs": "1000000",
+  "source_length": 21489,
+  "category": "Proxy_Upgradeable_UUPS",
+  "collected_at": "2026-03-16T18:22:55.317008"
+}

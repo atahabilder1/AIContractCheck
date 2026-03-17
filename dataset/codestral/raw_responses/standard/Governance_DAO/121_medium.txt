@@ -1,0 +1,53 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Governance {
+    // Define the structure for proposals
+    struct Proposal {
+        string description;
+        uint256 numVotes;
+        bool executed;
+    }
+
+    mapping(uint256 => address) public delegates;
+    mapping(address => uint256) public votes;
+    mapping(uint256 => Proposal) public proposals;
+    uint256 private totalSupply = 100000; // Example total supply
+    uint256 private quorumPercentage = 5; // Example 5% quorum requirement
+    uint256 private proposalThreshold = 1000; // Example minimum vote threshold for proposals
+    uint256 private timeLockDuration = 3 days; // Example 3-day execution delay
+    uint256 public numProposals;
+
+    function delegate(address to) external {
+        delegates[_msgSender()] = to;
+    }
+
+    function vote(uint256 proposalId, bool support) external {
+        address voter = _msgSender();
+        require(!proposals[proposalId].executed, "Proposal already executed");
+        require(votes[voter] == 0, "Already voted");
+        votes[voter] = support ? 1 : 2; // 1 for yes, 2 for no
+        proposals[proposalId].numVotes += support ? getVotePower(voter) : 0;
+    }
+
+    function createProposal(string memory description) external {
+        require(_msgSender().balance >= proposalThreshold, "Insufficient funds");
+        numProposals++;
+        proposals[numProposals] = Proposal({description: description, numVotes: 0, executed: false});
+    }
+
+    function executeProposal(uint256 proposalId) external {
+        require(!proposals[proposalId].executed, "Proposal already executed");
+        require(proposals[proposalId].numVotes > totalSupply * quorumPercentage / 100, "Quorum not reached");
+        require(block.timestamp >= proposals[proposalId].creationTime + timeLockDuration, "Execution delay has not passed");
+        // Execute the proposal here (e.g., calling another contract's function)
+        proposals[proposalId].executed = true;
+    }
+
+    function getVotePower(address account) internal view returns (uint256) {
+        if (delegates[account] != address(0)) return getVotePower(delegates[account]);
+        else return votes[account];
+    }
+}
+```

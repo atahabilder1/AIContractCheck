@@ -1,0 +1,11 @@
+{
+  "address": "0x39053d51b77dc0d36036fc1fcc8cb819df8ef37a",
+  "name": "TransparentUpgradeableProxy",
+  "compiler": "v0.8.12+commit.f00d7308",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 29092,
+  "category": "DeFi_Staking",
+  "collected_at": "2026-03-16T17:55:07.324130"
+}

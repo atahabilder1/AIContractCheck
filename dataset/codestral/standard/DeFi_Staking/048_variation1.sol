@@ -1,0 +1,54 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract LiquidStaking is Ownable {
+    using SafeMath for uint256;
+
+    IERC20 public stakingToken;
+    IERC20 public stToken;
+
+    constructor(IERC20 _stakingToken, IERC20 _stToken) {
+        stakingToken = _stakingToken;
+        stToken = _stToken;
+    }
+
+    function stake(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+
+        stakingToken.transferFrom(msg.sender, address(this), amount);
+
+        uint256 stTokensToMint = calculateStTokensToMint(amount);
+        stToken.mint(msg.sender, stTokensToMint);
+    }
+
+    function unstake(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+
+        uint256 tokensToBurn = calculateTokensToBurn(amount);
+        require(stToken.balanceOf(msg.sender) >= tokensToBurn, "Insufficient stToken balance");
+
+        stToken.burn(msg.sender, tokensToBurn);
+
+        uint256 stakingTokensToReturn = calculateStakingTokensToReturn(amount);
+        stakingToken.transfer(msg.sender, stakingTokensToReturn);
+    }
+
+    function calculateStTokensToMint(uint256 amount) private view returns (uint256) {
+        // Implement your logic to calculate the number of stTokens to mint based on the staked amount
+        return amount;  // Placeholder logic, replace with actual calculation
+    }
+
+    function calculateTokensToBurn(uint256 amount) private view returns (uint256) {
+        // Implement your logic to calculate the number of stTokens to burn based on the unstaking amount
+        return amount;  // Placeholder logic, replace with actual calculation
+    }
+
+    function calculateStakingTokensToReturn(uint256 amount) private view returns (uint256) {
+        // Implement your logic to calculate the number of staking tokens to return based on the unstaking amount
+        return amount;  // Placeholder logic, replace with actual calculation
+    }
+}

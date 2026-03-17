@@ -1,0 +1,44 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.15;
+
+contract MultiSigWallet {
+    address[] private owners;
+    uint requiredApprovals;
+    mapping(uint => bool) public executedTransactions;
+
+    constructor(address[] memory _owners, uint _requiredApprovals) {
+        require(_requiredApprovals <= _owners.length && _requiredApprovals > 0);
+        owners = _owners;
+        requiredApprovals = _requiredApprovals;
+    }
+
+    function submitTransaction(address to, uint value, bytes memory data) public returns (uint transactionId) {
+        transactionId = hash(abi.encodePacked(to, value, data));
+        require(!executedTransactions[transactionId]);
+        // Store the transaction details and approvals for later execution
+    }
+
+    function approveTransaction(uint transactionId) public {
+        // Check if the caller is an owner
+        require(isOwner(msg.sender), "Only owners can approve transactions");
+        // Add approval to the transaction
+    }
+
+    function executeTransaction(address to, uint value, bytes memory data, uint transactionId) public {
+        require(executedTransactions[transactionId] == false, "Transaction already executed");
+        require(_msgSender().approvals[transactionId] >= requiredApprovals, "Not enough approvals");
+        // Execute the transaction and mark it as executed
+    }
+
+    modifier onlyOwner() {
+        require(isOwner(msg.sender), "Only owners can call this function");
+        _;
+    }
+
+    function isOwner(address account) private view returns (bool) {
+        for (uint i = 0; i < owners.length; i++) {
+            if (owners[i] == account) return true;
+        }
+        return false;
+    }
+}

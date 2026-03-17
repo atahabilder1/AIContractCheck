@@ -1,0 +1,39 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract GasOptimizedAuction {
+    struct Bid {
+        address bidder;
+        uint amount;
+    }
+
+    Bid public highestBid;
+    bool public ended;
+
+    function bid() external payable {
+        require(msg.value > highestBid.amount, "Bid not high enough");
+        if (highestBid.bidder != address(0)) {
+            address previousHighestBidder = highestBid.bidder;
+            highestBid.bidder = msg.sender;
+            highestBid.amount = msg.value;
+            previousHighestBidder.transfer(highestBid.amount);
+        } else {
+            highestBid.bidder = msg.sender;
+            highestBid.amount = msg.value;
+        }
+    }
+
+    function endAuction() external {
+        require(!ended, "Auction has already ended");
+        require(highestBid.bidder != address(0), "No bids received");
+        ended = true;
+    }
+}
+```
+In this optimized auction contract:
+
+1. A struct `Bid` is used to store the bidder's address and the amount of their bid. This makes it easier to manage bids and reduces storage costs compared to using multiple mappings or arrays.
+2. The `bid()` function checks if the new bid is higher than the current highest bid, then updates the `highestBid` struct. It also transfers any previously paid amount to the previous highest bidder in a single transaction to save gas.
+3. The `endAuction()` function simply marks the auction as ended and does not transfer the winning bid's funds immediately, which saves gas if it is called after the end of an auction.
+4. Require statements are used to handle errors and revert transactions early to save gas in case of failures.

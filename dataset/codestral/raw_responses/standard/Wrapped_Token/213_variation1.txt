@@ -1,0 +1,32 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+contract RebasingTokenWrapper is ERC20 {
+    IERC20 public underlying;
+    uint256 public initialSupply;
+
+    constructor(IERC20 _underlying, uint256 _initialSupply) ERC20("RebasingTokenWrapper", "RWT") {
+        underlying = _underlying;
+        initialSupply = _initialSupply;
+        _mint(msg.sender, _initialSupply);
+    }
+
+    function withdraw() public {
+        uint256 balance = this.balanceOf(msg.sender);
+        require(balance > 0, "No tokens to withdraw");
+
+        underlying.transferFrom(this, msg.sender, (underlying.balanceOf(address(this)) * balance) / initialSupply);
+        _burn(msg.sender, balance);
+    }
+
+    function deposit() public {
+        uint256 amount = underlying.balanceOf(msg.sender);
+        require(amount > 0, "No tokens to deposit");
+
+        underlying.transferFrom(msg.sender, address(this), amount);
+        _mint(msg.sender, (initialSupply * amount) / underlying.balanceOf(address(this)));
+    }
+}

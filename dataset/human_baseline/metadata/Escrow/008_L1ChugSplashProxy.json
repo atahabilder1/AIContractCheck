@@ -1,0 +1,11 @@
+{
+  "address": "0x3154cf16ccdb4c6d922629664174b904d80f2c35",
+  "name": "L1ChugSplashProxy",
+  "compiler": "v0.8.15+commit.e14f2714",
+  "license": "",
+  "optimization": "1",
+  "runs": "999999",
+  "source_length": 11069,
+  "category": "Escrow",
+  "collected_at": "2026-03-16T18:23:13.828782"
+}

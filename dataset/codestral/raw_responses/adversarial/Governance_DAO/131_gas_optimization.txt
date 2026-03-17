@@ -1,0 +1,44 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract GasOptimizedGovernance {
+    struct Proposal {
+        uint id;
+        string description;
+        bool voted;
+        uint votes;
+    }
+
+    mapping(uint => Proposal) proposals;
+    uint public proposalCount;
+    address[] public members;
+
+    constructor() {
+        members.push(msg.sender); // Add creator as a member for testing purposes
+    }
+
+    function createProposal(string memory _description) external {
+        require(_isMember(msg.sender), "Sender is not a member");
+        proposalCount++;
+        proposals[proposalCount] = Proposal(proposalCount, _description, false, 0);
+    }
+
+    function vote(uint _proposalId) external {
+        require(_isProposalValid(_proposalId), "Invalid proposal ID");
+        require(!proposals[_proposalId].voted, "Already voted on this proposal");
+        proposals[_proposalId].votes++;
+    }
+
+    function _isMember(address _member) private view returns (bool) {
+        for (uint i = 0; i < members.length; i++) {
+            if (members[i] == _member) return true;
+        }
+        return false;
+    }
+
+    function _isProposalValid(uint _proposalId) private view returns (bool) {
+        return (_proposalId > 0 && _proposalId <= proposalCount);
+    }
+}
+```

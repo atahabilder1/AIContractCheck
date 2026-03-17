@@ -1,0 +1,11 @@
+{
+  "address": "0xa6b71e26c5e0845f74c812102ca7114b6a896ab2",
+  "name": "GnosisSafeProxyFactory",
+  "compiler": "v0.7.6+commit.7338295f",
+  "license": "GNU LGPLv3",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 8307,
+  "category": "Multisig_Wallet",
+  "collected_at": "2026-03-16T17:55:45.943258"
+}

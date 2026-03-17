@@ -1,0 +1,44 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+interface IFlashLoan {
+    function flashFee(address token, uint amount) external view returns (uint);
+    function flashLoan(address receiver, address token, uint amount, bytes calldata data) external;
+}
+
+contract FlashLoanProvider is IFlashLoan {
+    mapping(address => mapping(address => uint)) public fees;
+
+    constructor() {}
+
+    function setFee(address token, address receiver, uint feePercentage) public onlyOwner {
+        require(feePercentage <= 100, "Fee percentage must be less than or equal to 100");
+        fees[token][receiver] = feePercentage;
+    }
+
+    function flashFee(address token, uint amount) external view override returns (uint) {
+        return (amount * fees[token][msg.sender]) / 100;
+    }
+
+    function flashLoan(address receiver, address token, uint amount, bytes calldata data) external override {
+        IERC20(token).transferFrom(msg.sender, this, amount);
+        uint fee = flashFee(token, amount);
+        IFlashLoanReceiver(receiver).executeOperation(token, amount - fee, data);
+    }
+
+    function withdrawFees(address token) public {
+        require(IERC20(token).balanceOf(this) >= fees[token][msg.sender], "Insufficient fees to withdraw");
+        IERC20(token).transfer(msg.sender, fees[token][msg.sender]);
+    }
+
+    function onlyOwner() modifier {
+        require(owner == msg.sender, "Only the owner can perform this action");
+        _;
+    }
+}
+
+interface IFlashLoanReceiver {
+    function executeOperation(address token, uint amount, bytes calldata data) external;
+}

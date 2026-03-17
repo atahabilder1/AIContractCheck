@@ -1,0 +1,11 @@
+{
+  "address": "0xf8ce90c2710713552fb564869694b2505bfc0846",
+  "name": "DepositHelper",
+  "compiler": "v0.5.16+commit.9c3226ce",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "150",
+  "source_length": 21764,
+  "category": "Escrow",
+  "collected_at": "2026-03-16T17:56:16.718355"
+}

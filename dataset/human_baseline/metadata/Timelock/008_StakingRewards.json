@@ -1,0 +1,11 @@
+{
+  "address": "0x8302fe9f0c509a996573d3cc5b0d5d51e4fdd5ec",
+  "name": "StakingRewards",
+  "compiler": "v0.5.17+commit.d19bba13",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 18972,
+  "category": "Timelock",
+  "collected_at": "2026-03-16T17:55:52.462017"
+}

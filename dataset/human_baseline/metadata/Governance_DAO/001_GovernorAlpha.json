@@ -1,0 +1,11 @@
+{
+  "address": "0xc0da01a04c3f3e0be433606045bb7017a7323e38",
+  "name": "GovernorAlpha",
+  "compiler": "v0.5.16+commit.9c3226ce",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 14874,
+  "category": "Governance_DAO",
+  "collected_at": "2026-03-16T17:55:37.608006"
+}

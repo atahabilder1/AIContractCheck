@@ -1,0 +1,11 @@
+{
+  "address": "0xd4b6cd147ad8a0d5376b6fdba85fe8128c6f0686",
+  "name": "LiquidatorProxyV1ForSoloMargin",
+  "compiler": "v0.5.7+commit.6da8b019",
+  "license": "",
+  "optimization": "1",
+  "runs": "10000",
+  "source_length": 67358,
+  "category": "Timelock",
+  "collected_at": "2026-03-16T17:55:52.461220"
+}

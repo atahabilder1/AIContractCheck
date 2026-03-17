@@ -1,0 +1,11 @@
+{
+  "address": "0xb1a32fc9f9d8b2cf86c068cae13108809547ef71",
+  "name": "NounsDAOExecutorProxy",
+  "compiler": "v0.8.19+commit.7dd6d404",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 23993,
+  "category": "Timelock",
+  "collected_at": "2026-03-16T17:55:52.461002"
+}

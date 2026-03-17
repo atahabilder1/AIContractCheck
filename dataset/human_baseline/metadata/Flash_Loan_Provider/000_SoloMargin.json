@@ -1,0 +1,11 @@
+{
+  "address": "0x1e0447b19bb6ecfdae1e4ae1694b0c3659614e4e",
+  "name": "SoloMargin",
+  "compiler": "v0.5.7+commit.6da8b019",
+  "license": "",
+  "optimization": "1",
+  "runs": "10000",
+  "source_length": 154192,
+  "category": "Flash_Loan_Provider",
+  "collected_at": "2026-03-16T17:56:20.441758"
+}

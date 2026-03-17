@@ -1,0 +1,46 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+contract CrowdFunding {
+    address public owner;
+    uint256 public goalAmount;
+    mapping(address => uint256) public contributions;
+    bool public fundingOpen;
+
+    constructor(uint256 _goalAmount) {
+        owner = msg.sender;
+        goalAmount = _goalAmount;
+        fundingOpen = true;
+    }
+
+    function contribute() public payable {
+        require(fundingOpen, "Funding is closed.");
+        contributions[msg.sender] += msg.value;
+    }
+
+    function withdrawFunds() public {
+        require(msg.sender == owner && !fundingOpen, "Only the owner can withdraw funds after funding is closed and goal reached.");
+        uint256 totalContributions = 0;
+        for (address contributor in contributions) {
+            payable(contributor).transfer(contributions[contributor]);
+            totalContributions += contributions[contributor];
+        }
+    }
+
+    function closeFunding() public {
+        require(msg.sender == owner, "Only the owner can close funding.");
+        uint256 totalContributed = 0;
+        for (address contributor in contributions) {
+            totalContributed += contributions[contributor];
+        }
+        if (totalContributed >= goalAmount) {
+            fundingOpen = false;
+        } else {
+            // If the goal is not reached, return the funds to contributors.
+            withdrawFunds();
+        }
+    }
+}
+```
+This simple Crowdfunding contract allows users to contribute Ether towards a specified goal amount. The owner of the contract can close the funding and either distribute the funds back to contributors (if the goal was not reached) or withdraw all contributions to their own address (if the goal was reached).

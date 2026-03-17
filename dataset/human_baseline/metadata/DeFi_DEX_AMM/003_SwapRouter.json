@@ -1,0 +1,11 @@
+{
+  "address": "0xe592427a0aece92de3edee1f18e0157c05861564",
+  "name": "SwapRouter",
+  "compiler": "v0.7.6+commit.7338295f",
+  "license": "",
+  "optimization": "1",
+  "runs": "1000000",
+  "source_length": 86868,
+  "category": "DeFi_DEX_AMM",
+  "collected_at": "2026-03-16T17:55:28.271142"
+}

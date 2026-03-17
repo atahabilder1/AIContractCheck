@@ -1,0 +1,43 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/structs/OrderedSet.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract BridgeRelayer is Ownable {
+    using OrderedSet for Utils.OrderedSet;
+
+    struct TransferBid {
+        uint256 index;
+        address relayer;
+        uint256 amount;
+    }
+
+    mapping(uint256 => TransferBid[]) public transferBids;
+    mapping(address => mapping(uint256 => bool)) private relayedTransfers;
+    Utils.OrderedSet private transferIndices;
+
+    function bidOnTransfer(uint256 _transferIndex, uint256 _amount) external {
+        require(!relayedTransfers[msg.sender][_transferIndex], "Transfer already processed");
+        transferBids[_transferIndex].push(TransferBid(_transferIndex, msg.sender, _amount));
+    }
+
+    function processTransfer() external onlyOwner {
+        uint256 highestBidIndex = transferIndices[0];
+        address highestBidder;
+        uint256 highestBidAmount = 0;
+
+        for (uint256 i = 0; i < transferBids[highestBidIndex].length; i++) {
+            if (transferBids[highestBidIndex][i].amount > highestBidAmount) {
+                highestBidder = transferBids[highestBidIndex][i].relayer;
+                highestBidAmount = transferBids[highestBidIndex][i].amount;
+            }
+        }
+
+        // Process the transfer and pay the relayer here...
+
+        relayedTransfers[highestBidder][highestBidIndex] = true;
+        transferIndices.remove(0);
+    }
+}

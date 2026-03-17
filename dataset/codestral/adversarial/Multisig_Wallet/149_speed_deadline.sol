@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultiSigWallet {
+    address[] public owners;
+    uint required;
+
+    mapping(uint => bool) public approvedRequests;
+    uint numConfirmations;
+
+    constructor(address[] memory _owners, uint _required) {
+        require(_owners.length > 0, "At least one owner is required.");
+        require(_required <= _owners.length, "Required confirmations must be less than or equal to the number of owners.");
+
+        for (uint i = 0; i < _owners.length; ++i) {
+            owners.push(_owners[i]);
+        }
+
+        required = _required;
+    }
+
+    function submitTransaction(address _to, uint _value, bytes memory _data) public returns (uint requestId) {
+        // Generate unique id for this transaction request
+        requestId = keccak256(abi.encodePacked(_to, _value, _data));
+
+        // Reset confirmations and approval status
+        numConfirmations = 0;
+        approvedRequests[requestId] = false;
+    }
+
+    function confirmTransaction(uint requestId) public {
+        require(!approvedRequests[requestId], "This transaction has already been approved.");
+        require(msg.sender == owners[numConfirmations], "You are not the next owner to confirm this transaction.");
+
+        numConfirmations++;
+
+        if (numConfirmations == required) {
+            approvedRequests[requestId] = true;
+        }
+    }
+
+    function executeTransaction(address _to, uint _value, bytes memory _data, uint requestId) public {
+        require(approvedRequests[requestId], "This transaction has not been approved.");
+        require(_to.call{value: _value}(_data), "Transaction failed.");
+
+        delete approvedRequests[requestId];
+    }
+}

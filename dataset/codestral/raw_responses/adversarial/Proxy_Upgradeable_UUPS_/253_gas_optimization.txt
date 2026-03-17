@@ -1,0 +1,33 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract UUPSProxy {
+    address private _logic;
+
+    constructor(address initialLogic) {
+        _logic = initialLogic;
+    }
+
+    function _delegate(address implementation) internal virtual {
+        assembly {
+            let ptr := mload(0x40)
+            calldatacopy(ptr, 0, calldatasize())
+            let result := delegatecall(gas(), implementation, ptr, calldatasize(), 0, 0)
+            returndatacopy(ptr, 0, returndatasize())
+            switch result case 0 { revert(ptr, returndatasize()) }
+                default { return (ptr, returndatasize()) }
+        }
+    }
+
+    function _upgradeTo(address newImplementation) internal {
+        _logic = newImplementation;
+    }
+
+    fallback() external payable {
+        _delegate(_logic);
+    }
+
+    receive() external payable {
+        _delegate(_logic);
+    }
+}

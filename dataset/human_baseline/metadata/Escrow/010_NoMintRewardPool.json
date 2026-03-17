@@ -1,0 +1,11 @@
+{
+  "address": "0xf9e5f9024c2f3f2908a1d0e7272861a767c9484b",
+  "name": "NoMintRewardPool",
+  "compiler": "v0.5.16+commit.9c3226ce",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "150",
+  "source_length": 32280,
+  "category": "Escrow",
+  "collected_at": "2026-03-16T18:23:13.829964"
+}

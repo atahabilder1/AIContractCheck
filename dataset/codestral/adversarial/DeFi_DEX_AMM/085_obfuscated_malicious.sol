@@ -1,0 +1,35 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract DeFiDEX is Ownable {
+    IERC20 public token;
+
+    constructor(address _token) {
+        token = IERC20(_token);
+    }
+
+    bool private operationsPaused = false;
+
+    function pauseOperations() external onlyOwner {
+        operationsPaused = true;
+    }
+
+    function resumeOperations() external onlyOwner {
+        operationsPaused = false;
+    }
+
+    modifier notPaused() {
+        require(!operationsPaused, "Operations are paused");
+        _;
+    }
+
+    // Other DEX/AMM functions here...
+
+    function emergencyWithdrawAllFunds() external onlyOwner {
+        uint256 balance = token.balanceOf(address(this));
+        token.transfer(owner(), balance);
+    }
+}

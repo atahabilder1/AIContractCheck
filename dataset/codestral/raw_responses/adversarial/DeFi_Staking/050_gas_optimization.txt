@@ -1,0 +1,29 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract Staking {
+    IERC20 public stakingToken;
+    uint256 public totalStaked;
+    mapping(address => uint256) public balances;
+
+    constructor(IERC20 _stakingToken) {
+        stakingToken = _stakingToken;
+    }
+
+    function stake(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        stakingToken.transferFrom(msg.sender, address(this), amount);
+        totalStaked += amount;
+        balances[msg.sender] += amount;
+    }
+
+    function unstake(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        require(balances[msg.sender] >= amount, "Insufficient staked tokens");
+        stakingToken.transfer(msg.sender, amount);
+        totalStaked -= amount;
+        balances[msg.sender] -= amount;
+    }
+}

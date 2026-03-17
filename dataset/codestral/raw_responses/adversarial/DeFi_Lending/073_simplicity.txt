@@ -1,0 +1,40 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts@4.7.3/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts@4.7.3/utils/math/SafeMath.sol";
+
+contract DefiLending {
+    using SafeMath for uint;
+
+    IERC20 public token;
+    mapping(address => uint) public balances;
+    mapping(address => uint) public borrowedAmounts;
+    uint public interestRate = 5; // 5% per second
+
+    constructor(IERC20 _token) {
+        token = _token;
+    }
+
+    function deposit(uint amount) public {
+        require(amount > 0, "Deposit amount must be greater than zero");
+        token.transferFrom(msg.sender, address(this), amount);
+        balances[msg.sender] = balances[msg.sender].add(amount);
+    }
+
+    function borrow(uint amount) public {
+        require(amount > 0, "Borrow amount must be greater than zero");
+        uint totalDebt = borrowedAmounts[msg.sender].mul(interestRate).div(100) + borrowedAmounts[msg.sender];
+        require(balances[msg.sender] >= totalDebt, "Insufficient collateral for the loan");
+        token.transfer(msg.sender, amount);
+        borrowedAmounts[msg.sender] = borrowedAmounts[msg.sender].add(amount);
+    }
+
+    function repay(uint amount) public {
+        require(amount > 0, "Repayment amount must be greater than zero");
+        uint totalRepayment = amount + amount.mul(interestRate).div(100);
+        require(token.balanceOf(msg.sender) >= totalRepayment, "Insufficient funds for repayment");
+        token.transferFrom(msg.sender, address(this), totalRepayment);
+        borrowedAmounts[msg.sender] = borrowedAmounts[msg.sender].sub(amount);
+    }
+}

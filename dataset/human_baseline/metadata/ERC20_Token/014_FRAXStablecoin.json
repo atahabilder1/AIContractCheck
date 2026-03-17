@@ -1,0 +1,11 @@
+{
+  "address": "0x853d955acef822db058eb8505911ed77f175b99e",
+  "name": "FRAXStablecoin",
+  "compiler": "v0.6.11+commit.5ef660b1",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "100000",
+  "source_length": 321376,
+  "category": "ERC20_Token",
+  "collected_at": "2026-03-16T17:54:41.456897"
+}

@@ -1,0 +1,11 @@
+{
+  "address": "0xb66a603f4cfe17e3d27b87a8bfcad319856518b8",
+  "name": "TransparentUpgradeableProxy",
+  "compiler": "v0.8.2+commit.661d1103",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 35776,
+  "category": "ERC1155_Multi-Token",
+  "collected_at": "2026-03-16T17:54:58.822866"
+}

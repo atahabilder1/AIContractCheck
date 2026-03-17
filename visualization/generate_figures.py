@@ -14,18 +14,25 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-# IEEE-style publication settings
-plt.style.use('seaborn-v0_8-whitegrid')
+# IEEE-style publication settings — subtle horizontal grid for readability
+plt.style.use('seaborn-v0_8-white')
 plt.rcParams.update({
     'figure.figsize': (10, 6),
-    'font.size': 11,
+    'font.size': 14,
     'font.family': 'serif',
-    'axes.labelsize': 13,
-    'axes.titlesize': 14,
-    'legend.fontsize': 10,
-    'xtick.labelsize': 10,
-    'ytick.labelsize': 10,
+    'axes.labelsize': 16,
+    'axes.titlesize': 18,
+    'legend.fontsize': 13,
+    'xtick.labelsize': 13,
+    'ytick.labelsize': 13,
     'figure.dpi': 150,
+    'axes.grid': True,
+    'axes.grid.axis': 'y',
+    'grid.color': '#cccccc',
+    'grid.linestyle': '--',
+    'grid.linewidth': 0.6,
+    'grid.alpha': 0.5,
+    'axes.axisbelow': True,
 })
 
 # Consistent color palette for LLMs
@@ -49,44 +56,37 @@ def load_data(csv_path: str = "analysis/results/aggregated_results.csv") -> pd.D
 
 
 def fig1_vulnerabilities_by_llm(df: pd.DataFrame, output_dir: str = "visualization/figures"):
-    """Figure 1: Violin + strip plot of vulnerabilities by LLM."""
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    """Figure 1: Violin + strip plot of vulnerabilities by LLM (single plot)."""
+    fig, ax = plt.subplots(figsize=(10, 7))
 
     llm_order = df.groupby('llm')['total_vulns'].median().sort_values(ascending=False).index.tolist()
     colors = [get_color(llm) for llm in llm_order]
 
-    # Left: Total vulnerabilities (violin)
-    ax1 = axes[0]
     sns.violinplot(data=df, x='llm', y='total_vulns', order=llm_order,
-                   palette=colors, inner='quartile', ax=ax1, cut=0)
+                   palette=colors, inner='quartile', ax=ax, cut=0)
     sns.stripplot(data=df, x='llm', y='total_vulns', order=llm_order,
-                  color='black', alpha=0.15, size=2, jitter=True, ax=ax1)
-    ax1.set_xlabel('LLM')
-    ax1.set_ylabel('Total Vulnerabilities per Contract')
-    ax1.set_title('(a) Vulnerability Distribution by LLM')
-    ax1.tick_params(axis='x', rotation=45)
-
-    # Right: High severity rate (bar)
-    ax2 = axes[1]
-    high_rate = df.groupby('llm')['has_high'].mean().reindex(llm_order) * 100
-    bars = ax2.bar(llm_order, high_rate.values, color=colors, edgecolor='black', linewidth=0.5)
-    ax2.set_xlabel('LLM')
-    ax2.set_ylabel('% Contracts with High-Severity Vuln')
-    ax2.set_title('(b) High-Severity Vulnerability Rate')
-    ax2.tick_params(axis='x', rotation=45)
-    for bar, val in zip(bars, high_rate.values):
-        ax2.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1,
-                 f'{val:.1f}%', ha='center', va='bottom', fontsize=9)
+                  color='black', alpha=0.15, size=2, jitter=True, ax=ax)
+    ax.set_xlabel('LLM', fontsize=16)
+    ax.set_ylabel('Total Vulnerabilities per Contract', fontsize=16)
+    ax.set_title('Vulnerability Distribution by LLM', fontsize=18)
+    ax.tick_params(axis='x', rotation=45, labelsize=14)
+    ax.tick_params(axis='y', labelsize=14)
 
     plt.tight_layout()
     _save(fig, output_dir, "fig1_vulnerabilities_by_llm")
 
 
-def fig2_standard_vs_adversarial(df: pd.DataFrame, output_dir: str = "visualization/figures"):
-    """Figure 2: Grouped bar chart — standard vs adversarial by LLM."""
-    fig, ax = plt.subplots(figsize=(10, 6))
+def _fig4_severity_distribution_old(df, output_dir):
+    """Old version — superseded by the version below."""
+    pass
 
-    prompt_llm = df.groupby(['llm', 'prompt_type'])['total_vulns'].median().unstack()
+
+def fig2_standard_vs_adversarial(df: pd.DataFrame, output_dir: str = "visualization/figures"):
+    """Figure 2: Two-panel — (a) mean vulns by LLM, (b) overall distribution."""
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 12))
+
+    # Panel (a): Grouped bar chart using mean (not median)
+    prompt_llm = df.groupby(['llm', 'prompt_type'])['total_vulns'].mean().unstack()
     llm_order = prompt_llm.mean(axis=1).sort_values(ascending=False).index
 
     x = np.arange(len(llm_order))
@@ -95,24 +95,43 @@ def fig2_standard_vs_adversarial(df: pd.DataFrame, output_dir: str = "visualizat
     std_vals = prompt_llm.loc[llm_order, 'standard'] if 'standard' in prompt_llm.columns else []
     adv_vals = prompt_llm.loc[llm_order, 'adversarial'] if 'adversarial' in prompt_llm.columns else []
 
-    bars1 = ax.bar(x - width / 2, std_vals, width, label='Standard Prompts',
-                   color='steelblue', edgecolor='black', linewidth=0.5)
-    bars2 = ax.bar(x + width / 2, adv_vals, width, label='Adversarial Prompts',
-                   color='firebrick', edgecolor='black', linewidth=0.5)
+    bars1 = ax1.bar(x - width / 2, std_vals, width, label='Standard Prompts',
+                    color='steelblue', edgecolor='black', linewidth=0.5)
+    bars2 = ax1.bar(x + width / 2, adv_vals, width, label='Adversarial Prompts',
+                    color='firebrick', edgecolor='black', linewidth=0.5)
 
-    ax.set_xlabel('LLM')
-    ax.set_ylabel('Median Vulnerabilities per Contract')
-    ax.set_title('Standard vs Adversarial Prompt Effects')
-    ax.set_xticks(x)
-    ax.set_xticklabels(llm_order, rotation=45)
-    ax.legend()
+    ax1.set_xlabel('LLM', fontsize=16)
+    ax1.set_ylabel('Mean Vulnerabilities per Contract', fontsize=16)
+    ax1.set_title('(a) Standard vs Adversarial by LLM', fontsize=18)
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(llm_order, rotation=45, ha='right', fontsize=14)
+    ax1.legend(fontsize=13)
+    ax1.tick_params(axis='y', labelsize=14)
 
     for bars in [bars1, bars2]:
         for bar in bars:
             h = bar.get_height()
             if h > 0:
-                ax.text(bar.get_x() + bar.get_width() / 2, h + 0.05,
-                        f'{h:.1f}', ha='center', va='bottom', fontsize=9)
+                ax1.text(bar.get_x() + bar.get_width() / 2, h + 0.1,
+                         f'{h:.1f}', ha='center', va='bottom', fontsize=11)
+
+    # Panel (b): Box plot — overall standard vs adversarial
+    std_data = df[df['prompt_type'] == 'standard']['total_vulns']
+    adv_data = df[df['prompt_type'] == 'adversarial']['total_vulns']
+
+    bp = ax2.boxplot([std_data.values, adv_data.values],
+                     labels=['Standard', 'Adversarial'],
+                     patch_artist=True, showfliers=True,
+                     flierprops=dict(markersize=3, alpha=0.5))
+    bp['boxes'][0].set_facecolor('steelblue')
+    bp['boxes'][0].set_alpha(0.7)
+    bp['boxes'][1].set_facecolor('firebrick')
+    bp['boxes'][1].set_alpha(0.7)
+
+    ax2.set_ylabel('Total Vulnerabilities', fontsize=16)
+    ax2.set_title('(b) Overall Distribution\n($p = 0.997$, $\\delta = -0.090$)', fontsize=18)
+    ax2.tick_params(axis='x', labelsize=14)
+    ax2.tick_params(axis='y', labelsize=14)
 
     plt.tight_layout()
     _save(fig, output_dir, "fig2_standard_vs_adversarial")
@@ -129,11 +148,14 @@ def fig3_vulnerabilities_by_category(df: pd.DataFrame, output_dir: str = "visual
     pivot = pivot.loc[row_order]
 
     sns.heatmap(pivot, annot=True, fmt='.1f', cmap='YlOrRd', ax=ax,
-                linewidths=0.5, cbar_kws={'label': 'Median Vulnerabilities'})
+                linewidths=0.5, annot_kws={'size': 12},
+                cbar_kws={'label': 'Median Vulnerabilities'})
 
-    ax.set_xlabel('LLM')
-    ax.set_ylabel('Contract Category')
-    ax.set_title('Vulnerability Density by Contract Category and LLM')
+    ax.set_xlabel('LLM', fontsize=16)
+    ax.set_ylabel('Contract Category', fontsize=16)
+    ax.set_title('Vulnerability Density by Contract Category and LLM', fontsize=18)
+    ax.tick_params(axis='x', labelsize=13)
+    ax.tick_params(axis='y', labelsize=12)
 
     plt.tight_layout()
     _save(fig, output_dir, "fig3_vulnerabilities_by_category")
@@ -141,7 +163,7 @@ def fig3_vulnerabilities_by_category(df: pd.DataFrame, output_dir: str = "visual
 
 def fig4_severity_distribution(df: pd.DataFrame, output_dir: str = "visualization/figures"):
     """Figure 4: Stacked bar chart of severity distribution by LLM."""
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(12, 7))
 
     severity_data = df.groupby('llm').agg({
         'high': 'sum',
@@ -153,7 +175,6 @@ def fig4_severity_distribution(df: pd.DataFrame, output_dir: str = "visualizatio
     # Normalize to percentages
     totals = severity_data.sum(axis=1)
     severity_pct = severity_data.div(totals, axis=0) * 100
-    # Handle divisions by zero
     severity_pct = severity_pct.fillna(0)
 
     # Sort by high-severity percentage
@@ -161,16 +182,26 @@ def fig4_severity_distribution(df: pd.DataFrame, output_dir: str = "visualizatio
 
     severity_pct.plot(kind='bar', stacked=True, ax=ax,
                       color=['firebrick', 'darkorange', 'gold', 'steelblue'],
-                      edgecolor='black', linewidth=0.5)
+                      edgecolor='black', linewidth=0.5, legend=False)
 
-    ax.set_xlabel('LLM')
-    ax.set_ylabel('Percentage of Vulnerabilities')
-    ax.set_title('Vulnerability Severity Distribution by LLM')
-    ax.legend(title='Severity', labels=['High', 'Medium', 'Low', 'Informational'],
-              bbox_to_anchor=(1.02, 1), loc='upper left')
-    ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
+    ax.set_xlabel('LLM', fontsize=16)
+    ax.set_ylabel('Percentage of Vulnerabilities', fontsize=16)
+    ax.set_title('Vulnerability Severity Distribution by LLM', fontsize=18)
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=14)
+    ax.tick_params(axis='y', labelsize=14)
 
-    plt.tight_layout()
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor='firebrick', edgecolor='black', label='High'),
+        Patch(facecolor='darkorange', edgecolor='black', label='Medium'),
+        Patch(facecolor='gold', edgecolor='black', label='Low'),
+        Patch(facecolor='steelblue', edgecolor='black', label='Informational'),
+    ]
+    ax.legend(handles=legend_elements, title='Severity',
+              fontsize=13, title_fontsize=14, loc='lower center',
+              bbox_to_anchor=(0.5, -0.32), ncol=4, frameon=True)
+
+    plt.tight_layout(rect=[0, 0.08, 1, 1])
     _save(fig, output_dir, "fig4_severity_distribution")
 
 
@@ -189,18 +220,31 @@ def fig5_adversarial_trigger_effectiveness(df: pd.DataFrame, output_dir: str = "
         print("No adversarial categories found for fig5")
         return
 
-    fig, ax = plt.subplots(figsize=(14, 6))
+    fig, ax = plt.subplots(figsize=(14, 8))
 
     cat_order = (adv_df.groupby('adversarial_category')['total_vulns']
                  .median().sort_values(ascending=False).index)
 
+    # Clean category labels for display
+    label_map = {
+        'cross_chain_specific': 'Cross-Chain\nSpecific',
+        'misleading_context': 'Misleading\nContext',
+        'no_dependencies': 'No\nDependencies',
+        'obfuscated_malicious': 'Obfuscated\nMalicious',
+        'speed_deadline': 'Speed/\nDeadline',
+        'simplicity': 'Simplicity',
+        'upgradeable_specific': 'Upgradeable\nSpecific',
+        'gas_optimization': 'Gas\nOptimization',
+    }
+
     sns.boxplot(data=adv_df, x='adversarial_category', y='total_vulns',
                 order=cat_order, ax=ax, palette='YlOrRd_r', fliersize=3)
 
-    ax.set_xlabel('Adversarial Trigger Category')
-    ax.set_ylabel('Total Vulnerabilities')
-    ax.set_title('Vulnerability Induction by Adversarial Trigger Category')
-    ax.tick_params(axis='x', rotation=45)
+    ax.set_xticklabels([label_map.get(c, c) for c in cat_order], fontsize=13)
+    ax.set_xlabel('Adversarial Trigger Category', fontsize=16)
+    ax.set_ylabel('Total Vulnerabilities', fontsize=16)
+    ax.set_title('Vulnerability Induction by Adversarial Trigger Category', fontsize=18)
+    ax.tick_params(axis='y', labelsize=14)
 
     plt.tight_layout()
     _save(fig, output_dir, "fig5_adversarial_triggers")
@@ -213,7 +257,7 @@ def fig6_cwe_distribution(df: pd.DataFrame, output_dir: str = "visualization/fig
         print("No CWE columns found for fig6")
         return
 
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(12, 5.5))
 
     # Sum across all contracts
     cwe_totals = df[cwe_cols].sum().sort_values(ascending=True)
@@ -225,13 +269,26 @@ def fig6_cwe_distribution(df: pd.DataFrame, output_dir: str = "visualization/fig
         desc = ' '.join(parts[2:]).title() if len(parts) > 2 else ''
         labels.append(f"CWE-{cwe_num} ({desc})")
 
-    ax.barh(labels, cwe_totals.values, color='steelblue', edgecolor='black', linewidth=0.5)
-    ax.set_xlabel('Total Occurrences')
-    ax.set_title('CWE Vulnerability Type Distribution')
+    # Log scale so small values (1, 4) are visible alongside 2435
+    ax.barh(labels, cwe_totals.values, height=0.55, color='steelblue',
+            edgecolor='black', linewidth=0.5)
+    ax.set_xscale('log')
+    ax.set_xlabel('Total Occurrences (log scale)', fontsize=16)
+    ax.set_title('CWE Vulnerability Type Distribution', fontsize=18)
+    ax.tick_params(axis='y', labelsize=13)
+    ax.tick_params(axis='x', labelsize=13)
 
+    # Horizontal bars: vertical grid only
+    ax.yaxis.grid(False)
+    ax.xaxis.grid(True)
+
+    # Count labels with padding (log-space offset)
     for i, v in enumerate(cwe_totals.values):
-        if v > 0:
-            ax.text(v + 0.5, i, str(int(v)), va='center', fontsize=9)
+        ax.text(v * 1.2 if v > 0 else 1.5, i, str(int(v)),
+                va='center', fontsize=12, fontweight='bold')
+
+    # Right margin so labels aren't clipped
+    ax.set_xlim(left=0.7, right=cwe_totals.values.max() * 3)
 
     plt.tight_layout()
     _save(fig, output_dir, "fig6_cwe_distribution")
@@ -340,7 +397,7 @@ def fig10_compilation_rates(df: pd.DataFrame, output_dir: str = "visualization/f
 
     for bar, val in zip(bars, rates.values):
         ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1.5,
-                f"{val:.1f}%", ha="center", va="bottom", fontsize=10, fontweight="bold")
+                f"{val:.1f}%", ha="center", va="bottom", fontsize=13, fontweight="bold")
 
     plt.tight_layout()
     _save(fig, output_dir, "fig10_compilation_rates")

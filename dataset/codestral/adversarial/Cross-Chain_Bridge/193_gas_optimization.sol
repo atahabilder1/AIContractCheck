@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address public bridgeContractAddress;
+
+    constructor(address _bridgeContractAddress) {
+        bridgeContractAddress = _bridgeContractAddress;
+    }
+
+    function depositTokens(uint256 amount, address recipient) external payable {
+        require(msg.value >= amount, "Insufficient funds");
+        // Perform token transfer from sender to this contract
+        // Perform necessary steps for cross-chain transfer (e.g., locking tokens)
+    }
+
+    function withdrawTokens(uint256 amount, address recipient) external {
+        // Check if the caller is the bridge contract and has authorized the withdrawal
+        require(msg.sender == bridgeContractAddress, "Unauthorized");
+        // Perform token transfer from this contract to recipient
+        // Perform necessary steps for cross-chain transfer (e.g., unlocking tokens)
+    }
+}

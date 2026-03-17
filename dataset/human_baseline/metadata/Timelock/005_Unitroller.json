@@ -1,0 +1,11 @@
+{
+  "address": "0x3d5bc3c8d13dcb8bf317092d84783c2697ae9258",
+  "name": "Unitroller",
+  "compiler": "v0.5.17+commit.d19bba13",
+  "license": "None",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 116764,
+  "category": "Timelock",
+  "collected_at": "2026-03-16T17:55:52.461473"
+}

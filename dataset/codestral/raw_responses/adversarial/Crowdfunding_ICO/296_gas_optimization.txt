@@ -1,0 +1,46 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrowdFunding {
+    uint256 public goalAmount;
+    uint256 public deadline;
+    mapping(address => uint256) public contributions;
+    bool public isGoalReached = false;
+    bool public isCrowdfundingEnded = false;
+
+    constructor(uint256 _goalAmount, uint256 _deadline) {
+        goalAmount = _goalAmount;
+        deadline = _deadline;
+    }
+
+    function contribute() external payable {
+        require(!isCrowdfundingEnded && msg.value > 0);
+        contributions[msg.sender] += msg.value;
+        if (totalContributions() >= goalAmount) {
+            isGoalReached = true;
+        }
+    }
+
+    function withdraw() external {
+        require(isCrowdfundingEnded || !isGoalReached);
+        uint256 amountToWithdraw = contributions[msg.sender];
+        contributions[msg.sender] = 0;
+        payable(msg.sender).transfer(amountToWithdraw);
+    }
+
+    function checkDeadline() external {
+        if (block.timestamp > deadline) {
+            isCrowdfundingEnded = true;
+        }
+    }
+
+    function totalContributions() public view returns (uint256) {
+        uint256 total = 0;
+        for (address contributor in contributions) {
+            total += contributions[contributor];
+        }
+        return total;
+    }
+}
+```

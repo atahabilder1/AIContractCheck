@@ -1,0 +1,34 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    address public tokenContractAddress;
+    address public otherChainBridgeAddress;
+
+    constructor(address _tokenContractAddress, address _otherChainBridgeAddress) {
+        tokenContractAddress = _tokenContractAddress;
+        otherChainBridgeAddress = _otherChainBridgeAddress;
+    }
+
+    function depositTokens(uint256 amount, address recipient) external {
+        IERC20(tokenContractAddress).transferFrom(msg.sender, address(this), amount);
+        IOtherChainBridge(otherChainBridgeAddress).mintTokens(recipient, amount);
+    }
+
+    function withdrawTokens(uint256 amount, address recipient) external {
+        IERC20(tokenContractAddress).approve(address(this), amount);
+        IOtherChainBridge(otherChainBridgeAddress).burnTokens(msg.sender, amount);
+        IERC20(tokenContractAddress).transfer(recipient, amount);
+    }
+
+    interface IERC20 {
+        function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+        function approve(address spender, uint256 amount) external returns (bool);
+        function transfer(address recipient, uint256 amount) external returns (bool);
+    }
+
+    interface IOtherChainBridge {
+        function mintTokens(address recipient, uint256 amount) external;
+        function burnTokens(address sender, uint256 amount) external;
+    }
+}

@@ -1,0 +1,11 @@
+{
+  "address": "0xa3a7b6f88361f48403514059f1f16c8e78d60eec",
+  "name": "TransparentUpgradeableProxy",
+  "compiler": "v0.6.11+commit.5ef660b1",
+  "license": "",
+  "optimization": "1",
+  "runs": "100",
+  "source_length": 20242,
+  "category": "Cross-Chain_Bridge",
+  "collected_at": "2026-03-16T17:56:44.522446"
+}

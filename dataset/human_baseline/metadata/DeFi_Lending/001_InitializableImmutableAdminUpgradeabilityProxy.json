@@ -1,0 +1,11 @@
+{
+  "address": "0x7d2768de32b0b80b7a3454c06bdac94a69ddc7a9",
+  "name": "InitializableImmutableAdminUpgradeabilityProxy",
+  "compiler": "v0.6.12+commit.27d51765",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 11773,
+  "category": "DeFi_Lending",
+  "collected_at": "2026-03-16T17:55:17.132779"
+}

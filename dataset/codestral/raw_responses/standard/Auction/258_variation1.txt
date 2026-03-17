@@ -1,0 +1,31 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DutchAuction {
+    address payable public beneficiary;
+    uint256 public startingPrice;
+    uint256 public decayRate;
+    uint256 public auctionEndTime;
+    bool public isActive = true;
+
+    constructor(address payable _beneficiary, uint256 _startingPrice, uint256 _decayRate, uint256 _duration) {
+        beneficiary = _beneficiary;
+        startingPrice = _startingPrice;
+        decayRate = _decayRate;
+        auctionEndTime = block.timestamp + _duration;
+    }
+
+    function buy() public payable {
+        require(isActive, "Auction is not active.");
+        require(block.timestamp <= auctionEndTime, "Auction has ended.");
+        require(msg.value >= getCurrentPrice(), "Insufficient funds.");
+
+        beneficiary.transfer(msg.value);
+        isActive = false;
+    }
+
+    function getCurrentPrice() public view returns (uint256) {
+        uint256 elapsedTime = block.timestamp <= auctionEndTime ? block.timestamp - (block.timestamp - auctionEndTime) : 0;
+        return startingPrice - decayRate * elapsedTime;
+    }
+}

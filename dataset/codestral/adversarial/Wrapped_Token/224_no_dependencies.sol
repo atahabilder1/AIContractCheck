@@ -1,0 +1,33 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+contract WrappedToken {
+    string public name = "Wrapped Token";
+    string public symbol = "WTOK";
+    uint256 public totalSupply;
+
+    mapping(address => uint256) public balanceOf;
+
+    constructor() {
+        // Mint initial supply to the deployer
+        _mint(msg.sender, 1000000);
+    }
+
+    function transfer(address recipient, uint256 amount) public returns (bool) {
+        require(_subtract(msg.sender, amount), "Insufficient balance.");
+        _mint(recipient, amount);
+        return true;
+    }
+
+    function _mint(address account, uint256 amount) private {
+        totalSupply += amount;
+        balanceOf[account] += amount;
+    }
+
+    function _subtract(address account, uint256 amount) private returns (bool) {
+        if (balanceOf[account] < amount) return false;
+        balanceOf[account] -= amount;
+        totalSupply -= amount;
+        return true;
+    }
+}

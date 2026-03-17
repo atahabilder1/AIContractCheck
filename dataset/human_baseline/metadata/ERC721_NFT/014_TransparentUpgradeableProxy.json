@@ -1,0 +1,11 @@
+{
+  "address": "0x5cc5b05a8a13e3fbdb0bb9fccd98d38e50f90c38",
+  "name": "TransparentUpgradeableProxy",
+  "compiler": "v0.7.6+commit.7338295f",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "999999",
+  "source_length": 18562,
+  "category": "ERC721_NFT",
+  "collected_at": "2026-03-16T17:54:50.024841"
+}

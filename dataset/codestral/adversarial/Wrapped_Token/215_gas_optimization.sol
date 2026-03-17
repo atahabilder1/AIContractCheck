@@ -1,0 +1,29 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract WrappedToken {
+    IERC20 public underlying;
+    uint256 private totalWrapped;
+
+    constructor(IERC20 _underlying) {
+        underlying = _underlying;
+    }
+
+    function wrap(uint256 amount) external returns (uint256 wrappedAmount) {
+        require(amount > 0, "Cannot wrap zero tokens");
+        underlying.transferFrom(msg.sender, address(this), amount);
+        totalWrapped += amount;
+        _mint(msg.sender, amount);
+    }
+
+    function unwrap(uint256 amount) external {
+        require(amount > 0, "Cannot unwrap zero tokens");
+        burn(msg.sender, amount);
+        totalWrapped -= amount;
+        underlying.transfer(msg.sender, amount);
+    }
+
+    // ERC20 token methods omitted for brevity
+}

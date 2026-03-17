@@ -1,0 +1,11 @@
+{
+  "address": "0x9984ab537298be3e53edc83b3934603da3fa5d08",
+  "name": "Banny",
+  "compiler": "v0.8.6+commit.11564f7e",
+  "license": "",
+  "optimization": "1",
+  "runs": "10000",
+  "source_length": 371921,
+  "category": "Crowdfunding_ICO",
+  "collected_at": "2026-03-16T17:56:12.568525"
+}

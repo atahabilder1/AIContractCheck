@@ -1,0 +1,11 @@
+{
+  "address": "0xf0358e8c3cd5fa238a29301d0bea3d63a17bedbe",
+  "name": "VaultProxy",
+  "compiler": "v0.5.16+commit.9c3226ce",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "150",
+  "source_length": 7041,
+  "category": "Yield_Aggregator",
+  "collected_at": "2026-03-16T18:23:26.346737"
+}

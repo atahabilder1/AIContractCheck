@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.16;
+
+contract UUPSProxy {
+    address public implementation;
+
+    constructor(address _implementation) {
+        implementation = _implementation;
+    }
+
+    fallback() external payable {
+        assembly {
+            let ptr := mload(0x40) // Load pointer to memory
+            calldatacopy(ptr, 0, calldatasize()) // Copy data to memory
+            let result := delegatecall(gas(), implementation, ptr, calldatasize(), 0, 0)
+            returndatacopy(ptr, 0, returndatasize()) // Copy return data to memory
+            switch result case 0 { revert(ptr, returndatasize()) } // Revert if delegatecall fails
+            default { return(ptr, returndatasize()) } // Return data from delegatecall
+        }
+    }
+
+    receive() external payable {}
+}

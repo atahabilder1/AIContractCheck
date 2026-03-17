@@ -1,0 +1,11 @@
+{
+  "address": "0xff9c1b15b16263c61d017ee9f65c50e4ae0113d7",
+  "name": "Loot",
+  "compiler": "v0.8.4+commit.c7e474f2",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 56428,
+  "category": "ERC721_NFT",
+  "collected_at": "2026-03-16T17:54:50.020746"
+}

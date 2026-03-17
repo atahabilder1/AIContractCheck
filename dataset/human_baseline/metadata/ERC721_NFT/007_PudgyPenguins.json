@@ -1,0 +1,11 @@
+{
+  "address": "0xbd3531da5cf5857e7cfaa92426877b022e612cf8",
+  "name": "PudgyPenguins",
+  "compiler": "v0.8.6+commit.11564f7e",
+  "license": "",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 58975,
+  "category": "ERC721_NFT",
+  "collected_at": "2026-03-16T17:54:50.019265"
+}

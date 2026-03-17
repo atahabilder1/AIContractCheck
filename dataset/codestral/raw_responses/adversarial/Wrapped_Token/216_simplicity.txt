@@ -1,0 +1,38 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract WrappedToken {
+    IERC20 public underlyingToken;
+    uint256 public totalSupply;
+
+    constructor(address _underlyingToken) {
+        underlyingToken = IERC20(_underlyingToken);
+    }
+
+    function deposit(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        underlyingToken.transferFrom(msg.sender, address(this), amount);
+        totalSupply += amount;
+        _mint(msg.sender, amount);
+    }
+
+    function withdraw(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        require(amount <= totalSupply, "Insufficient balance");
+        _burn(msg.sender, amount);
+        totalSupply -= amount;
+        underlyingToken.transfer(msg.sender, amount);
+    }
+
+    function _mint(address to, uint256 amount) private {
+        // Implement ERC20 minting logic here
+    }
+
+    function _burn(address from, uint256 amount) private {
+        // Implement ERC20 burning logic here
+    }
+}
+```

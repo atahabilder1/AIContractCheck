@@ -1,0 +1,11 @@
+{
+  "address": "0x5fd79d46eba7f351fe49bff9e87cdea6c821ef9f",
+  "name": "SynthetixBridgeEscrow",
+  "compiler": "v0.5.16+commit.9c3226ce",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 23889,
+  "category": "Escrow",
+  "collected_at": "2026-03-16T18:23:13.827457"
+}

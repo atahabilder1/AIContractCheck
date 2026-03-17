@@ -1,0 +1,11 @@
+{
+  "address": "0x8014595f2ab54cd7c604b00e9fb932176fdc86ae",
+  "name": "CrvDepositor",
+  "compiler": "v0.6.12+commit.27d51765",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 33186,
+  "category": "Yield_Aggregator",
+  "collected_at": "2026-03-16T17:56:27.720995"
+}

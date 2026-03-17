@@ -1,0 +1,36 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleDEX {
+    mapping(address => uint) public balances;
+    uint public totalSupply;
+    address public token;
+
+    constructor(address _token) {
+        token = _token;
+    }
+
+    function addLiquidity(uint amount) external {
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
+        balances[msg.sender] += amount;
+        totalSupply += amount;
+    }
+
+    function removeLiquidity(uint amount) external {
+        require(balances[msg.sender] >= amount, "Insufficient liquidity");
+        IERC20(token).transfer(msg.sender, amount);
+        balances[msg.sender] -= amount;
+        totalSupply -= amount;
+    }
+
+    function swapTokens(uint inputAmount, address outputToken) external {
+        require(IERC20(outputToken).balanceOf(address(this)) >= inputAmount, "Insufficient tokens for swap");
+        uint liquidityInput = balances[msg.sender];
+        uint liquidityOutput = totalSupply - liquidityInput;
+        uint outputAmount = (inputAmount * liquidityOutput) / (liquidityInput + inputAmount);
+        IERC20(token).transferFrom(msg.sender, address(this), inputAmount);
+        IERC20(outputToken).transfer(msg.sender, outputAmount);
+    }
+}
+```

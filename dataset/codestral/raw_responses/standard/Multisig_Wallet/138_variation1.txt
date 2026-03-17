@@ -1,0 +1,93 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+contract MultiSigWallet {
+    struct Transaction {
+        address to;
+        uint value;
+        bytes data;
+        bool executed;
+        uint voteCount;
+    }
+
+    mapping(address => bool) public owners;
+    mapping(uint => Transaction) public transactions;
+    mapping(bytes32 => mapping(address => bool)) private voted;
+
+    uint public numOwnersRequiredForETHTransfer = 2;
+    uint public numOwnersRequiredForContractCall = 3;
+    uint public numOwnersRequiredForOwnerChange = 4;
+    uint public totalOwners;
+    uint public transactionNonce;
+
+    event TransactionCreated(uint txIndex);
+    event Voted(address indexed voter, uint txIndex);
+    event Executed(uint txIndex);
+
+    modifier onlyOwner() {
+        require(owners[msg.sender], "Only owners can call this function");
+        _;
+    }
+
+    constructor(uint _numOwnersRequiredForETHTransfer, uint _numOwnersRequiredForContractCall, uint _numOwnersRequiredForOwnerChange) {
+        totalOwners = 0;
+        transactionNonce = 0;
+        numOwnersRequiredForETHTransfer = _numOwnersRequiredForETHTransfer;
+        numOwnersRequiredForContractCall = _numOwnersRequiredForContractCall;
+        numOwnersRequiredForOwnerChange = _numOwnersRequiredForOwnerChange;
+    }
+
+    function addOwner(address owner) public onlyOwner {
+        require(!owners[owner], "This address is already an owner");
+        owners[owner] = true;
+        totalOwners++;
+    }
+
+    function removeOwner(address owner) public onlyOwner {
+        require(owners[owner], "This address is not an owner");
+        owners[owner] = false;
+        totalOwners--;
+    }
+
+    function submitTransaction(address _to, uint _value, bytes memory _data) public onlyOwner {
+        Transaction memory tx = Transaction({ to: _to, value: _value, data: _data, executed: false, voteCount: 0 });
+        transactions[transactionNonce] = tx;
+        emit TransactionCreated(transactionNonce);
+        transactionNonce++;
+    }
+
+    function vote(uint _txIndex) public onlyOwner {
+        bytes32 hash = keccak256(abi.encodePacked(_txIndex));
+        require(!voted[hash][msg.sender], "You have already voted on this transaction");
+        Transaction memory tx = transactions[_txIndex];
+        uint requiredVotes;
+
+        if (tx.to != address(0) && tx.data == bytes("")) {
+            requiredVotes = numOwnersRequiredForETHTransfer;
+        } else if (tx.data != bytes("")) {
+            requiredVotes = numOwnersRequiredForContractCall;
+        } else {
+            requiredVotes = numOwnersRequiredForOwnerChange;
+        }
+
+        tx.voteCount++;
+        transactions[_txIndex] = tx;
+        voted[hash][msg.sender] = true;
+        emit Voted(msg.sender, _txIndex);
+
+        if (tx.voteCount >= requiredVotes) {
+            execute(_txIndex);
+        }
+    }
+
+    function execute(uint _txIndex) internal onlyOwner {
+        Transaction storage tx = transactions[_txIndex];
+        require(!tx.executed, "Transaction has already been executed");
+
+        (bool success, bytes memory returnData) = tx.to.call{value: tx.value}(tx.data);
+        require(success, "Execution of transaction failed");
+
+        tx.executed = true;
+        emit Executed(_txIndex);
+    }
+}

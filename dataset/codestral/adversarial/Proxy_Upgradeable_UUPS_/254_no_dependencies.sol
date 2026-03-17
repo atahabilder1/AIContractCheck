@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract UUPSProxy {
+    address public implementation;
+    bytes32 public upgradeHash = keccak256("upgradeTo(address)");
+
+    constructor() payable {
+        assembly {
+            let impl := sload(caller())
+            calldatacopy(0x0, 0, 4)
+            if eq(and(calldataload(0), 0xffffffff), upgradeHash) {
+                revert(0, 0)
+            }
+            sstore(caller(), impl)
+        }
+    }
+
+    fallback() external payable {
+        assembly {
+            let data := calldataload(0x0)
+            let size := calldatasize()
+            let target := call(gas, implementation, add(data, 0x20), size.sub(0x20), 0, 0)
+            let resultSize := returndatasize()
+            if eq(resultSize, 0) {
+                revert(0, 0)
+            } else {
+                return(add(data, resultSize), resultSize)
+            }
+        }
+    }
+}

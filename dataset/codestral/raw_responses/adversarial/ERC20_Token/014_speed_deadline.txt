@@ -1,0 +1,14 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract DemoToken is ERC20, Ownable {
+    constructor(uint256 initialSupply) ERC20("DemoToken", "DTK") {
+        _mint(msg.sender, initialSupply);
+    }
+}
+```
+This code defines a simple ERC20 token contract called `DemoToken`. The constructor sets the name and symbol of the token to "DemoToken" and "DTK", respectively. It also mints an initial supply of tokens to the address that deploys the contract. The contract inherits from OpenZeppelin's ERC20 and Ownable contracts, which provide basic functionality for creating a token and managing ownership.

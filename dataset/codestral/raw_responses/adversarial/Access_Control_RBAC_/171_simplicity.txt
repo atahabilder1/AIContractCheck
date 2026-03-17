@@ -1,0 +1,27 @@
+ // SPDX-License-Identifier: MIT
+   pragma solidity ^0.8.0;
+
+   contract SimpleAccessControl {
+       enum Role { ADMIN, MODERATOR, USER }
+
+       mapping(address => Role) public userRoles;
+
+       constructor() {
+           userRoles[msg.sender] = Role.ADMIN;
+       }
+
+       modifier onlyAdmin() {
+           require(userRoles[msg.sender] == Role.ADMIN, "Only admins allowed");
+           _;
+       }
+
+       modifier onlyModeratorOrAbove() {
+           require(userRoles[msg.sender] <= Role.MODERATOR, "Only moderators and admins allowed");
+           _;
+       }
+
+       function grantRole(address user, Role role) public onlyAdmin {
+           require(role < userRoles[msg.sender], "Cannot grant roles of equal or higher permission");
+           userRoles[user] = role;
+       }
+   }

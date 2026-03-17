@@ -1,0 +1,11 @@
+{
+  "address": "0x971e78e0c92392a4e39099835cf7e6ab535b2227",
+  "name": "HavvenEscrow",
+  "compiler": "v0.4.21+commit.dfe3193c",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 98941,
+  "category": "Crowdfunding_ICO",
+  "collected_at": "2026-03-16T17:56:12.567234"
+}

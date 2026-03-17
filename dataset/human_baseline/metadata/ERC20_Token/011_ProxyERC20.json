@@ -1,0 +1,11 @@
+{
+  "address": "0xc011a73ee8576fb46f5e1c5751ca3b9fe0af2a6f",
+  "name": "ProxyERC20",
+  "compiler": "v0.4.25+commit.59dbf8f1",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 15178,
+  "category": "ERC20_Token",
+  "collected_at": "2026-03-16T17:54:41.456421"
+}

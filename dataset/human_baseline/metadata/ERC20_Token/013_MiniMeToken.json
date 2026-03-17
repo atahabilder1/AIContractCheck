@@ -1,0 +1,11 @@
+{
+  "address": "0x5a98fcbea516cf06857215779fd812ca3bef1b32",
+  "name": "MiniMeToken",
+  "compiler": "v0.4.24+commit.e67f0147",
+  "license": "",
+  "optimization": "1",
+  "runs": "10000",
+  "source_length": 25437,
+  "category": "ERC20_Token",
+  "collected_at": "2026-03-16T17:54:41.456628"
+}

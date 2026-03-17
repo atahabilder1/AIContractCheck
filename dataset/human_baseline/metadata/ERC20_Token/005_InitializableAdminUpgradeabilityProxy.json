@@ -1,0 +1,11 @@
+{
+  "address": "0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9",
+  "name": "InitializableAdminUpgradeabilityProxy",
+  "compiler": "v0.6.10+commit.00c0fcaf",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 47204,
+  "category": "ERC20_Token",
+  "collected_at": "2026-03-16T17:54:41.455636"
+}

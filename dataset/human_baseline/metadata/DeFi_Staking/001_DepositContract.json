@@ -1,0 +1,11 @@
+{
+  "address": "0x00000000219ab540356cBB839Cbe05303d7705Fa",
+  "name": "DepositContract",
+  "compiler": "v0.6.11+commit.5ef660b1",
+  "license": "Unlicense",
+  "optimization": "1",
+  "runs": "5000000",
+  "source_length": 8113,
+  "category": "DeFi_Staking",
+  "collected_at": "2026-03-16T17:41:48.822479"
+}

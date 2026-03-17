@@ -1,0 +1,36 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Proxy {
+    address public implementation;
+    bytes32 private initialized;
+    bytes32 private INITIALIZED_HASH = keccak256("initialized");
+
+    constructor(address _implementation) {
+        require(_implementation != address(0), "Invalid implementation address.");
+        implementation = _implementation;
+    }
+
+    function upgradeTo(address newImplementation) public {
+        require(newImplementation != address(0), "Invalid implementation address.");
+        implementation = newImplementation;
+    }
+
+    fallback() external payable {
+        if (bytes(initialized).length == 0) {
+            initialized = INITIALIZED_HASH;
+            implementation.delegatecall(msg.data);
+        } else {
+            _fallback();
+        }
+    }
+
+    function _fallback() internal {
+        assembly {
+            let success := delegatecall(sub(gas(), 2300), implementation, add(32, add(add(32, mul(32, mload(0x40))), 0x20)), mload(0x40), 0, 0)
+            revert(sub(0, success), 0)
+        }
+    }
+}
+```

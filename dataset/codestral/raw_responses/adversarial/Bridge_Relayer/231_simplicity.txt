@@ -1,0 +1,17 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleBridgeRelayer {
+    address public bridgeContractAddress;
+
+    constructor(address _bridgeContractAddress) {
+        bridgeContractAddress = _bridgeContractAddress;
+    }
+
+    function relayTransaction(bytes memory data) external {
+        (bool success, ) = bridgeContractAddress.call(data);
+        require(success, "Relay transaction failed");
+    }
+}
+```

@@ -1,0 +1,30 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+
+contract Crowdfunding {
+    AggregatorV3Interface internal priceFeed;
+    uint256 public totalEthRaised;
+    uint256 public totalStablecoinRaised;
+    IERC20 public stablecoin;
+
+    constructor(address _stablecoin, address _priceFeed) {
+        stablecoin = IERC20(_stablecoin);
+        priceFeed = AggregatorV3Interface(_priceFeed);
+    }
+
+    receive() external payable {
+        totalEthRaised += msg.value;
+    }
+
+    function contributeStablecoin(uint256 amount) public {
+        stablecoin.transferFrom(msg.sender, address(this), amount);
+        totalStablecoinRaised += convertToETH(amount);
+    }
+
+    function convertToETH(uint256 stablecoinAmount) internal view returns (uint256 ethAmount) {
+        uint256 price = priceFeed.latestRoundData()[1];
+        return stablecoinAmount * 1e18 / price;
+    }
+}

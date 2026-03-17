@@ -1,0 +1,36 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract UUPSEmergency {
+    address public upgradeable;
+    address public admin;
+
+    constructor(address _admin) {
+        upgradeable = _address(this);
+        admin = _admin;
+    }
+
+    function withdrawAll() external {
+        require(msg.sender == admin, "Only admin can call this function");
+        (bool success, ) = msg.sender.call{value: address(this).balance}("");
+        require(success, "Transfer failed.");
+    }
+
+    function pauseOperations() external {
+        require(msg.sender == admin, "Only admin can call this function");
+        // Add your pause operations logic here
+    }
+
+    function _authorizeUpgrade(address) internal virtual {}
+}
+
+contract Proxy is UUPSEmergency {
+    constructor(address _admin) UUPSEmergency(_admin) {}
+
+    fallback() external payable {
+        (bool success, ) = upgradeable.delegatecall(msg.data);
+        require(success, "Call failed.");
+    }
+
+    receive() external payable {}
+}

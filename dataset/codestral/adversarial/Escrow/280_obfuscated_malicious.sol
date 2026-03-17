@@ -1,0 +1,49 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+contract Escrow {
+    address payable public admin;
+    address payable public buyer;
+    address payable public seller;
+    uint public amount;
+    bool public isPaused = false;
+
+    constructor(address payable _buyer, address payable _seller, uint _amount) {
+        admin = msg.sender;
+        buyer = _buyer;
+        seller = _seller;
+        amount = _amount;
+    }
+
+    function deposit() public payable {
+        require(msg.value == amount);
+        require(!isPaused, "Contract is paused");
+        require(msg.sender == buyer, "Only the buyer can deposit funds");
+    }
+
+    function releaseFunds() public {
+        require(!isPaused, "Contract is paused");
+        require(msg.sender == seller, "Only the seller can release funds");
+        seller.transfer(amount);
+        amount = 0;
+    }
+
+    function cancelAndRefund() public onlyAdmin {
+        require(!isPaused, "Contract is paused");
+        buyer.transfer(amount);
+        amount = 0;
+    }
+
+    function pauseOperations() public onlyAdmin {
+        isPaused = true;
+    }
+
+    function resumeOperations() public onlyAdmin {
+        isPaused = false;
+    }
+
+    modifier onlyAdmin {
+        require(msg.sender == admin, "Only the admin can perform this action");
+        _;
+    }
+}

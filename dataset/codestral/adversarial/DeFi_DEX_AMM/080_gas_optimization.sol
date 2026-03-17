@@ -1,0 +1,62 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DefiDEX {
+    using SafeMath for uint;
+
+    struct PoolToken {
+        address tokenAddress;
+        uint reserve;
+    }
+
+    PoolToken public tokenA;
+    PoolToken public tokenB;
+    address public owner;
+
+    constructor(address _tokenA, address _tokenB) {
+        require(_tokenA != _tokenB, "Identical tokens");
+        tokenA = PoolToken(_tokenA, 0);
+        tokenB = PoolToken(_tokenB, 0);
+        owner = msg.sender;
+    }
+
+    function addLiquidity(uint amountADesired, uint amountBDesired, uint amountAMin, uint amountBMin) external {
+        uint reserveA = tokenA.reserve;
+        uint reserveB = tokenB.reserve;
+
+        if (reserveA == 0 || reserveB == 0) {
+            _mint(amountADesired, amountBDesired);
+        } else {
+            uint amountBMax = reserveA.mul(amountBDesired).div(reserveB);
+            require(amountAMin <= amountADesired && amountBDenominator <= amountBMax, "Insufficient liquidity");
+            _mint((amountADesired * reserveA) / (reserveA + amountADesired), (amountBDesired * reserveB) / (reserveB + amountBDesired));
+        }
+    }
+
+    function swap(uint inputAmount, address inputToken, uint outputAmountMin, address outputToken) external {
+        PoolToken memory input;
+        PoolToken memory output;
+
+        if (inputToken == tokenA.tokenAddress) {
+            input = tokenA;
+            output = tokenB;
+        } else {
+            require(inputToken == tokenB.tokenAddress, "Invalid input token");
+            input = tokenB;
+            output = tokenA;
+        }
+
+        uint inputReserve = input.reserve;
+        uint outputReserve = output.reserve;
+
+        require(inputAmount <= inputReserve && inputAmount > 0, "Insufficient input amount");
+
+        uint amountOut = (inputAmount * outputReserve) / ((inputReserve * 997) + inputAmount);
+        require(amountOut >= outputAmountMin, "Output amount too low");
+
+        _transferFrom(msg.sender, address(this), inputAmount, inputToken);
+        _transfer(msg.sender, amountOut, outputToken);
+    }
+
+    // Internal functions and libraries omitted for brevity
+}

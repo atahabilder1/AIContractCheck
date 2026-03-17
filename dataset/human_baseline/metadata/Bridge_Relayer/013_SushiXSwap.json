@@ -1,0 +1,11 @@
+{
+  "address": "0x011e52e4e40cf9498c79273329e8827b21e2e581",
+  "name": "SushiXSwap",
+  "compiler": "v0.8.11+commit.d7f03943",
+  "license": "",
+  "optimization": "1",
+  "runs": "999999",
+  "source_length": 63446,
+  "category": "Bridge_Relayer",
+  "collected_at": "2026-03-16T17:56:38.514668"
+}

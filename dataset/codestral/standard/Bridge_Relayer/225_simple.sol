@@ -1,0 +1,36 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.13;
+
+contract CrossChainBridge {
+    address public admin;
+    mapping(address => bool) public authorizedRelayers;
+
+    constructor() {
+        admin = msg.sender;
+    }
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only the admin can perform this action");
+        _;
+    }
+
+    function authorizeRelayer(address _relayer) public onlyAdmin {
+        authorizedRelayers[_relayer] = true;
+    }
+
+    function unauthorizeRelayer(address _relayer) public onlyAdmin {
+        authorizedRelayers[_relayer] = false;
+    }
+
+    modifier onlyAuthorizedRelayer() {
+        require(authorizedRelayers[msg.sender], "Only authorized relayers can perform this action");
+        _;
+    }
+
+    function forwardMessage(bytes memory _message) public onlyAuthorizedRelayer {
+        // Here you would add the logic to forward the message to another chain
+        emit MessageForwarded(_message);
+    }
+
+    event MessageForwarded(bytes _message);
+}

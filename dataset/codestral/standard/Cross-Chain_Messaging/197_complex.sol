@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.13;
+
+import "@layerzerolabs/lz-sdk/contracts/LZEndpoint.sol";
+
+contract CrossChainMessaging {
+    LZEndpoint public lzEndpoint;
+    address public oracle;
+    uint256 public retryInterval;
+    uint256 public maxRetries;
+    mapping(uint256 => bool) public nonces;
+
+    constructor(LZEndpoint _lzEndpoint, address _oracle, uint256 _retryInterval, uint256 _maxRetries) {
+        lzEndpoint = _lzEndpoint;
+        oracle = _oracle;
+        retryInterval = _retryInterval;
+        maxRetries = _maxRetries;
+    }
+
+    function sendMessage(uint16 dstChainId, bytes memory payload, uint256 nonce) public {
+        require(!nonces[nonce], "Nonce already used");
+        lzEndpoint.sendTo(dstChainId, address(this), 0, payload);
+        nonces[nonce] = true;
+    }
+
+    function retryMessage(uint16 srcChainId, bytes memory payload) public {
+        require(msg.sender == oracle, "Only the oracle can call this function");
+        LZEndpoint.ReceiveCall memory rc = LZEndpoint.ReceiveCall(payload);
+        if (rc._messageRetryCount < maxRetries) {
+            uint256 delay = retryInterval * (rc._messageRetryCount + 1);
+            _retryMessage(srcChainId, payload, delay);
+        }
+    }
+
+    function _retryMessage(uint16 srcChainId, bytes memory payload, uint256 delay) private {
+        bytes memory newPayload = abi.encodePacked(payload, "retry");
+        lzEndpoint.retryMessage(srcChainId, 0, address(this), 0, newPayload, delay);
+    }
+
+    function receiveMessageFulfillment(uint16 srcChainId, bytes memory payload) public {
+        LZEndpoint.ReceiveCall memory rc = LZEndpoint.ReceiveCall(payload);
+        if (keccak256(abi.encodePacked(rc._payload, "retry")) == keccak256(payload)) {
+            // Handle successful message fulfillment
+        } else {
+            oracle.call(abi.encodeWithSignature("retryMessage(uint16,bytes)", srcChainId, payload));
+        }
+    }
+}

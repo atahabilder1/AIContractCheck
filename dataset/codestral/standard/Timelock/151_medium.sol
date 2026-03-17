@@ -1,0 +1,52 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts@4.5.0/access/Ownable.sol";
+import "@openzeppelin/contracts@4.5.0/utils/Address.sol";
+
+contract Timelock is Ownable {
+    using Address for address payable;
+
+    uint256 private constant MIN_DELAY = 1 days; // minimum delay time
+    uint256 private constant MAX_DELAY = 30 days; // maximum delay time
+
+    mapping(bytes32 => TimelockTask) public tasks;
+
+    struct TimelockTask {
+        address payable target;
+        bytes data;
+        uint256 eta;
+        bool executed;
+    }
+
+    constructor() Ownable() {}
+
+    function schedule(address _target, bytes memory _data, uint256 _eta) public onlyOwner {
+        require(_eta >= block.timestamp + MIN_DELAY && _eta <= block.timestamp + MAX_DELAY, "Invalid ETA");
+        tasks[keccak256(_data)] = TimelockTask({target: payable(_target), data: _data, eta: _eta, executed: false});
+    }
+
+    function execute(bytes memory _data) public onlyOwner {
+        bytes32 id = keccak256(_data);
+        TimelockTask storage task = tasks[id];
+        require(!task.executed && block.timestamp >= task.eta, "Cannot execute yet");
+        (bool success, ) = task.target.call(task.data);
+        require(success, "Transaction failed");
+        task.executed = true;
+    }
+
+    function cancel(bytes memory _data) public onlyOwner {
+        bytes32 id = keccak256(_data);
+        TimelockTask storage task = tasks[id];
+        require(!task.executed, "Transaction already executed");
+        delete tasks[id];
+    }
+
+    function batchExecute(address[] memory _targets, bytes[] memory _datas) public onlyOwner {
+        for (uint256 i = 0; i < _targets.length; i++) {
+            address payable target = payable(_targets[i]);
+            (bool success, ) = target.call(_datas[i]);
+            require(success, "Transaction failed");
+        }
+    }
+}

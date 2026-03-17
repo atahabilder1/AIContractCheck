@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultiSigWallet {
+    uint numConfirmationsRequired;
+    address[] public owners;
+    mapping(address => bool) isOwner;
+    mapping(bytes32 => bool) executed;
+
+    constructor(uint _numConfirmationsRequired, address[] memory _owners) {
+        require(_owners.length > 0, "There must be at least one owner.");
+        numConfirmationsRequired = _numConfirmationsRequired;
+        for (uint i = 0; i < _owners.length; ++i) {
+            owners.push(_owners[i]);
+            isOwner[_owners[i]] = true;
+        }
+    }
+
+    struct Transaction {
+        address to;
+        uint value;
+        bytes data;
+        bool executed;
+        uint numConfirmations;
+    }
+
+    mapping(uint => Transaction) transactions;
+    uint transactionCount;
+
+    function submitTransaction(address _to, uint _value, bytes memory _data) public {
+        require(isOwner[msg.sender], "Only owners can submit transactions.");
+        transactions[transactionCount] = Transaction(_to, _value, _data, false, 1);
+        transactionCount++;
+    }
+
+    function confirmTransaction(uint _id) public {
+        require(isOwner[msg.sender], "Only owners can confirm transactions.");
+        Transaction storage tx = transactions[_id];
+        require(!tx.executed, "This transaction has already been executed.");
+        require(tx.numConfirmations < numConfirmationsRequired, "This transaction has enough confirmations.");
+        tx.numConfirmations++;
+        if (tx.numConfirmations == numConfirmationsRequired) {
+            tx.to.call{value: tx.value}(tx.data);
+            tx.executed = true;
+            executed[keccak256(abi.encodePacked(_id, msg.sender))] = true;
+        }
+    }
+}

@@ -1,0 +1,40 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract UUPSProxy {
+    address public implementation;
+    bytes32 private constant _IMPLEMENTATION_SLOT = keccak256("eip1967.proxy.implementation");
+
+    constructor(address initialImplementation) {
+        assembly {
+            sstore(_IMPLEMENTATION_SLOT, initialImplementation)
+        }
+    }
+
+    function _fallback() internal virtual {}
+
+    fallback() external payable override {
+        address impl = implementation;
+        assembly {
+            let ptr := mload(0x40)
+            calldatacopy(ptr, 0, calldatasize())
+            let result := delegatecall(sub(gas(), 2300), impl, ptr, calldatasize(), ptr, 0)
+            returndatacopy(ptr, 0, returndatasize())
+            switch result
+            case 0 { revert(ptr, returndatasize()) }
+            default { return(ptr, returndatasize()) }
+        }
+    }
+
+    receive() external payable override {
+        _fallback();
+    }
+
+    function upgradeTo(address newImplementation) public onlyOwner {
+        assembly {
+            sstore(_IMPLEMENTATION_SLOT, newImplementation)
+        }
+    }
+}
+```

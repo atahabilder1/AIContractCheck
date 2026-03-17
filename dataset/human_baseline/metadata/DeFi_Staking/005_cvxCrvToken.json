@@ -1,0 +1,11 @@
+{
+  "address": "0x62b9c7356a2dc64a1969e19c23e4f579f9810aa7",
+  "name": "cvxCrvToken",
+  "compiler": "v0.6.12+commit.27d51765",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 41009,
+  "category": "DeFi_Staking",
+  "collected_at": "2026-03-16T17:55:07.321571"
+}

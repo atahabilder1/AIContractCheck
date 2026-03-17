@@ -1,0 +1,28 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DefiStaking {
+    // Token address that can be staked
+    address public stakingToken;
+    // Mapping from user address to their staked amount
+    mapping(address => uint) public stakedBalances;
+
+    constructor(address _stakingToken) {
+        stakingToken = _stakingToken;
+    }
+
+    function stakeTokens(uint amount) external {
+        // Transfer tokens from user's balance to contract
+        IERC20(stakingToken).transferFrom(msg.sender, address(this), amount);
+        // Update staked balances mapping
+        stakedBalances[msg.sender] += amount;
+    }
+
+    function withdrawTokens(uint amount) external {
+        require(amount <= stakedBalances[msg.sender], "Insufficient staked tokens");
+        // Transfer tokens from contract to user's balance
+        IERC20(stakingToken).transfer(msg.sender, amount);
+        // Update staked balances mapping
+        stakedBalances[msg.sender] -= amount;
+    }
+}

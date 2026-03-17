@@ -1,0 +1,11 @@
+{
+  "address": "0x00000000006c3852cbef3e08e8df289169ede581",
+  "name": "Seaport",
+  "compiler": "v0.8.14+commit.80d49f37",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "19066",
+  "source_length": 467429,
+  "category": "Proxy_Upgradeable_UUPS",
+  "collected_at": "2026-03-16T18:22:55.317475"
+}

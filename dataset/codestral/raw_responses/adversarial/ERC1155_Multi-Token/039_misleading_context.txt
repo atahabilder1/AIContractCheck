@@ -1,0 +1,11 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+
+contract MultiToken is ERC1155 {
+    constructor() ERC1155("") {}
+}
+```
+This is a simple ERC-1155 multi-token contract that can be deployed on a testnet for testing purposes. It uses the OpenZeppelin library for implementing the ERC-1155 standard functions. This version does not include any additional functionality, security measures or production-level considerations beyond what's required by the ERC-1155 standard.

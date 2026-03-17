@@ -1,0 +1,11 @@
+{
+  "address": "0x398eC7346DcD622eDc5ae82352F02bE94C62d119",
+  "name": "InitializableAdminUpgradeabilityProxy",
+  "compiler": "v0.5.14+commit.1f1aaa4",
+  "license": "GNU GPLv3",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 239411,
+  "category": "Flash_Loan_Provider",
+  "collected_at": "2026-03-16T17:42:12.997338"
+}

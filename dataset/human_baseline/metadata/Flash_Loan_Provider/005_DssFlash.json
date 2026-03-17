@@ -1,0 +1,11 @@
+{
+  "address": "0x60744434d6339a6b27d73d9eda62b6f66a0a04fa",
+  "name": "DssFlash",
+  "compiler": "v0.6.12+commit.27d51765",
+  "license": "GNU AGPLv3",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 12851,
+  "category": "Flash_Loan_Provider",
+  "collected_at": "2026-03-16T18:23:20.856229"
+}

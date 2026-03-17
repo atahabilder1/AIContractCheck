@@ -1,0 +1,11 @@
+{
+  "address": "0x7be8076f4ea4a4ad08075c2508e481d6c946d12b",
+  "name": "WyvernExchange",
+  "compiler": "v0.4.23+commit.124ca40d",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 68720,
+  "category": "Auction",
+  "collected_at": "2026-03-16T18:23:06.832158"
+}

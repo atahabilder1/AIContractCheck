@@ -1,0 +1,11 @@
+{
+  "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+  "name": "WETH9",
+  "compiler": "v0.4.19+commit.c4cbbb05",
+  "license": "",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 38401,
+  "category": "Wrapped_Token",
+  "collected_at": "2026-03-16T17:56:30.227922"
+}

@@ -1,0 +1,31 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address public buyer;
+    address public seller;
+    uint public amount;
+
+    constructor() payable {}
+
+    function deposit(uint _amount) public {
+        require(_amount > 0, "Amount must be greater than zero");
+        require(msg.value == _amount, "Incorrect amount sent");
+        buyer = msg.sender;
+        amount = _amount;
+    }
+
+    function release() public {
+        require(buyer != address(0), "No deposit has been made yet");
+        require(msg.sender == seller, "Only the seller can call this function");
+        payable(buyer).transfer(amount);
+        amount = 0;
+    }
+
+    function setSeller(address _seller) public {
+        require(buyer != address(0), "Deposit must be made first");
+        seller = _seller;
+    }
+}
+```

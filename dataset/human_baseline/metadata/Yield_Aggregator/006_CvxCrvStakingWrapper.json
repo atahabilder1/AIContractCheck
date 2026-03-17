@@ -1,0 +1,11 @@
+{
+  "address": "0xaa0c3f5f7dfd688c6e646f66cd2a6b66acdbe434",
+  "name": "CvxCrvStakingWrapper",
+  "compiler": "v0.6.12+commit.27d51765",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 58949,
+  "category": "Yield_Aggregator",
+  "collected_at": "2026-03-16T17:56:27.721327"
+}

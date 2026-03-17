@@ -1,0 +1,11 @@
+{
+  "address": "0x4d224452801aced8b2f0aebe155379bb5d594381",
+  "name": "SimpleToken",
+  "compiler": "v0.8.10+commit.fc410830",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 16739,
+  "category": "ERC20_Token",
+  "collected_at": "2026-03-16T17:54:41.456064"
+}

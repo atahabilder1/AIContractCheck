@@ -1,0 +1,900 @@
+Found 434 Solidity files
+[1/434] Access_Control_RBAC/000_OpenZeppelinContracts.sol (solc 0.8.20)
+  OK: 2 findings
+[2/434] Access_Control_RBAC/001_FRAXShares.sol (solc 0.6.12)
+  FAILED: unknown
+[3/434] Auction/000_NounsAuctionHouse.sol (solc 0.8.20)
+  FAILED: unknown
+[4/434] Auction/001_AuctionHouse.sol (solc 0.8.20)
+  FAILED: unknown
+[5/434] Auction/002_AuctionHouse.sol (solc 0.6.12)
+  FAILED: unknown
+[6/434] Auction/003_AdminUpgradeabilityProxy.sol (solc 0.6.12)
+  OK: 10 findings
+[7/434] Auction/004_WyvernExchange.sol (solc 0.8.20)
+  FAILED: unknown
+[8/434] Auction/005_BlurSwap.sol (solc 0.8.20)
+  FAILED: unknown
+[9/434] Auction/006_LooksRareProtocol.sol (solc 0.8.20)
+  FAILED: unknown
+[10/434] Auction/007_LooksRareExchange.sol (solc 0.8.20)
+  FAILED: unknown
+[11/434] Auction/008_ExchangeV1.sol (solc 0.5.17)
+  OK: 9 findings
+[12/434] Auction/009_TransparentUpgradeableProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[13/434] Auction/010_ERC1967Proxy.sol (solc 0.8.20)
+  FAILED: unknown
+[14/434] Auction/011_ERC1967Proxy.sol (solc 0.8.20)
+  FAILED: unknown
+[15/434] Auction/012_Seaport.sol (solc 0.8.20)
+  FAILED: unknown
+[16/434] Bridge_Relayer/000_Endpoint.sol (solc 0.7.6)
+  FAILED: unknown
+[17/434] Bridge_Relayer/001_EndpointV2.sol (solc 0.8.20)
+  FAILED: unknown
+[18/434] Bridge_Relayer/002_Wormhole.sol (solc 0.8.20)
+  FAILED: unknown
+[19/434] Bridge_Relayer/003_TokenBridge.sol (solc 0.8.20)
+  FAILED: unknown
+[20/434] Bridge_Relayer/004_AxelarGatewayProxyMultisig.sol (solc 0.8.20)
+  FAILED: unknown
+[21/434] Bridge_Relayer/005_UltraLightNodeV2.sol (solc 0.7.6)
+  FAILED: unknown
+[22/434] Bridge_Relayer/006_Router.sol (solc 0.8.20)
+  FAILED: unknown
+[23/434] Bridge_Relayer/007_TransparentUpgradeableProxy.sol (solc 0.8.20)
+  OK: 123 findings
+[24/434] Bridge_Relayer/008_Lib_ResolvedDelegateProxy.sol (solc 0.6.12)
+  FAILED: unknown
+[25/434] Bridge_Relayer/009_TransparentUpgradeableProxy.sol (solc 0.6.12)
+  FAILED: unknown
+[26/434] Bridge_Relayer/010_TransparentUpgradeableProxy.sol (solc 0.6.12)
+  FAILED: unknown
+[27/434] Bridge_Relayer/011_BurnableMintableCappedERC20.sol (solc 0.8.20)
+  FAILED: unknown
+[28/434] Bridge_Relayer/012_InterchainProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[29/434] Bridge_Relayer/013_SushiXSwap.sol (solc 0.8.20)
+  FAILED: unknown
+[30/434] Bridge_Relayer/014_Hyperlane.sol (solc 0.8.20)
+  OK: 0 findings
+[31/434] Cross-Chain_Bridge/000_TransparentUpgradeableProxy.sol (solc 0.6.12)
+  FAILED: unknown
+[32/434] Cross-Chain_Bridge/001_L1_ETH_Bridge.sol (solc 0.6.12)
+  FAILED: unknown
+[33/434] Cross-Chain_Bridge/002_L1_ERC20_Bridge.sol (solc 0.6.12)
+  FAILED: unknown
+[34/434] Cross-Chain_Bridge/003_L1_HOP_Bridge.sol (solc 0.6.12)
+  FAILED: unknown
+[35/434] Cross-Chain_Bridge/004_L1_ERC20_Bridge.sol (solc 0.6.12)
+  FAILED: unknown
+[36/434] Cross-Chain_Bridge/005_L1_ERC20_Bridge.sol (solc 0.6.12)
+  FAILED: unknown
+[37/434] Cross-Chain_Bridge/006_Proxy.sol (solc 0.8.20)
+  FAILED: unknown
+[38/434] Cross-Chain_Bridge/007_RollupProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[39/434] Cross-Chain_Bridge/008_Bridge.sol (solc 0.7.6)
+  FAILED: unknown
+[40/434] Cross-Chain_Bridge/009_TransparentUpgradeableProxy.sol (solc 0.7.6)
+  FAILED: unknown
+[41/434] Cross-Chain_Bridge/010_NFTBridgeEntrypoint.sol (solc 0.8.20)
+  FAILED: unknown
+[42/434] Cross-Chain_Messaging/000_SequencerInbox.sol (solc 0.6.12)
+  FAILED: unknown
+[43/434] Cross-Chain_Messaging/001_HyperlaneImplementation.sol (solc 0.8.20)
+  FAILED: unknown
+[44/434] Cross-Chain_Messaging/002_RollupProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[45/434] Crowdfunding_ICO/000_TerminalV1.sol (solc 0.8.20)
+  FAILED: unknown
+[46/434] Crowdfunding_ICO/001_TerminalV1_1.sol (solc 0.8.20)
+  FAILED: unknown
+[47/434] Crowdfunding_ICO/002_FundingCycles.sol (solc 0.8.20)
+  FAILED: unknown
+[48/434] Crowdfunding_ICO/003_ModStore.sol (solc 0.8.20)
+  FAILED: unknown
+[49/434] Crowdfunding_ICO/004_ENJCrowdfund.sol (solc 0.8.20)
+  FAILED: unknown
+[50/434] Crowdfunding_ICO/005_StandardERC20.sol (solc 0.7.6)
+  OK: 4 findings
+[51/434] Crowdfunding_ICO/006_RewardToken.sol (solc 0.5.17)
+  FAILED: unknown
+[52/434] Crowdfunding_ICO/007_JuiceBox.sol (solc 0.8.20)
+  OK: 1 findings
+[53/434] Crowdfunding_ICO/008_HavvenEscrow.sol (solc 0.8.20)
+  FAILED: unknown
+[54/434] Crowdfunding_ICO/009_AnyswapV6ERC20.sol (solc 0.8.20)
+  OK: 14 findings
+[55/434] Crowdfunding_ICO/010_Banny.sol (solc 0.8.20)
+  FAILED: unknown
+[56/434] Crowdfunding_ICO/011_VaultProxy.sol (solc 0.5.17)
+  FAILED: unknown
+[57/434] DeFi_DEX_AMM/000_UniswapV2Router02.sol (solc 0.6.12)
+  FAILED: unknown
+[58/434] DeFi_DEX_AMM/001_SwapRouter.sol (solc 0.7.6)
+  FAILED: unknown
+[59/434] DeFi_DEX_AMM/001_UniswapV2Factory.sol (solc 0.5.17)
+  FAILED: unknown
+[60/434] DeFi_DEX_AMM/002_UniswapV2Router02.sol (solc 0.5.17)
+  FAILED: unknown
+[61/434] DeFi_DEX_AMM/002_UniswapV3Factory.sol (solc 0.7.6)
+  FAILED: unknown
+[62/434] DeFi_DEX_AMM/003_SwapRouter.sol (solc 0.7.6)
+  FAILED: unknown
+[63/434] DeFi_DEX_AMM/004_SwapRouter02.sol (solc 0.7.6)
+  FAILED: unknown
+[64/434] DeFi_DEX_AMM/005_UniswapV2Router02.sol (solc 0.5.17)
+  FAILED: unknown
+[65/434] DeFi_DEX_AMM/006_UniswapV2Factory.sol (solc 0.5.17)
+  FAILED: unknown
+[66/434] DeFi_DEX_AMM/007_Vault.sol (solc 0.7.6)
+  FAILED: unknown
+[67/434] DeFi_DEX_AMM/008_Vault.sol (solc 0.8.20)
+  FAILED: unknown
+[68/434] DeFi_DEX_AMM/009_NonfungiblePositionManager.sol (solc 0.7.6)
+  FAILED: unknown
+[69/434] DeFi_DEX_AMM/010_UniswapV3Pool.sol (solc 0.7.6)
+  FAILED: unknown
+[70/434] DeFi_DEX_AMM/011_Quoter.sol (solc 0.7.6)
+  FAILED: unknown
+[71/434] DeFi_DEX_AMM/012_AggregationRouterV4.sol (solc 0.6.12)
+  FAILED: unknown
+[72/434] DeFi_DEX_AMM/013_WeightedPoolFactory.sol (solc 0.7.6)
+  FAILED: unknown
+[73/434] DeFi_Lending/000_InitializableImmutableAdminUpgradeabilityProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[74/434] DeFi_Lending/001_InitializableImmutableAdminUpgradeabilityProxy.sol (solc 0.6.12)
+  FAILED: unknown
+[75/434] DeFi_Lending/001_Unitroller.sol (solc 0.5.17)
+  OK: 45 findings
+[76/434] DeFi_Lending/002_LendingPoolAddressesProvider.sol (solc 0.6.12)
+  FAILED: unknown
+[77/434] DeFi_Lending/003_Unitroller.sol (solc 0.5.17)
+  OK: 45 findings
+[78/434] DeFi_Lending/004_CErc20Delegator.sol (solc 0.5.17)
+  OK: 6 findings
+[79/434] DeFi_Lending/005_CEther.sol (solc 0.5.17)
+  OK: 49 findings
+[80/434] DeFi_Lending/006_CErc20.sol (solc 0.5.17)
+  OK: 46 findings
+[81/434] DeFi_Lending/007_CErc20Delegator.sol (solc 0.5.17)
+  FAILED: unknown
+[82/434] DeFi_Lending/008_Vat.sol (solc 0.5.17)
+  FAILED: unknown
+[83/434] DeFi_Lending/009_Pot.sol (solc 0.5.17)
+  FAILED: unknown
+[84/434] DeFi_Lending/010_Morpho.sol (solc 0.8.20)
+  FAILED: unknown
+[85/434] DeFi_Lending/011_TransparentUpgradeableProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[86/434] DeFi_Lending/012_EthereumBundler.sol (solc 0.8.20)
+  FAILED: unknown
+[87/434] DeFi_Lending/013_TransparentUpgradeableProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[88/434] DeFi_Staking/000_AppProxyUpgradeable.sol (solc 0.8.20)
+  FAILED: unknown
+[89/434] DeFi_Staking/001_DepositContract.sol (solc 0.6.12)
+  FAILED: unknown
+[90/434] DeFi_Staking/001_WstETH.sol (solc 0.6.12)
+  OK: 6 findings
+[91/434] DeFi_Staking/002_RocketTokenRETH.sol (solc 0.6.12)
+  FAILED: unknown
+[92/434] DeFi_Staking/003_Booster.sol (solc 0.6.12)
+  OK: 30 findings
+[93/434] DeFi_Staking/004_ConvexToken.sol (solc 0.6.12)
+  OK: 1 findings
+[94/434] DeFi_Staking/005_cvxCrvToken.sol (solc 0.6.12)
+  OK: 1 findings
+[95/434] DeFi_Staking/006_BaseRewardPool.sol (solc 0.6.12)
+  OK: 32 findings
+[96/434] DeFi_Staking/007_TransparentUpgradeableProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[97/434] DeFi_Staking/008_TransparentUpgradeableProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[98/434] DeFi_Staking/009_RewardEscrow.sol (solc 0.8.20)
+  FAILED: unknown
+[99/434] DeFi_Staking/010_StakingRewards.sol (solc 0.5.17)
+  OK: 14 findings
+[100/434] DeFi_Staking/011_StakingRewards.sol (solc 0.5.17)
+  OK: 13 findings
+[101/434] DeFi_Staking/012_StakingRewards.sol (solc 0.5.17)
+  OK: 10 findings
+[102/434] DeFi_Staking/013_CvxLocker.sol (solc 0.6.12)
+  OK: 46 findings
+[103/434] DeFi_Staking/014_SavingsDai.sol (solc 0.8.20)
+  OK: 24 findings
+[104/434] ERC1155_Multi-Token/000_TransparentUpgradeableProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[105/434] ERC1155_Multi-Token/001_AdminUpgradeabilityProxy.sol (solc 0.6.12)
+  FAILED: unknown
+[106/434] ERC1155_Multi-Token/002_BatchWrapper.sol (solc 0.5.17)
+  FAILED: unknown
+[107/434] ERC1155_Multi-Token/003_Mintvial.sol (solc 0.8.20)
+  FAILED: unknown
+[108/434] ERC1155_Multi-Token/004_ENJToken.sol (solc 0.8.20)
+  FAILED: unknown
+[109/434] ERC1155_Multi-Token/005_Cards.sol (solc 0.5.17)
+  FAILED: unknown
+[110/434] ERC1155_Multi-Token/006_RaribleToken.sol (solc 0.5.17)
+  OK: 10 findings
+[111/434] ERC1155_Multi-Token/007_ERC1967Proxy.sol (solc 0.8.20)
+  OK: 13 findings
+[112/434] ERC1155_Multi-Token/008_RaribleUserToken.sol (solc 0.5.17)
+  OK: 16 findings
+[113/434] ERC1155_Multi-Token/009_Planets.sol (solc 0.8.20)
+  FAILED: unknown
+[114/434] ERC1155_Multi-Token/010_DigitalMediaCore.sol (solc 0.8.20)
+  FAILED: unknown
+[115/434] ERC1155_Multi-Token/011_MEMES.sol (solc 0.8.20)
+  FAILED: unknown
+[116/434] ERC20_Token/000_TetherToken.sol (solc 0.8.20)
+  FAILED: unknown
+[117/434] ERC20_Token/001_FiatTokenProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[118/434] ERC20_Token/002_Dai.sol (solc 0.5.17)
+  FAILED: unknown
+[119/434] ERC20_Token/003_LinkToken.sol (solc 0.8.20)
+  FAILED: unknown
+[120/434] ERC20_Token/004_Uni.sol (solc 0.5.17)
+  OK: 7 findings
+[121/434] ERC20_Token/005_InitializableAdminUpgradeabilityProxy.sol (solc 0.6.12)
+  FAILED: unknown
+[122/434] ERC20_Token/006_WBTC.sol (solc 0.8.20)
+  FAILED: unknown
+[123/434] ERC20_Token/007_TokenMintERC20Token.sol (solc 0.5.17)
+  OK: 5 findings
+[124/434] ERC20_Token/008_SimpleToken.sol (solc 0.8.20)
+  FAILED: unknown
+[125/434] ERC20_Token/009_Sand.sol (solc 0.5.17)
+  FAILED: unknown
+[126/434] ERC20_Token/010_DSToken.sol (solc 0.8.20)
+  FAILED: unknown
+[127/434] ERC20_Token/011_ProxyERC20.sol (solc 0.8.20)
+  FAILED: unknown
+[128/434] ERC20_Token/012_Comp.sol (solc 0.5.17)
+  OK: 2 findings
+[129/434] ERC20_Token/013_MiniMeToken.sol (solc 0.8.20)
+  FAILED: unknown
+[130/434] ERC20_Token/014_FRAXStablecoin.sol (solc 0.6.12)
+  FAILED: unknown
+[131/434] ERC721_NFT/000_BoredApeYachtClub.sol (solc 0.6.12)
+  FAILED: unknown
+[132/434] ERC721_NFT/001_WrappedPunk.sol (solc 0.5.17)
+  OK: 10 findings
+[133/434] ERC721_NFT/002_Azuki.sol (solc 0.8.20)
+  FAILED: unknown
+[134/434] ERC721_NFT/003_Doodles.sol (solc 0.8.20)
+  FAILED: unknown
+[135/434] ERC721_NFT/004_CloneX.sol (solc 0.8.20)
+  FAILED: unknown
+[136/434] ERC721_NFT/005_Moonbirds.sol (solc 0.8.20)
+  FAILED: unknown
+[137/434] ERC721_NFT/006_Land.sol (solc 0.8.20)
+  FAILED: unknown
+[138/434] ERC721_NFT/007_PudgyPenguins.sol (solc 0.8.20)
+  FAILED: unknown
+[139/434] ERC721_NFT/008_GenArt721Core.sol (solc 0.5.17)
+  OK: 5 findings
+[140/434] ERC721_NFT/009_Loot.sol (solc 0.8.20)
+  OK: 3 findings
+[141/434] ERC721_NFT/010_MutantApeYachtClub.sol (solc 0.8.20)
+  FAILED: unknown
+[142/434] ERC721_NFT/011_Meebits.sol (solc 0.7.6)
+  OK: 10 findings
+[143/434] ERC721_NFT/012_WorldOfWomen.sol (solc 0.8.20)
+  FAILED: unknown
+[144/434] ERC721_NFT/013_NounsToken.sol (solc 0.8.20)
+  FAILED: unknown
+[145/434] ERC721_NFT/014_TransparentUpgradeableProxy.sol (solc 0.7.6)
+  FAILED: unknown
+[146/434] Escrow/000_PaymentSplitter.sol (solc 0.8.20)
+  FAILED: unknown
+[147/434] Escrow/001_PaymentSplitter.sol (solc 0.8.20)
+  FAILED: unknown
+[148/434] Escrow/002_PaymentSplitter.sol (solc 0.8.20)
+  FAILED: unknown
+[149/434] Escrow/003_PaymentSplitter.sol (solc 0.6.12)
+  OK: 4 findings
+[150/434] Escrow/004_TheConnorsPaymentSplitter.sol (solc 0.8.20)
+  FAILED: unknown
+[151/434] Escrow/005_DepositHelper.sol (solc 0.5.17)
+  FAILED: unknown
+[152/434] Escrow/006_SynthetixBridgeEscrow.sol (solc 0.5.17)
+  OK: 6 findings
+[153/434] Escrow/007_RootChainManagerProxy.sol (solc 0.6.12)
+  FAILED: unknown
+[154/434] Escrow/008_L1ChugSplashProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[155/434] Escrow/009_VaultProxy.sol (solc 0.5.17)
+  FAILED: unknown
+[156/434] Escrow/010_NoMintRewardPool.sol (solc 0.5.17)
+  FAILED: unknown
+[157/434] Escrow/011_ERC1155LazyPayableClaim.sol (solc 0.8.20)
+  FAILED: unknown
+[158/434] Flash_Loan_Provider/000_InitializableAdminUpgradeabilityProxy.sol (solc 0.5.17)
+  OK: 85 findings
+[159/434] Flash_Loan_Provider/000_SoloMargin.sol (solc 0.5.17)
+  FAILED: unknown
+[160/434] Flash_Loan_Provider/001_PayableProxyForSoloMargin.sol (solc 0.5.17)
+  FAILED: unknown
+[161/434] Flash_Loan_Provider/002_InitializableAdminUpgradeabilityProxy.sol (solc 0.5.17)
+  OK: 85 findings
+[162/434] Flash_Loan_Provider/003_InitializableAdminUpgradeabilityProxy.sol (solc 0.5.17)
+  OK: 85 findings
+[163/434] Flash_Loan_Provider/004_LendingPoolAddressesProvider.sol (solc 0.5.17)
+  OK: 85 findings
+[164/434] Flash_Loan_Provider/005_DssFlash.sol (solc 0.6.12)
+  OK: 5 findings
+[165/434] Flash_Loan_Provider/006_LendingPool.sol (solc 0.6.12)
+  FAILED: unknown
+[166/434] Governance_DAO/000_GovernorBravoDelegator.sol (solc 0.5.17)
+  FAILED: unknown
+[167/434] Governance_DAO/001_GovernorAlpha.sol (solc 0.5.17)
+  OK: 20 findings
+[168/434] Governance_DAO/002_AaveGovernanceV2.sol (solc 0.7.6)
+  FAILED: unknown
+[169/434] Governance_DAO/003_GovernorBravoDelegator.sol (solc 0.5.17)
+  FAILED: unknown
+[170/434] Governance_DAO/004_GovernorAlpha.sol (solc 0.5.17)
+  OK: 17 findings
+[171/434] Governance_DAO/005_ENSGovernor.sol (solc 0.8.20)
+  FAILED: unknown
+[172/434] Governance_DAO/006_GovernorAlpha.sol (solc 0.6.12)
+  OK: 17 findings
+[173/434] Governance_DAO/007_NounsDAOProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[174/434] Governance_DAO/008_NounsDAOExecutor.sol (solc 0.8.20)
+  OK: 6 findings
+[175/434] Governance_DAO/009_Governance.sol (solc 0.8.20)
+  FAILED: unknown
+[176/434] Governance_DAO/010_Executor.sol (solc 0.8.20)
+  FAILED: unknown
+[177/434] Governance_DAO/011_Executor.sol (solc 0.8.20)
+  FAILED: unknown
+[178/434] Governance_DAO/012_AppProxyUpgradeable.sol (solc 0.8.20)
+  FAILED: unknown
+[179/434] Governance_DAO/013_GTC.sol (solc 0.6.12)
+  OK: 8 findings
+[180/434] Multisig_Wallet/000_GnosisSafe.sol (solc 0.7.6)
+  FAILED: unknown
+[181/434] Multisig_Wallet/001_GnosisSafeProxyFactory.sol (solc 0.7.6)
+  FAILED: unknown
+[182/434] Multisig_Wallet/002_Proxy.sol (solc 0.5.17)
+  OK: 1 findings
+[183/434] Multisig_Wallet/003_GnosisSafeProxy.sol (solc 0.7.6)
+  OK: 1 findings
+[184/434] Multisig_Wallet/004_ERC20PredicateProxy.sol (solc 0.6.12)
+  FAILED: unknown
+[185/434] Multisig_Wallet/005_DepositManagerProxy.sol (solc 0.5.17)
+  OK: 8 findings
+[186/434] Multisig_Wallet/006_GnosisSafe.sol (solc 0.5.17)
+  OK: 3 findings
+[187/434] Multisig_Wallet/007_SafeProxyFactory.sol (solc 0.7.6)
+  FAILED: unknown
+[188/434] Multisig_Wallet/008_ProxyFactory.sol (solc 0.5.17)
+  OK: 1 findings
+[189/434] Multisig_Wallet/009_Proxy.sol (solc 0.5.17)
+  OK: 1 findings
+[190/434] Multisig_Wallet/010_TreasuryFunds.sol (solc 0.6.12)
+  OK: 4 findings
+[191/434] Multisig_Wallet/011_TreasuryVault.sol (solc 0.5.17)
+  OK: 6 findings
+[192/434] Multisig_Wallet/012_GnosisSafeProxy.sol (solc 0.7.6)
+  OK: 1 findings
+[193/434] Multisig_Wallet/013_GnosisSafeProxy.sol (solc 0.7.6)
+  OK: 1 findings
+[194/434] Proxy_Upgradeable_UUPS/000_ERC1967Proxy.sol (solc 0.8.20)
+  OK: 13 findings
+[195/434] Proxy_Upgradeable_UUPS/000_TransparentUpgradeableProxy.sol (solc 0.7.6)
+  FAILED: unknown
+[196/434] Proxy_Upgradeable_UUPS/001_TransparentUpgradeableProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[197/434] Proxy_Upgradeable_UUPS/002_TransparentUpgradeableProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[198/434] Proxy_Upgradeable_UUPS/003_TransparentUpgradeableProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[199/434] Proxy_Upgradeable_UUPS/004_TransparentUpgradeableProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[200/434] Proxy_Upgradeable_UUPS/005_TransparentUpgradeableProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[201/434] Proxy_Upgradeable_UUPS/006_L1ChugSplashProxy.sol (solc 0.5.17)
+  FAILED: unknown
+[202/434] Proxy_Upgradeable_UUPS/007_NounsAuctionHouseProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[203/434] Proxy_Upgradeable_UUPS/008_RootChainManager.sol (solc 0.6.12)
+  FAILED: unknown
+[204/434] Proxy_Upgradeable_UUPS/009_TransparentUpgradeableProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[205/434] Proxy_Upgradeable_UUPS/010_TransparentUpgradeableProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[206/434] Proxy_Upgradeable_UUPS/011_PoolAddressesProvider.sol (solc 0.8.20)
+  FAILED: unknown
+[207/434] Proxy_Upgradeable_UUPS/012_ERC1967Proxy.sol (solc 0.8.20)
+  FAILED: unknown
+[208/434] Proxy_Upgradeable_UUPS/013_FiatTokenProxy.sol (solc 0.6.12)
+  FAILED: unknown
+[209/434] Proxy_Upgradeable_UUPS/014_Seaport.sol (solc 0.8.20)
+  FAILED: unknown
+[210/434] Timelock/000_Timelock.sol (solc 0.5.17)
+  OK: 6 findings
+[211/434] Timelock/001_Timelock.sol (solc 0.5.17)
+  OK: 6 findings
+[212/434] Timelock/002_Executor.sol (solc 0.7.6)
+  FAILED: unknown
+[213/434] Timelock/003_NounsDAOExecutorProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[214/434] Timelock/004_LiquidatorProxyV1ForSoloMargin.sol (solc 0.5.17)
+  FAILED: unknown
+[215/434] Timelock/005_Unitroller.sol (solc 0.5.17)
+  FAILED: unknown
+[216/434] Timelock/006_Stake_FXS_WETH.sol (solc 0.6.12)
+  FAILED: unknown
+[217/434] Timelock/007_TerminalDirectory.sol (solc 0.8.20)
+  FAILED: unknown
+[218/434] Timelock/008_StakingRewards.sol (solc 0.5.17)
+  OK: 10 findings
+[219/434] Timelock/009_Timelock.sol (solc 0.6.12)
+  OK: 6 findings
+[220/434] Timelock/010_DSPause.sol (solc 0.8.20)
+  FAILED: unknown
+[221/434] Timelock/011_DSPauseProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[222/434] Timelock/012_Vow.sol (solc 0.5.17)
+  FAILED: unknown
+[223/434] Timelock/013_Executor.sol (solc 0.7.6)
+  FAILED: unknown
+[224/434] Timelock/014_TokenLock.sol (solc 0.8.20)
+  FAILED: unknown
+[225/434] Wrapped_Token/000_WETH9.sol (solc 0.8.20)
+  FAILED: unknown
+[226/434] Wrapped_Token/001_frxETH.sol (solc 0.8.20)
+  OK: 15 findings
+[227/434] Wrapped_Token/002_sfrxETH.sol (solc 0.8.20)
+  OK: 11 findings
+[228/434] Wrapped_Token/003_TransparentUpgradeableProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[229/434] Wrapped_Token/004_AdminUpgradeabilityProxy.sol (solc 0.6.12)
+  OK: 10 findings
+[230/434] Wrapped_Token/005_OETHProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[231/434] Wrapped_Token/006_UUPSProxy.sol (solc 0.8.20)
+  FAILED: unknown
+[232/434] Wrapped_Token/007_PENDLE.sol (solc 0.6.12)
+  FAILED: unknown
+[233/434] Wrapped_Token/008_InitializeGovernedUpgradeabilityProxy.sol (solc 0.5.17)
+  FAILED: unknown
+[234/434] Wrapped_Token/009_ANKRToken.sol (solc 0.8.20)
+  FAILED: unknown
+[235/434] Wrapped_Token/010_FiatTokenProxy.sol (solc 0.6.12)
+  FAILED: unknown
+[236/434] Yield_Aggregator/000_yVault.sol (solc 0.5.17)
+  OK: 10 findings
+[237/434] Yield_Aggregator/001_VaultRegistry.sol (solc 0.8.20)
+  FAILED: unknown
+[238/434] Yield_Aggregator/002_BeefyVaultV7.sol (solc 0.8.20)
+  OK: 12 findings
+[239/434] Yield_Aggregator/003_VaultProxy.sol (solc 0.5.17)
+  FAILED: unknown
+[240/434] Yield_Aggregator/004_VaultProxy.sol (solc 0.5.17)
+  FAILED: unknown
+[241/434] Yield_Aggregator/005_CrvDepositor.sol (solc 0.6.12)
+  OK: 15 findings
+[242/434] Yield_Aggregator/006_CvxCrvStakingWrapper.sol (solc 0.6.12)
+  OK: 40 findings
+[243/434] Yield_Aggregator/007_YearnRewards.sol (solc 0.5.17)
+  OK: 9 findings
+[244/434] Yield_Aggregator/008_yVault.sol (solc 0.5.17)
+  OK: 10 findings
+[245/434] Yield_Aggregator/009_VaultProxy.sol (solc 0.5.17)
+  FAILED: unknown
+[246/434] Yield_Aggregator/010_PendleRouterV3.sol (solc 0.8.20)
+  FAILED: unknown
+[247/434] Yield_Aggregator/011_PendleRouter.sol (solc 0.7.6)
+  FAILED: unknown
+[248/434] node_modules/@openzeppelin/contracts/access/AccessControl.sol (solc 0.8.20)
+  OK: 9 findings
+[249/434] node_modules/@openzeppelin/contracts/access/AccessControlCrossChain.sol (solc 0.8.20)
+  OK: 9 findings
+[250/434] node_modules/@openzeppelin/contracts/access/AccessControlDefaultAdminRules.sol (solc 0.8.20)
+  OK: 18 findings
+[251/434] node_modules/@openzeppelin/contracts/access/AccessControlEnumerable.sol (solc 0.8.20)
+  OK: 11 findings
+[252/434] node_modules/@openzeppelin/contracts/access/IAccessControl.sol (solc 0.8.20)
+  OK: 0 findings
+[253/434] node_modules/@openzeppelin/contracts/access/IAccessControlDefaultAdminRules.sol (solc 0.8.20)
+  OK: 0 findings
+[254/434] node_modules/@openzeppelin/contracts/access/IAccessControlEnumerable.sol (solc 0.8.20)
+  OK: 0 findings
+[255/434] node_modules/@openzeppelin/contracts/access/Ownable.sol (solc 0.8.20)
+  OK: 0 findings
+[256/434] node_modules/@openzeppelin/contracts/access/Ownable2Step.sol (solc 0.8.20)
+  OK: 1 findings
+[257/434] node_modules/@openzeppelin/contracts/crosschain/CrossChainEnabled.sol (solc 0.8.20)
+  OK: 0 findings
+[258/434] node_modules/@openzeppelin/contracts/crosschain/amb/CrossChainEnabledAMB.sol (solc 0.8.20)
+  OK: 1 findings
+[259/434] node_modules/@openzeppelin/contracts/crosschain/amb/LibAMB.sol (solc 0.8.20)
+  OK: 0 findings
+[260/434] node_modules/@openzeppelin/contracts/crosschain/arbitrum/CrossChainEnabledArbitrumL1.sol (solc 0.8.20)
+  OK: 0 findings
+[261/434] node_modules/@openzeppelin/contracts/crosschain/arbitrum/CrossChainEnabledArbitrumL2.sol (solc 0.8.20)
+  OK: 0 findings
+[262/434] node_modules/@openzeppelin/contracts/crosschain/arbitrum/LibArbitrumL1.sol (solc 0.8.20)
+  OK: 0 findings
+[263/434] node_modules/@openzeppelin/contracts/crosschain/arbitrum/LibArbitrumL2.sol (solc 0.8.20)
+  OK: 0 findings
+[264/434] node_modules/@openzeppelin/contracts/crosschain/errors.sol (solc 0.8.20)
+  OK: 0 findings
+[265/434] node_modules/@openzeppelin/contracts/crosschain/optimism/CrossChainEnabledOptimism.sol (solc 0.8.20)
+  OK: 0 findings
+[266/434] node_modules/@openzeppelin/contracts/crosschain/optimism/LibOptimism.sol (solc 0.8.20)
+  OK: 0 findings
+[267/434] node_modules/@openzeppelin/contracts/crosschain/polygon/CrossChainEnabledPolygonChild.sol (solc 0.8.20)
+  OK: 3 findings
+[268/434] node_modules/@openzeppelin/contracts/finance/PaymentSplitter.sol (solc 0.8.20)
+  OK: 2 findings
+[269/434] node_modules/@openzeppelin/contracts/finance/VestingWallet.sol (solc 0.8.20)
+  OK: 1 findings
+[270/434] node_modules/@openzeppelin/contracts/governance/Governor.sol (solc 0.8.20)
+  OK: 16 findings
+[271/434] node_modules/@openzeppelin/contracts/governance/IGovernor.sol (solc 0.8.20)
+  OK: 0 findings
+[272/434] node_modules/@openzeppelin/contracts/governance/TimelockController.sol (solc 0.8.20)
+  OK: 19 findings
+[273/434] node_modules/@openzeppelin/contracts/governance/compatibility/GovernorCompatibilityBravo.sol (solc 0.8.20)
+  OK: 17 findings
+[274/434] node_modules/@openzeppelin/contracts/governance/compatibility/IGovernorCompatibilityBravo.sol (solc 0.8.20)
+  OK: 0 findings
+[275/434] node_modules/@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol (solc 0.8.20)
+  OK: 16 findings
+[276/434] node_modules/@openzeppelin/contracts/governance/extensions/GovernorPreventLateQuorum.sol (solc 0.8.20)
+  OK: 16 findings
+[277/434] node_modules/@openzeppelin/contracts/governance/extensions/GovernorProposalThreshold.sol (solc 0.8.20)
+  OK: 16 findings
+[278/434] node_modules/@openzeppelin/contracts/governance/extensions/GovernorSettings.sol (solc 0.8.20)
+  OK: 16 findings
+[279/434] node_modules/@openzeppelin/contracts/governance/extensions/GovernorTimelockCompound.sol (solc 0.8.20)
+  OK: 27 findings
+[280/434] node_modules/@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol (solc 0.8.20)
+  OK: 26 findings
+[281/434] node_modules/@openzeppelin/contracts/governance/extensions/GovernorVotes.sol (solc 0.8.20)
+  OK: 17 findings
+[282/434] node_modules/@openzeppelin/contracts/governance/extensions/GovernorVotesComp.sol (solc 0.8.20)
+  OK: 22 findings
+[283/434] node_modules/@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol (solc 0.8.20)
+  OK: 20 findings
+[284/434] node_modules/@openzeppelin/contracts/governance/extensions/IGovernorTimelock.sol (solc 0.8.20)
+  OK: 0 findings
+[285/434] node_modules/@openzeppelin/contracts/governance/utils/IVotes.sol (solc 0.8.20)
+  OK: 0 findings
+[286/434] node_modules/@openzeppelin/contracts/governance/utils/Votes.sol (solc 0.8.20)
+  OK: 13 findings
+[287/434] node_modules/@openzeppelin/contracts/interfaces/IERC1155.sol (solc 0.8.20)
+  OK: 0 findings
+[288/434] node_modules/@openzeppelin/contracts/interfaces/IERC1155MetadataURI.sol (solc 0.8.20)
+  OK: 0 findings
+[289/434] node_modules/@openzeppelin/contracts/interfaces/IERC1155Receiver.sol (solc 0.8.20)
+  OK: 0 findings
+[290/434] node_modules/@openzeppelin/contracts/interfaces/IERC1271.sol (solc 0.8.20)
+  OK: 0 findings
+[291/434] node_modules/@openzeppelin/contracts/interfaces/IERC1363.sol (solc 0.8.20)
+  OK: 0 findings
+[292/434] node_modules/@openzeppelin/contracts/interfaces/IERC1363Receiver.sol (solc 0.8.20)
+  OK: 0 findings
+[293/434] node_modules/@openzeppelin/contracts/interfaces/IERC1363Spender.sol (solc 0.8.20)
+  OK: 0 findings
+[294/434] node_modules/@openzeppelin/contracts/interfaces/IERC165.sol (solc 0.8.20)
+  OK: 0 findings
+[295/434] node_modules/@openzeppelin/contracts/interfaces/IERC1820Implementer.sol (solc 0.8.20)
+  OK: 0 findings
+[296/434] node_modules/@openzeppelin/contracts/interfaces/IERC1820Registry.sol (solc 0.8.20)
+  OK: 0 findings
+[297/434] node_modules/@openzeppelin/contracts/interfaces/IERC1967.sol (solc 0.8.20)
+  OK: 0 findings
+[298/434] node_modules/@openzeppelin/contracts/interfaces/IERC20.sol (solc 0.8.20)
+  OK: 0 findings
+[299/434] node_modules/@openzeppelin/contracts/interfaces/IERC20Metadata.sol (solc 0.8.20)
+  OK: 0 findings
+[300/434] node_modules/@openzeppelin/contracts/interfaces/IERC2309.sol (solc 0.8.20)
+  OK: 0 findings
+[301/434] node_modules/@openzeppelin/contracts/interfaces/IERC2612.sol (solc 0.8.20)
+  OK: 0 findings
+[302/434] node_modules/@openzeppelin/contracts/interfaces/IERC2981.sol (solc 0.8.20)
+  OK: 0 findings
+[303/434] node_modules/@openzeppelin/contracts/interfaces/IERC3156.sol (solc 0.8.20)
+  OK: 0 findings
+[304/434] node_modules/@openzeppelin/contracts/interfaces/IERC3156FlashBorrower.sol (solc 0.8.20)
+  OK: 0 findings
+[305/434] node_modules/@openzeppelin/contracts/interfaces/IERC3156FlashLender.sol (solc 0.8.20)
+  OK: 0 findings
+[306/434] node_modules/@openzeppelin/contracts/interfaces/IERC4626.sol (solc 0.8.20)
+  OK: 0 findings
+[307/434] node_modules/@openzeppelin/contracts/interfaces/IERC4906.sol (solc 0.8.20)
+  OK: 0 findings
+[308/434] node_modules/@openzeppelin/contracts/interfaces/IERC5267.sol (solc 0.8.20)
+  OK: 0 findings
+[309/434] node_modules/@openzeppelin/contracts/interfaces/IERC5313.sol (solc 0.8.20)
+  OK: 0 findings
+[310/434] node_modules/@openzeppelin/contracts/interfaces/IERC5805.sol (solc 0.8.20)
+  OK: 0 findings
+[311/434] node_modules/@openzeppelin/contracts/interfaces/IERC6372.sol (solc 0.8.20)
+  OK: 0 findings
+[312/434] node_modules/@openzeppelin/contracts/interfaces/IERC721.sol (solc 0.8.20)
+  OK: 0 findings
+[313/434] node_modules/@openzeppelin/contracts/interfaces/IERC721Enumerable.sol (solc 0.8.20)
+  OK: 0 findings
+[314/434] node_modules/@openzeppelin/contracts/interfaces/IERC721Metadata.sol (solc 0.8.20)
+  OK: 0 findings
+[315/434] node_modules/@openzeppelin/contracts/interfaces/IERC721Receiver.sol (solc 0.8.20)
+  OK: 0 findings
+[316/434] node_modules/@openzeppelin/contracts/interfaces/IERC777.sol (solc 0.8.20)
+  OK: 0 findings
+[317/434] node_modules/@openzeppelin/contracts/interfaces/IERC777Recipient.sol (solc 0.8.20)
+  OK: 0 findings
+[318/434] node_modules/@openzeppelin/contracts/interfaces/IERC777Sender.sol (solc 0.8.20)
+  OK: 0 findings
+[319/434] node_modules/@openzeppelin/contracts/interfaces/draft-IERC1822.sol (solc 0.8.20)
+  OK: 0 findings
+[320/434] node_modules/@openzeppelin/contracts/interfaces/draft-IERC2612.sol (solc 0.8.20)
+  OK: 0 findings
+[321/434] node_modules/@openzeppelin/contracts/metatx/ERC2771Context.sol (solc 0.8.20)
+  OK: 0 findings
+[322/434] node_modules/@openzeppelin/contracts/metatx/MinimalForwarder.sol (solc 0.8.20)
+  OK: 11 findings
+[323/434] node_modules/@openzeppelin/contracts/proxy/Clones.sol (solc 0.8.20)
+  OK: 0 findings
+[324/434] node_modules/@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol (solc 0.8.20)
+  OK: 2 findings
+[325/434] node_modules/@openzeppelin/contracts/proxy/ERC1967/ERC1967Upgrade.sol (solc 0.8.20)
+  OK: 2 findings
+[326/434] node_modules/@openzeppelin/contracts/proxy/Proxy.sol (solc 0.8.20)
+  OK: 1 findings
+[327/434] node_modules/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol (solc 0.8.20)
+  OK: 2 findings
+[328/434] node_modules/@openzeppelin/contracts/proxy/beacon/IBeacon.sol (solc 0.8.20)
+  OK: 0 findings
+[329/434] node_modules/@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol (solc 0.8.20)
+  OK: 0 findings
+[330/434] node_modules/@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol (solc 0.8.20)
+  OK: 5 findings
+[331/434] node_modules/@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol (solc 0.8.20)
+  OK: 5 findings
+[332/434] node_modules/@openzeppelin/contracts/proxy/utils/Initializable.sol (solc 0.8.20)
+  OK: 0 findings
+[333/434] node_modules/@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol (solc 0.8.20)
+  OK: 2 findings
+[334/434] node_modules/@openzeppelin/contracts/security/Pausable.sol (solc 0.8.20)
+  OK: 0 findings
+[335/434] node_modules/@openzeppelin/contracts/security/PullPayment.sol (solc 0.8.20)
+  OK: 1 findings
+[336/434] node_modules/@openzeppelin/contracts/security/ReentrancyGuard.sol (solc 0.8.20)
+  OK: 0 findings
+[337/434] node_modules/@openzeppelin/contracts/token/ERC1155/ERC1155.sol (solc 0.8.20)
+  OK: 0 findings
+[338/434] node_modules/@openzeppelin/contracts/token/ERC1155/IERC1155.sol (solc 0.8.20)
+  OK: 0 findings
+[339/434] node_modules/@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol (solc 0.8.20)
+  OK: 0 findings
+[340/434] node_modules/@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Burnable.sol (solc 0.8.20)
+  OK: 0 findings
+[341/434] node_modules/@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Pausable.sol (solc 0.8.20)
+  OK: 0 findings
+[342/434] node_modules/@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol (solc 0.8.20)
+  OK: 0 findings
+[343/434] node_modules/@openzeppelin/contracts/token/ERC1155/extensions/ERC1155URIStorage.sol (solc 0.8.20)
+  OK: 9 findings
+[344/434] node_modules/@openzeppelin/contracts/token/ERC1155/extensions/IERC1155MetadataURI.sol (solc 0.8.20)
+  OK: 0 findings
+[345/434] node_modules/@openzeppelin/contracts/token/ERC1155/presets/ERC1155PresetMinterPauser.sol (solc 0.8.20)
+  OK: 12 findings
+[346/434] node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol (solc 0.8.20)
+  OK: 0 findings
+[347/434] node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Receiver.sol (solc 0.8.20)
+  OK: 0 findings
+[348/434] node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol (solc 0.8.20)
+  OK: 0 findings
+[349/434] node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol (solc 0.8.20)
+  OK: 0 findings
+[350/434] node_modules/@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol (solc 0.8.20)
+  OK: 0 findings
+[351/434] node_modules/@openzeppelin/contracts/token/ERC20/extensions/ERC20Capped.sol (solc 0.8.20)
+  OK: 0 findings
+[352/434] node_modules/@openzeppelin/contracts/token/ERC20/extensions/ERC20FlashMint.sol (solc 0.8.20)
+  OK: 2 findings
+[353/434] node_modules/@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol (solc 0.8.20)
+  OK: 0 findings
+[354/434] node_modules/@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol (solc 0.8.20)
+  OK: 11 findings
+[355/434] node_modules/@openzeppelin/contracts/token/ERC20/extensions/ERC20Snapshot.sol (solc 0.8.20)
+  OK: 9 findings
+[356/434] node_modules/@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol (solc 0.8.20)
+  OK: 14 findings
+[357/434] node_modules/@openzeppelin/contracts/token/ERC20/extensions/ERC20VotesComp.sol (solc 0.8.20)
+  OK: 14 findings
+[358/434] node_modules/@openzeppelin/contracts/token/ERC20/extensions/ERC20Wrapper.sol (solc 0.8.20)
+  OK: 2 findings
+[359/434] node_modules/@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol (solc 0.8.20)
+  OK: 12 findings
+[360/434] node_modules/@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol (solc 0.8.20)
+  OK: 0 findings
+[361/434] node_modules/@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol (solc 0.8.20)
+  OK: 0 findings
+[362/434] node_modules/@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol (solc 0.8.20)
+  OK: 11 findings
+[363/434] node_modules/@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol (solc 0.8.20)
+  OK: 0 findings
+[364/434] node_modules/@openzeppelin/contracts/token/ERC20/presets/ERC20PresetFixedSupply.sol (solc 0.8.20)
+  OK: 2 findings
+[365/434] node_modules/@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol (solc 0.8.20)
+  OK: 13 findings
+[366/434] node_modules/@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol (solc 0.8.20)
+  OK: 0 findings
+[367/434] node_modules/@openzeppelin/contracts/token/ERC20/utils/TokenTimelock.sol (solc 0.8.20)
+  OK: 3 findings
+[368/434] node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol (solc 0.8.20)
+  OK: 9 findings
+[369/434] node_modules/@openzeppelin/contracts/token/ERC721/IERC721.sol (solc 0.8.20)
+  OK: 0 findings
+[370/434] node_modules/@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol (solc 0.8.20)
+  OK: 0 findings
+[371/434] node_modules/@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol (solc 0.8.20)
+  OK: 9 findings
+[372/434] node_modules/@openzeppelin/contracts/token/ERC721/extensions/ERC721Consecutive.sol (solc 0.8.20)
+  OK: 12 findings
+[373/434] node_modules/@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol (solc 0.8.20)
+  OK: 9 findings
+[374/434] node_modules/@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol (solc 0.8.20)
+  OK: 9 findings
+[375/434] node_modules/@openzeppelin/contracts/token/ERC721/extensions/ERC721Royalty.sol (solc 0.8.20)
+  OK: 9 findings
+[376/434] node_modules/@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol (solc 0.8.20)
+  OK: 9 findings
+[377/434] node_modules/@openzeppelin/contracts/token/ERC721/extensions/ERC721Votes.sol (solc 0.8.20)
+  OK: 13 findings
+[378/434] node_modules/@openzeppelin/contracts/token/ERC721/extensions/ERC721Wrapper.sol (solc 0.8.20)
+  OK: 14 findings
+[379/434] node_modules/@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol (solc 0.8.20)
+  OK: 0 findings
+[380/434] node_modules/@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol (solc 0.8.20)
+  OK: 0 findings
+[381/434] node_modules/@openzeppelin/contracts/token/ERC721/extensions/draft-ERC721Votes.sol (solc 0.8.20)
+  OK: 13 findings
+[382/434] node_modules/@openzeppelin/contracts/token/ERC721/presets/ERC721PresetMinterPauserAutoId.sol (solc 0.8.20)
+  OK: 13 findings
+[383/434] node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol (solc 0.8.20)
+  OK: 0 findings
+[384/434] node_modules/@openzeppelin/contracts/token/ERC777/ERC777.sol (solc 0.8.20)
+  OK: 5 findings
+[385/434] node_modules/@openzeppelin/contracts/token/ERC777/IERC777.sol (solc 0.8.20)
+  OK: 0 findings
+[386/434] node_modules/@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol (solc 0.8.20)
+  OK: 0 findings
+[387/434] node_modules/@openzeppelin/contracts/token/ERC777/IERC777Sender.sol (solc 0.8.20)
+  OK: 0 findings
+[388/434] node_modules/@openzeppelin/contracts/token/ERC777/presets/ERC777PresetFixedSupply.sol (solc 0.8.20)
+  OK: 8 findings
+[389/434] node_modules/@openzeppelin/contracts/token/common/ERC2981.sol (solc 0.8.20)
+  OK: 0 findings
+[390/434] node_modules/@openzeppelin/contracts/utils/Address.sol (solc 0.8.20)
+  OK: 0 findings
+[391/434] node_modules/@openzeppelin/contracts/utils/Arrays.sol (solc 0.8.20)
+  OK: 9 findings
+[392/434] node_modules/@openzeppelin/contracts/utils/Base64.sol (solc 0.8.20)
+  OK: 1 findings
+[393/434] node_modules/@openzeppelin/contracts/utils/Checkpoints.sol (solc 0.8.20)
+  OK: 10 findings
+[394/434] node_modules/@openzeppelin/contracts/utils/Context.sol (solc 0.8.20)
+  OK: 0 findings
+[395/434] node_modules/@openzeppelin/contracts/utils/Counters.sol (solc 0.8.20)
+  OK: 0 findings
+[396/434] node_modules/@openzeppelin/contracts/utils/Create2.sol (solc 0.8.20)
+  OK: 0 findings
+[397/434] node_modules/@openzeppelin/contracts/utils/Multicall.sol (solc 0.8.20)
+  OK: 0 findings
+[398/434] node_modules/@openzeppelin/contracts/utils/ShortStrings.sol (solc 0.8.20)
+  OK: 0 findings
+[399/434] node_modules/@openzeppelin/contracts/utils/StorageSlot.sol (solc 0.8.20)
+  OK: 0 findings
+[400/434] node_modules/@openzeppelin/contracts/utils/Strings.sol (solc 0.8.20)
+  OK: 9 findings
+[401/434] node_modules/@openzeppelin/contracts/utils/Timers.sol (solc 0.8.20)
+  OK: 2 findings
+[402/434] node_modules/@openzeppelin/contracts/utils/cryptography/ECDSA.sol (solc 0.8.20)
+  OK: 9 findings
+[403/434] node_modules/@openzeppelin/contracts/utils/cryptography/EIP712.sol (solc 0.8.20)
+  OK: 9 findings
+[404/434] node_modules/@openzeppelin/contracts/utils/cryptography/MerkleProof.sol (solc 0.8.20)
+  OK: 0 findings
+[405/434] node_modules/@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol (solc 0.8.20)
+  OK: 9 findings
+[406/434] node_modules/@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol (solc 0.8.20)
+  OK: 9 findings
+[407/434] node_modules/@openzeppelin/contracts/utils/escrow/ConditionalEscrow.sol (solc 0.8.20)
+  OK: 1 findings
+[408/434] node_modules/@openzeppelin/contracts/utils/escrow/Escrow.sol (solc 0.8.20)
+  OK: 1 findings
+[409/434] node_modules/@openzeppelin/contracts/utils/escrow/RefundEscrow.sol (solc 0.8.20)
+  OK: 1 findings
+[410/434] node_modules/@openzeppelin/contracts/utils/introspection/ERC165.sol (solc 0.8.20)
+  OK: 0 findings
+[411/434] node_modules/@openzeppelin/contracts/utils/introspection/ERC165Checker.sol (solc 0.8.20)
+  OK: 0 findings
+[412/434] node_modules/@openzeppelin/contracts/utils/introspection/ERC165Storage.sol (solc 0.8.20)
+  OK: 0 findings
+[413/434] node_modules/@openzeppelin/contracts/utils/introspection/ERC1820Implementer.sol (solc 0.8.20)
+  OK: 0 findings
+[414/434] node_modules/@openzeppelin/contracts/utils/introspection/IERC165.sol (solc 0.8.20)
+  OK: 0 findings
+[415/434] node_modules/@openzeppelin/contracts/utils/introspection/IERC1820Implementer.sol (solc 0.8.20)
+  OK: 0 findings
+[416/434] node_modules/@openzeppelin/contracts/utils/introspection/IERC1820Registry.sol (solc 0.8.20)
+  OK: 0 findings
+[417/434] node_modules/@openzeppelin/contracts/utils/math/Math.sol (solc 0.8.20)
+  OK: 9 findings
+[418/434] node_modules/@openzeppelin/contracts/utils/math/SafeCast.sol (solc 0.8.20)
+  OK: 0 findings
+[419/434] node_modules/@openzeppelin/contracts/utils/math/SafeMath.sol (solc 0.8.20)
+  OK: 0 findings
+[420/434] node_modules/@openzeppelin/contracts/utils/math/SignedMath.sol (solc 0.8.20)
+  OK: 0 findings
+[421/434] node_modules/@openzeppelin/contracts/utils/math/SignedSafeMath.sol (solc 0.8.20)
+  OK: 0 findings
+[422/434] node_modules/@openzeppelin/contracts/utils/structs/BitMaps.sol (solc 0.8.20)
+  OK: 0 findings
+[423/434] node_modules/@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol (solc 0.8.20)
+  OK: 0 findings
+[424/434] node_modules/@openzeppelin/contracts/utils/structs/EnumerableMap.sol (solc 0.8.20)
+  OK: 0 findings
+[425/434] node_modules/@openzeppelin/contracts/utils/structs/EnumerableSet.sol (solc 0.8.20)
+  OK: 0 findings
+[426/434] node_modules/@openzeppelin/contracts/vendor/amb/IAMB.sol (solc 0.8.20)
+  OK: 0 findings
+[427/434] node_modules/@openzeppelin/contracts/vendor/arbitrum/IArbSys.sol (solc 0.8.20)
+  OK: 0 findings
+[428/434] node_modules/@openzeppelin/contracts/vendor/arbitrum/IBridge.sol (solc 0.6.12)
+  OK: 0 findings
+[429/434] node_modules/@openzeppelin/contracts/vendor/arbitrum/IDelayedMessageProvider.sol (solc 0.6.12)
+  OK: 0 findings
+[430/434] node_modules/@openzeppelin/contracts/vendor/arbitrum/IInbox.sol (solc 0.6.12)
+  OK: 0 findings
+[431/434] node_modules/@openzeppelin/contracts/vendor/arbitrum/IOutbox.sol (solc 0.6.12)
+  OK: 0 findings
+[432/434] node_modules/@openzeppelin/contracts/vendor/compound/ICompoundTimelock.sol (solc 0.8.20)
+  OK: 0 findings
+[433/434] node_modules/@openzeppelin/contracts/vendor/optimism/ICrossDomainMessenger.sol (solc 0.5.17)
+  OK: 0 findings
+[434/434] node_modules/@openzeppelin/contracts/vendor/polygon/IFxMessageProcessor.sol (solc 0.8.20)
+  OK: 0 findings
+
+============================================================
+SLITHER ANALYSIS COMPLETE
+============================================================
+Total: 434
+Compiled: 256 (59.0%)
+Failed: 178 (41.0%)
+Total findings: 1887
+
+Per-category:
+  Access_Control_RBAC: 1/2 compiled (50%)
+  Auction: 2/13 compiled (15%)
+  Bridge_Relayer: 2/15 compiled (13%)
+  Cross-Chain_Bridge: 0/11 compiled (0%)
+  Cross-Chain_Messaging: 0/3 compiled (0%)
+  Crowdfunding_ICO: 3/12 compiled (25%)
+  DeFi_DEX_AMM: 0/16 compiled (0%)
+  DeFi_Lending: 5/15 compiled (33%)
+  DeFi_Staking: 10/16 compiled (62%)
+  ERC1155_Multi-Token: 3/12 compiled (25%)
+  ERC20_Token: 3/15 compiled (20%)
+  ERC721_NFT: 4/15 compiled (27%)
+  Escrow: 2/12 compiled (17%)
+  Flash_Loan_Provider: 5/8 compiled (62%)
+  Governance_DAO: 5/14 compiled (36%)
+  Multisig_Wallet: 10/14 compiled (71%)
+  Proxy_Upgradeable_UUPS: 1/16 compiled (6%)
+  Timelock: 4/15 compiled (27%)
+  Wrapped_Token: 3/11 compiled (27%)
+  Yield_Aggregator: 6/12 compiled (50%)
+  node_modules: 187/187 compiled (100%)

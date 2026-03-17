@@ -1,0 +1,11 @@
+{
+  "address": "0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B",
+  "name": "Unitroller",
+  "compiler": "v0.5.8+commit.23d335f2",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 104215,
+  "category": "DeFi_Lending",
+  "collected_at": "2026-03-16T17:41:51.488907"
+}

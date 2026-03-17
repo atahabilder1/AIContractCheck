@@ -47,21 +47,29 @@ def _import_generator(llm_name: str):
     elif llm_name == "qwen":
         from llm_clients.qwen_client import generate_contract
         return generate_contract
+    elif llm_name == "gpt5":
+        from llm_clients.gpt5_client import generate_contract
+        return generate_contract
+    elif llm_name == "codestral":
+        from llm_clients.codestral_client import generate_contract
+        return generate_contract
     else:
         raise ValueError(f"Unknown LLM: {llm_name}")
 
 
 # Order matters: run local models first (free), then API models
-ALL_LLMS = ["codellama", "deepseek", "qwen", "claude", "gemini", "gpt4o"]
+ALL_LLMS = ["codellama", "deepseek", "qwen", "codestral", "claude", "gemini", "gpt4o", "gpt5"]
 
 # Per-LLM delay (seconds) to respect rate limits
 RATE_LIMITS = {
     "gpt4o": 1.0,      # OpenAI: generous limits
+    "gpt5": 1.0,        # OpenAI: generous limits
     "claude": 3.0,      # Claude CLI: give it time
     "gemini": 5.0,      # Gemini 2.5 Flash-Lite: 15 RPM, 1000 RPD
     "codellama": 1.0,   # Local: no limit (but sequential)
     "deepseek": 1.0,    # Local
     "qwen": 1.0,        # Local
+    "codestral": 1.0,   # Local
 }
 
 

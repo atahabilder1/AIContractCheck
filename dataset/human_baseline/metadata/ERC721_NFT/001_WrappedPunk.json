@@ -1,0 +1,11 @@
+{
+  "address": "0xb7f7f6c52f2e2fdb1963eab30438024864c313f6",
+  "name": "WrappedPunk",
+  "compiler": "v0.5.17+commit.d19bba13",
+  "license": "None",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 57871,
+  "category": "ERC721_NFT",
+  "collected_at": "2026-03-16T17:54:50.013938"
+}

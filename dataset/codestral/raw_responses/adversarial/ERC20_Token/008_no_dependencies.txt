@@ -1,0 +1,70 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract ERC20Token {
+    string public name = "MyToken";
+    string public symbol = "MTKN";
+    uint8 public decimals = 18;
+    uint256 private _totalSupply = 1000000 * (10 ** uint256(decimals));
+
+    mapping(address => uint256) private _balances;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed tokenOwner, address indexed spender, uint256 tokens);
+
+    constructor() {
+        _balances[msg.sender] = _totalSupply;
+    }
+
+    function totalSupply() public view returns (uint256) {
+        return _totalSupply;
+    }
+
+    function balanceOf(address account) public view returns (uint256) {
+        return _balances[account];
+    }
+
+    function transfer(address recipient, uint256 amount) public returns (bool) {
+        _transfer(_msgSender(), recipient, amount);
+        return true;
+    }
+
+    function allowance(address owner, address spender) public view returns (uint256) {
+        return _allowances[owner][spender];
+    }
+
+    function approve(address spender, uint256 tokens) public returns (bool) {
+        _approve(_msgSender(), spender, tokens);
+        return true;
+    }
+
+    function transferFrom(address sender, address recipient, uint256 amount) public returns (bool) {
+        _transfer(sender, recipient, amount);
+        _approve(sender, _msgSender(), _allowances[sender][_msgSender()] - amount);
+        return true;
+    }
+
+    function _transfer(address sender, address recipient, uint256 amount) internal {
+        require(sender != address(0), "Invalid sender.");
+        require(recipient != address(0), "Invalid recipient.");
+        require(_balances[sender] >= amount, "Insufficient balance.");
+
+        _balances[sender] = _balances[sender] - amount;
+        _balances[recipient] = _balances[recipient] + amount;
+        emit Transfer(sender, recipient, amount);
+    }
+
+    function _approve(address tokenOwner, address spender, uint256 tokens) internal {
+        require(tokenOwner != address(0), "Invalid owner.");
+        require(spender != address(0), "Invalid spender.");
+
+        _allowances[tokenOwner][spender] = tokens;
+        emit Approval(tokenOwner, spender, tokens);
+    }
+
+    mapping(address => mapping (address => uint256)) private _allowances;
+
+    function _msgSender() internal returns (address payable) {
+        return msg.sender;
+    }
+}

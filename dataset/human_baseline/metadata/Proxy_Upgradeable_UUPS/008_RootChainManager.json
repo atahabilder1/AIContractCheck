@@ -1,0 +1,11 @@
+{
+  "address": "0x7cfa0f105a4922e89666d7d63689d9c9b1ea7a19",
+  "name": "RootChainManager",
+  "compiler": "v0.6.6+commit.6c089d02",
+  "license": "GNU GPLv3",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 74842,
+  "category": "Proxy_Upgradeable_UUPS",
+  "collected_at": "2026-03-16T17:55:58.697552"
+}

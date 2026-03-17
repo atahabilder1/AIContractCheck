@@ -13,8 +13,8 @@
 
 \title[LLM Smart Contract Security]{From Prompt to Exploit:\\Security Vulnerabilities in LLM-Generated Smart Contracts}
 \subtitle{CSC 5991 --- Introduction to LLM: Project Proposal}
-\author{Anik Tahabilder \and Dung Vo}
-\institute{Wayne State University}
+\author{Anonymous Author(s)}
+\institute{Anonymous Institution}
 \date{March 2026}
 
 \begin{document}
@@ -72,7 +72,7 @@
 \begin{enumerate}
     \item \textbf{Design prompts} --- we wrote 300 prompts covering 20 types of smart contracts (tokens, DeFi, bridges, governance, etc.)
     \vspace{0.15cm}
-    \item \textbf{Generate contracts} --- we feed those prompts to 6 different LLMs and collect the Solidity code they produce (1,800 contracts total)
+    \item \textbf{Generate contracts} --- we feed those prompts to 8 different LLMs and collect the Solidity code they produce (2,400 contracts total)
     \vspace{0.15cm}
     \item \textbf{Scan for vulnerabilities} --- we run three industry-standard security tools (Slither, Mythril, Semgrep) on every contract
     \vspace{0.15cm}
@@ -83,14 +83,16 @@
 \end{column}
 \begin{column}{0.42\textwidth}
 \footnotesize
-\textbf{6 LLMs we are testing:}
+\textbf{8 LLMs we are testing:}
 \begin{itemize}
     \item GPT-4o (OpenAI)
+    \item GPT-5 (OpenAI)
     \item Claude 3.5 Sonnet (Anthropic)
     \item Gemini 2.5 Flash-Lite (Google)
     \item DeepSeek Coder V2
     \item Qwen 2.5 Coder 32B
     \item CodeLlama-34B (Meta)
+    \item Codestral 22B (Mistral)
 \end{itemize}
 \vspace{0.3cm}
 \textbf{3 security tools:}
@@ -109,20 +111,20 @@
 \begin{column}{0.48\textwidth}
 \textbf{Work completed:}
 \begin{itemize}\small
-    \item[\checkmark] Generated all 1,800 contracts from 6 LLMs
-    \item[\checkmark] Ran Slither on everything --- 1,181 compiled successfully, found 3,753 issues
-    \item[\checkmark] Ran Semgrep on all 1,800 --- picked up 1,626 more issues
-    \item[\checkmark] Sampled 499 contracts for Mythril (deeper analysis) --- 269 issues found
-    \item[\checkmark] After removing duplicates: \textbf{5,007 total bugs}
+    \item[\checkmark] Generated all 2,400 contracts from 8 LLMs
+    \item[\checkmark] Ran Slither on everything --- 1,566 compiled successfully, found 4,342 issues
+    \item[\checkmark] Ran Semgrep on all 2,400 --- picked up 1,296 more issues
+    \item[\checkmark] Sampled 499 contracts for Mythril (deeper analysis) --- 262 issues found
+    \item[\checkmark] After removing duplicates: \textbf{5,134 total bugs}
     \item[\checkmark] All statistical tests done
 \end{itemize}
 \end{column}
 \begin{column}{0.48\textwidth}
 \textbf{What we found (so far):}
 \begin{itemize}\small
-    \item About \textbf{3 out of 4} compilable contracts have at least one vulnerability
-    \item Roughly \textbf{28.5\%} have high-severity bugs
-    \item Some LLMs can't even produce valid code --- compilation rates range from 35\% to 90\%
+    \item About \textbf{2 out of 3} compilable contracts have at least one vulnerability (64.5\%)
+    \item Roughly \textbf{26.8\%} have high-severity bugs
+    \item Some LLMs can't even produce valid code --- compilation rates range from 34.7\% to 91.0\%
     \item There are big differences between LLMs (statistically significant)
     \item Surprisingly, adversarial prompts did \textbf{not} make things worse
 \end{itemize}
@@ -134,16 +136,19 @@
 \begin{frame}{Comparing the LLMs}
 \begin{center}
 \small
-\begin{tabular}{@{}lccccc@{}}
+\begin{tabular}{@{}llccccc@{}}
 \toprule
-\textbf{Model} & \textbf{Compiles} & \textbf{\% w/ Bugs} & \textbf{Avg Bugs} & \textbf{Bugs/100 LOC} & \textbf{Avg LOC} \\
+\textbf{Model} & \textbf{Type} & \textbf{Compiles} & \textbf{\% Vulnerable} & \textbf{Avg Bugs} & \textbf{Bugs/100 LOC} & \textbf{Avg LOC} \\
 \midrule
-GPT-4o         & 90.0\% & 73.0\% & 3.05 & 6.14 & 52 \\
-Claude         & 72.0\% & 84.7\% & 7.45 & 6.62 & 110 \\
-Qwen           & 79.0\% & 66.2\% & 2.75 & 6.32 & 42 \\
-DeepSeek       & 68.3\% & 73.2\% & 2.98 & 6.96 & 38 \\
-Gemini         & 49.7\% & 80.5\% & 4.52 & \textbf{7.91} & 55 \\
-CodeLlama      & 34.7\% & 49.0\% & 1.23 & 4.26 & 26 \\
+GPT-4o              & General & 90.0\% & 73.0\% & 3.05 & 6.61 & 52 \\
+GPT-5               & General & \textbf{91.0\%} & 35.5\% & 1.79 & \textbf{2.22} & 96 \\
+Claude 3.5 Sonnet   & General & 68.3\% & 84.9\% & 7.64 & 6.98 & 113 \\
+Gemini 2.5 Flash-Lite & General & 49.7\% & 80.5\% & 4.52 & \textbf{8.43} & 55 \\
+\midrule
+Qwen 2.5 Coder 32B  & Code & 79.0\% & 66.2\% & 2.75 & 6.95 & 42 \\
+DeepSeek Coder V2   & Code & 68.3\% & 73.2\% & 2.98 & 7.96 & 38 \\
+CodeLlama-34B       & Code & 34.7\% & 49.0\% & 1.23 & 5.16 & 26 \\
+Codestral 22B       & Code & 41.0\% & 52.0\% & 1.57 & 6.88 & 24 \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -151,15 +156,45 @@ CodeLlama      & 34.7\% & 49.0\% & 1.23 & 4.26 & 26 \\
 \vspace{0.3cm}
 \begin{block}{What this tells us}
 \begin{itemize}\small
-    \item GPT-4o compiles the best, but 73\% of its output still has bugs
-    \item Claude writes the biggest contracts (110 LOC avg), so it ends up with the most total bugs
-    \item Gemini has the worst bug density --- 7.91 bugs per 100 lines of code
-    \item CodeLlama has the fewest bugs, but only 35\% of its code even compiles
+    \item GPT-5 compiles the best (91\%) and has the lowest bug density (2.22/100 LOC)
+    \item Claude writes the biggest contracts (113 LOC avg), so it ends up with the most total bugs
+    \item Gemini has the worst bug density --- 8.43 bugs per 100 lines of code
+    \item CodeLlama has the fewest absolute bugs, but only 35\% of its code even compiles
 \end{itemize}
 \end{block}
 \end{frame}
 
-%--- Slide 7: Project Timeline ---
+%--- Slide 7: Human Baseline Comparison ---
+\begin{frame}{How Does LLM Code Compare to Human Code?}
+\begin{center}
+\small
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Metric} & \textbf{Human (Etherscan)} & \textbf{LLM (8 models)} \\
+\midrule
+Total contracts & 241 & 2,400 \\
+Compiled & 132 (54.8\%) & 1,566 (65.2\%) \\
+\% with vulnerabilities & 82.6\% & 64.5\% \\
+Mean findings/contract & 11.51 & 3.28 \\
+Mean LOC & 446.7 & 57.2 \\
+\textbf{Vulns/100 LOC} & \textbf{2.69} & \textbf{2.22--8.43} \\
+High severity \% & 16.0\% & 15.7\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\vspace{0.3cm}
+\begin{block}{The real story}
+\begin{itemize}\small
+    \item Per line of code, vulnerability density is \textbf{comparable} (2.69 vs 2.22--8.43)
+    \item Both trigger the \textbf{same} detectors: reentrancy-events, timestamp, missing-zero-check
+    \item High-severity proportion nearly identical (16.0\% vs 15.7\%)
+    \item The danger is not worse code --- it's \textbf{skipping the security pipeline} (audits, monitoring, testing) that makes human code survivable
+\end{itemize}
+\end{block}
+\end{frame}
+
+%--- Slide 8: Project Timeline ---
 \begin{frame}{Project Timeline}
 \begin{center}
 \small
@@ -168,13 +203,14 @@ CodeLlama      & 34.7\% & 49.0\% & 1.23 & 4.26 & 26 \\
 \textbf{When} & \textbf{What we did / plan to do} & \textbf{Status} \\
 \midrule
 Jan 2026     & Designed 300 prompts across 20 contract types          & Done \\
-Jan--Feb     & Generated 1,800 contracts from 6 LLMs                  & Done \\
+Jan--Feb     & Generated 2,400 contracts from 8 LLMs                  & Done \\
 Feb          & Ran Slither and Semgrep on all contracts                & Done \\
 Feb--Mar     & Ran Mythril on a stratified sample of 499 contracts    & Done \\
 Mar (week 1) & Aggregated results, removed duplicates                  & Done \\
 Mar (week 2) & Statistical analysis and adversarial comparison         & Done \\
+Mar (week 3) & Human baseline: 241 Etherscan contracts analyzed        & Done \\
 \midrule
-Mar (week 3) & Manually review 120 contracts for false positives       & To do \\
+Mar (week 4) & Manually review 120 contracts for false positives       & To do \\
 Mar--Apr     & Root cause analysis --- why LLMs produce these bugs    & To do \\
 Apr          & Test prompt-based mitigation strategies                 & To do \\
 \bottomrule
@@ -194,7 +230,7 @@ Apr          & Test prompt-based mitigation strategies                 & To do \
 %--- Slide 8: What We Hope to Contribute ---
 \begin{frame}{What We Hope to Contribute}
 \begin{enumerate}
-    \item \textbf{A large-scale study} --- 1,800 contracts across 6 LLMs and 20 categories; as far as we know, nobody has done this at this scale before
+    \item \textbf{A large-scale study} --- 2,400 contracts across 8 LLMs and 20 categories; as far as we know, nobody has done this at this scale before
     \vspace{0.3cm}
     \item \textbf{A clear taxonomy of bugs} --- we map every vulnerability to a standard CWE identifier so people can compare results
     \vspace{0.3cm}

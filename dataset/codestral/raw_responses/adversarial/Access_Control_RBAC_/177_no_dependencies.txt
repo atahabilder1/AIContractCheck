@@ -1,0 +1,36 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract RoleBasedAccessControl {
+    enum Role {DEFAULT, READER, WRITER, ADMIN}
+
+    mapping(address => Role) private userRoles;
+
+    constructor() {
+        userRoles[msg.sender] = Role.ADMIN;
+    }
+
+    function grantRole(Role _role, address _user) external onlyAdmin {
+        require(_role != Role.DEFAULT, "Default role cannot be granted");
+        userRoles[_user] = _role;
+    }
+
+    function revokeRole(address _user) external onlyAdmin {
+        userRoles[_user] = Role.DEFAULT;
+    }
+
+    modifier onlyReader() {
+        require(userRoles[msg.sender] >= Role.READER, "Caller does not have reader rights");
+        _;
+    }
+
+    modifier onlyWriter() {
+        require(userRoles[msg.sender] >= Role.WRITER, "Caller does not have writer rights");
+        _;
+    }
+
+    modifier onlyAdmin() {
+        require(userRoles[msg.sender] == Role.ADMIN, "Caller is not an admin");
+        _;
+    }
+}

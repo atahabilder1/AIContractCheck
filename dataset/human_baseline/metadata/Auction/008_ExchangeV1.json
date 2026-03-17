@@ -1,0 +1,11 @@
+{
+  "address": "0xcd4ec7b66fbc029c116ba9ffb3e59351c20b5b06",
+  "name": "ExchangeV1",
+  "compiler": "v0.5.17+commit.d19bba13",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 43638,
+  "category": "Auction",
+  "collected_at": "2026-03-16T18:23:06.834811"
+}

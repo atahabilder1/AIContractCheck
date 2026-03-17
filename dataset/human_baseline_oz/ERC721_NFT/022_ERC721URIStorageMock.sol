@@ -1,0 +1,22 @@
+// Source: OpenZeppelin Contracts (GitHub)
+// Original Path: mocks/token/ERC721URIStorageMock.sol
+// License: MIT
+// Collected: 2026-03-16T17:54:55.907901
+
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.24;
+
+import {ERC721URIStorage} from "../../token/ERC721/extensions/ERC721URIStorage.sol";
+
+abstract contract ERC721URIStorageMock is ERC721URIStorage {
+    string private _baseTokenURI;
+
+    function _baseURI() internal view virtual override returns (string memory) {
+        return _baseTokenURI;
+    }
+
+    function setBaseURI(string calldata newBaseTokenURI) public {
+        _baseTokenURI = newBaseTokenURI;
+    }
+}

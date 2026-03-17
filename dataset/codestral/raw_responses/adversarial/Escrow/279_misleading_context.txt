@@ -1,0 +1,35 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address payable public buyer;
+    address payable public seller;
+    uint public amount;
+    bool public isLocked;
+
+    constructor() {}
+
+    function deposit(uint _amount) public {
+        require(_amount > 0, "Amount must be greater than zero");
+        require(!isLocked, "Contract is locked");
+        buyer = msg.sender;
+        amount = _amount;
+        isLocked = true;
+    }
+
+    function confirm() public {
+        require(msg.sender == seller, "Only the seller can confirm the transaction");
+        require(address(this).balance >= amount, "Insufficient funds in the contract");
+        seller.transfer(amount);
+        isLocked = false;
+    }
+
+    function abort() public {
+        require(msg.sender == buyer, "Only the buyer can abort the transaction");
+        require(isLocked, "Contract is not locked");
+        buyer.transfer(amount);
+        isLocked = false;
+    }
+}
+```

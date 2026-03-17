@@ -1,0 +1,11 @@
+{
+  "address": "0x24a42fd28c976a61df5d00d0599c34c4f90748c8",
+  "name": "LendingPoolAddressesProvider",
+  "compiler": "v0.5.14+commit.1f1aaa4",
+  "license": "GNU GPLv3",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 239482,
+  "category": "Flash_Loan_Provider",
+  "collected_at": "2026-03-16T18:23:20.855611"
+}

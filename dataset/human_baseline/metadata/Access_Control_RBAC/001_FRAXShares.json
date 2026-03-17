@@ -1,0 +1,11 @@
+{
+  "address": "0x3432b6a60d23ca0dfca7761b7ab56459d9c964d0",
+  "name": "FRAXShares",
+  "compiler": "v0.6.11+commit.5ef660b1",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "100000",
+  "source_length": 321376,
+  "category": "Access_Control_RBAC",
+  "collected_at": "2026-03-16T18:22:58.411526"
+}

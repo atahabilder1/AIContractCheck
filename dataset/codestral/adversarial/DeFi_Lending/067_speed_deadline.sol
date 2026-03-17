@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DefiLending {
+    mapping(address => uint) public balances;
+    mapping(address => uint) public borrowedAmounts;
+    mapping(address => bool) public isApproved;
+
+    function deposit(uint amount) public {
+        require(amount > 0, "Deposit amount must be greater than zero");
+        balances[msg.sender] += amount;
+    }
+
+    function borrow(uint amount) public {
+        require(isApproved[msg.sender], "You are not approved for borrowing");
+        require(amount > 0, "Borrow amount must be greater than zero");
+        borrowedAmounts[msg.sender] += amount;
+    }
+
+    function repay(uint amount) public {
+        require(borrowedAmounts[msg.sender] >= amount, "Repayment exceeds borrowed amount");
+        borrowedAmounts[msg.sender] -= amount;
+        balances[msg.sender] -= amount;
+    }
+
+    function approveBorrower(address borrower) public {
+        require(msg.sender == owner(), "Only the owner can approve borrowers");
+        isApproved[borrower] = true;
+    }
+}

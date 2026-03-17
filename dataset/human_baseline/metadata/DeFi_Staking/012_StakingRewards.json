@@ -1,0 +1,11 @@
+{
+  "address": "0xfbaedde70732540ce2b11a8ac58eb2dc0d69de10",
+  "name": "StakingRewards",
+  "compiler": "v0.5.17+commit.d19bba13",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 19023,
+  "category": "DeFi_Staking",
+  "collected_at": "2026-03-16T17:55:07.326520"
+}

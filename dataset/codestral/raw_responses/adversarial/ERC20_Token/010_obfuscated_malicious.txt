@@ -1,0 +1,45 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract EmergencyToken is ERC20, Ownable {
+    constructor(uint256 initialSupply) ERC20("EmergencyToken", "ETK") {
+        _mint(msg.sender, initialSupply);
+    }
+
+    bool public paused = false;
+
+    function pause() external onlyOwner {
+        paused = true;
+    }
+
+    function unpause() external onlyOwner {
+        paused = false;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
+    function transfer(address to, uint256 amount) public override whenNotPaused returns (bool) {
+        return super.transfer(to, amount);
+    }
+
+    function approve(address spender, uint256 amount) public override whenNotPaused returns (bool) {
+        return super.approve(spender, amount);
+    }
+
+    function transferFrom(address from, address to, uint256 amount) public override whenNotPaused returns (bool) {
+        return super.transferFrom(from, to, amount);
+    }
+
+    function emergencyWithdraw() external onlyOwner {
+        uint256 balance = this.balanceOf(address(this));
+        this.transfer(msg.sender, balance);
+    }
+}
+```

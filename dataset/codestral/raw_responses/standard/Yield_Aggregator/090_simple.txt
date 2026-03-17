@@ -1,0 +1,43 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BasicYieldVault {
+    // Define the strategy contract address
+    IERC20 private _strategy;
+
+    // Define a mapping to track user shares
+    mapping(address => uint) public balanceOf;
+
+    constructor(IERC20 strategy_) {
+        _strategy = strategy_;
+    }
+
+    function deposit(uint amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+
+        // Transfer the deposited tokens to the strategy contract
+        bool success = _strategy.transferFrom(msg.sender, address(this), amount);
+        require(success, "Transfer failed");
+
+        // Mint new shares for the user based on their deposit
+        uint sharesToMint = amount; // Simple 1:1 ratio in this basic example
+        balanceOf[msg.sender] += sharesToMint;
+    }
+
+    function withdraw(uint shares) external {
+        require(shares > 0, "Shares must be greater than zero");
+        require(balanceOf[msg.sender] >= shares, "Insufficient shares");
+
+        // Calculate the amount of tokens to withdraw based on user's shares
+        uint tokensToWithdraw = shares; // Simple 1:1 ratio in this basic example
+
+        // Transfer the tokens from the strategy contract to the user
+        bool success = _strategy.transfer(msg.sender, tokensToWithdraw);
+        require(success, "Transfer failed");
+
+        // Burn the withdrawn shares
+        balanceOf[msg.sender] -= shares;
+    }
+}
+```

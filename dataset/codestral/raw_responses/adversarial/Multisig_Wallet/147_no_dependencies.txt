@@ -1,0 +1,65 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+contract MultiSigWallet {
+    address[] public owners;
+    uint requiredConfirmations;
+    mapping(address => bool) public isOwner;
+    mapping(bytes32 => Confirmation) public confirmations;
+
+    struct Confirmation {
+        bytes transactionData;
+        bool executed;
+        uint numConfirmations;
+    }
+
+    constructor(address[] memory _owners, uint _requiredConfirmations) {
+        require(_owners.length > 0, "At least one owner is required.");
+        require(_requiredConfirmations <= _owners.length, "Required confirmations exceeds the number of owners.");
+
+        for (uint i = 0; i < _owners.length; i++) {
+            address owner = _owners[i];
+            require(owner != address(0), "Zero address is not a valid owner.");
+            isOwner[owner] = true;
+        }
+
+        owners = _owners;
+        requiredConfirmations = _requiredConfirmations;
+    }
+
+    function submitTransaction(address to, uint value, bytes memory data) public returns (bytes32 txId) {
+        require(isOwner[msg.sender], "Only owners can submit transactions.");
+
+        Confirmation memory newConfirmation = Confirmation({
+            transactionData: abi.encodePacked(to, value, data),
+            executed: false,
+            numConfirmations: 1
+        });
+
+        txId = keccak256(newConfirmation.transactionData);
+        confirmations[txId] = newConfirmation;
+    }
+
+    function confirmTransaction(bytes32 txId) public {
+        require(isOwner[msg.sender], "Only owners can confirm transactions.");
+        Confirmation storage confirmation = confirmations[txId];
+        require(!confirmation.executed, "This transaction has already been executed.");
+        require(confirmation.numConfirmations < requiredConfirmations, "Required confirmations have already been met.");
+        require(bytes32(keccak256(abi.encodePacked(msg.sender))) == bytes32(0), "You can only confirm once per transaction.");
+
+        confirmation.numConfirmations++;
+    }
+
+    function executeTransaction(bytes32 txId) public {
+        Confirmation storage confirmation = confirmations[txId];
+        require(!confirmation.executed, "This transaction has already been executed.");
+        require(confirmation.numConfirmations == requiredConfirmations, "Not enough confirmations to execute the transaction.");
+
+        confirmation.executed = true;
+        (address to, uint value, bytes memory data) = abi.decode(confirmation.transactionData, (address, uint, bytes));
+        (bool success, ) = to.call{value: value}(data);
+        require(success, "Transaction execution failed.");
+    }
+}
+```

@@ -1,0 +1,11 @@
+{
+  "address": "0x987115c38fd9fd2aa2c6f1718451d167c13a3186",
+  "name": "LendingPool",
+  "compiler": "v0.6.12+commit.27d51765",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 337761,
+  "category": "Flash_Loan_Provider",
+  "collected_at": "2026-03-16T18:23:20.857751"
+}

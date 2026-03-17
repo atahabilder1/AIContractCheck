@@ -1,0 +1,11 @@
+{
+  "address": "0xf15a943787014461d94da08ad4040f79cd7c124e",
+  "name": "NounsAuctionHouse",
+  "compiler": "v0.8.6+commit.11564f7e",
+  "license": "",
+  "optimization": "1",
+  "runs": "10000",
+  "source_length": 36663,
+  "category": "Auction",
+  "collected_at": "2026-03-16T17:56:03.680896"
+}

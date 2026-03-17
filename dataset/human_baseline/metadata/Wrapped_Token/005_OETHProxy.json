@@ -1,0 +1,11 @@
+{
+  "address": "0x856c4efb76c1d1ae02e20ceb03a2a6a08b0b8dc3",
+  "name": "OETHProxy",
+  "compiler": "v0.8.7+commit.e28d00a7",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 23023,
+  "category": "Wrapped_Token",
+  "collected_at": "2026-03-16T18:23:33.840789"
+}

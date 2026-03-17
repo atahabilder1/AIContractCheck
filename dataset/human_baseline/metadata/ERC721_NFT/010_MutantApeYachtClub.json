@@ -1,0 +1,11 @@
+{
+  "address": "0x60e4d786628fea6478f785a6d7e704777c86a7c6",
+  "name": "MutantApeYachtClub",
+  "compiler": "v0.8.6+commit.11564f7e",
+  "license": "MIT",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 59869,
+  "category": "ERC721_NFT",
+  "collected_at": "2026-03-16T17:54:50.021541"
+}

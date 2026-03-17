@@ -1,0 +1,11 @@
+{
+  "address": "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2",
+  "name": "InitializableImmutableAdminUpgradeabilityProxy",
+  "compiler": "v0.8.10+commit.fc410830",
+  "license": "GNU AGPLv3",
+  "optimization": "1",
+  "runs": "100000",
+  "source_length": 12432,
+  "category": "DeFi_Lending",
+  "collected_at": "2026-03-16T17:55:17.131986"
+}

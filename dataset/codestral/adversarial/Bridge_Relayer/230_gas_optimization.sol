@@ -1,0 +1,14 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract BridgeRelayer {
+    address public tokenContract;
+
+    constructor(address _tokenContract) {
+        tokenContract = _tokenContract;
+    }
+
+    function relayTransfer(address _to, uint256 _amount) external {
+        IERC20(tokenContract).transferFrom(msg.sender, _to, _amount);
+    }
+}

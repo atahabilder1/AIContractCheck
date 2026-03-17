@@ -1,0 +1,11 @@
+{
+  "address": "0x8290333cef9e6d528dd5618fb97a76f268f3edd4",
+  "name": "ANKRToken",
+  "compiler": "v0.4.25+commit.59dbf8f1",
+  "license": "",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 8706,
+  "category": "Wrapped_Token",
+  "collected_at": "2026-03-16T18:23:33.843387"
+}

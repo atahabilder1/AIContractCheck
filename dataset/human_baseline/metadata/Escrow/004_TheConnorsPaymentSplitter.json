@@ -1,0 +1,11 @@
+{
+  "address": "0x505cfce628d79cd3b3bafd48762a6560eaee97b8",
+  "name": "TheConnorsPaymentSplitter",
+  "compiler": "v0.8.17+commit.8df45f5f",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 31737,
+  "category": "Escrow",
+  "collected_at": "2026-03-16T17:56:16.717470"
+}

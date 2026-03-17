@@ -1,0 +1,11 @@
+{
+  "address": "0x830bd73e4184cef73443c15111a1df14e495c706",
+  "name": "NounsAuctionHouseProxy",
+  "compiler": "v0.8.6+commit.11564f7e",
+  "license": "",
+  "optimization": "1",
+  "runs": "10000",
+  "source_length": 28098,
+  "category": "Proxy_Upgradeable_UUPS",
+  "collected_at": "2026-03-16T17:55:58.696580"
+}

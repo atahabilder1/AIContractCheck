@@ -1,0 +1,11 @@
+{
+  "address": "0xb2ecfe4e4d61f8790bbb9de2d1259b9e2410cea5",
+  "name": "ERC1967Proxy",
+  "compiler": "v0.8.17+commit.8df45f5f",
+  "license": "",
+  "optimization": "1",
+  "runs": "20000",
+  "source_length": 26702,
+  "category": "Auction",
+  "collected_at": "2026-03-16T18:23:06.836175"
+}

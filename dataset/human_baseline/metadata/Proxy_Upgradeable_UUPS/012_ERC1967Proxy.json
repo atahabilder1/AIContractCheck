@@ -1,0 +1,11 @@
+{
+  "address": "0x5c7bcd6e7de5423a257d81b442095a1a6ced35c5",
+  "name": "ERC1967Proxy",
+  "compiler": "v0.8.9+commit.e5eed63a",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 38439,
+  "category": "Proxy_Upgradeable_UUPS",
+  "collected_at": "2026-03-16T18:22:55.316866"
+}

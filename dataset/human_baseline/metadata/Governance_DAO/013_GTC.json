@@ -1,0 +1,11 @@
+{
+  "address": "0xde30da39c46104798bb5aa3fe8b9e0e1f348163f",
+  "name": "GTC",
+  "compiler": "v0.6.12+commit.27d51765",
+  "license": "None",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 24244,
+  "category": "Governance_DAO",
+  "collected_at": "2026-03-16T17:55:37.615919"
+}

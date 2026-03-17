@@ -1,0 +1,11 @@
+{
+  "address": "0x80226fc0ee2b096224eeac085bb9a8cba1146f7d",
+  "name": "Router",
+  "compiler": "v0.8.19+commit.7dd6d404",
+  "license": "",
+  "optimization": "1",
+  "runs": "26000",
+  "source_length": 76766,
+  "category": "Bridge_Relayer",
+  "collected_at": "2026-03-16T17:56:38.510691"
+}

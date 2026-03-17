@@ -1,0 +1,48 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract Timelock is Ownable {
+    using SafeMath for uint256;
+
+    uint256 public constant MIN_DELAY = 1 days; // Minimum delay (in seconds)
+    uint256 public constant MAX_DELAY = 30 days; // Maximum delay (in seconds)
+    uint256 public constant BASE_DELAY = 1 hours; // Base delay for each ETH
+    uint256 public constant ETH_PER_SECOND = 1 ether; // ETH value to increase delay by one second
+
+    address payable public owner;
+
+    constructor() {
+        owner = payable(msg.sender);
+    }
+
+    function depositEther() public payable {
+        require(msg.value > 0, "Value must be greater than zero");
+    }
+
+    function withdrawEther() public {
+        uint256 balance = address(this).balance;
+        uint256 delay = calculateDelay(balance);
+
+        if (block.timestamp >= _lastWithdrawTime + delay) {
+            owner.transfer(balance);
+            _lastWithdrawTime = block.timestamp;
+        } else {
+            revert("Timelock delay not yet passed");
+        }
+    }
+
+    function calculateDelay(uint256 balance) private view returns (uint256) {
+        uint256 delay = balance / ETH_PER_SECOND * BASE_DELAY;
+        return delay.clamp(MIN_DELAY, MAX_DELAY);
+    }
+
+    function clamp(uint256 value, uint256 min, uint256 max) private pure returns (uint256) {
+        require(min <= max, "Invalid bounds");
+        return value < min ? min : value > max ? max : value;
+    }
+
+    uint256 private _lastWithdrawTime = 0;
+}

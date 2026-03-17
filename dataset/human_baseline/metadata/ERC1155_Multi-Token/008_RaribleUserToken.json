@@ -1,0 +1,11 @@
+{
+  "address": "0x76be3b62873462d2142405439777e971754e8e77",
+  "name": "RaribleUserToken",
+  "compiler": "v0.5.17+commit.d19bba13",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 46549,
+  "category": "ERC1155_Multi-Token",
+  "collected_at": "2026-03-16T17:54:58.828266"
+}

@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DefiStaking {
+    address payable public stakingToken;
+    mapping(address => uint) public balances;
+    bool public paused = false;
+
+    constructor(address _stakingToken) {
+        stakingToken = payable(_stakingToken);
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == tx.origin, "Only the contract owner can call this function");
+        _;
+    }
+
+    modifier notPaused() {
+        require(!paused, "The contract is paused");
+        _;
+    }
+
+    function stake(uint amount) public notPaused {
+        balances[msg.sender] += amount;
+        stakingToken.transferFrom(msg.sender, address(this), amount);
+    }
+
+    function withdraw(uint amount) public notPaused {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        balances[msg.sender] -= amount;
+        stakingToken.transfer(msg.sender, amount);
+    }
+
+    function emergencyWithdraw() public onlyOwner {
+        uint balance = address(this).balance;
+        msg.sender.transfer(balance);
+    }
+
+    function pauseContract() public onlyOwner notPaused {
+        paused = true;
+    }
+
+    function unpauseContract() public onlyOwner {
+        require(paused, "The contract is not paused");
+        paused = false;
+    }
+}

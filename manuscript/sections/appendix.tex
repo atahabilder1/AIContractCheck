@@ -1,0 +1,86 @@
+%======================================================================
+\section{Contract Category Analysis}
+\label{sec:category}
+%======================================================================
+
+Vulnerability rates vary substantially across contract categories (Kruskal-Wallis $H = 466.5$, $p < 10^{-87}$). Table~\ref{tab:categories} presents the per-category analysis for the top 10 categories ranked by mean vulnerability count.
+
+\begin{table}[t]
+\caption{Vulnerability Rates by Contract Category (Top 10, Compiled Only)}
+\label{tab:categories}
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lrrc@{}}
+\toprule
+\textbf{Category} & \textbf{Mean Vulns} & \textbf{\% High} & \textbf{Most Common CWE} \\
+\midrule
+DeFi Staking & 6.77 & 46.2\% & CWE-841 \\
+Timelock & 6.31 & 25.9\% & CWE-829 \\
+Auction & 6.05 & 24.1\% & CWE-829 \\
+Crowdfunding/ICO & 5.51 & 17.6\% & CWE-829 \\
+Yield Aggregator & 4.94 & 35.2\% & CWE-841 \\
+DEX/AMM & 4.73 & 37.8\% & CWE-841 \\
+DeFi Lending & 4.20 & 25.3\% & CWE-841 \\
+Governance/DAO & 3.49 & 11.4\% & CWE-829 \\
+ERC721 NFT & 3.36 & 64.4\% & CWE-841 \\
+Proxy/Upgradeable & 3.30 & 50.0\% & CWE-829 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{DeFi Contracts: Highest Vulnerability Rates}
+
+DeFi staking contracts exhibit the highest mean vulnerability rate (6.77 per contract), followed by timelock contracts (6.31) and auctions (6.05). These categories involve complex state management, token transfer logic, and reward calculation---areas where LLMs consistently introduce reentrancy and timestamp dependence vulnerabilities. DeFi staking also has the highest high-severity rate among DeFi categories (46.2\%).
+
+DEX/AMM contracts have both high vulnerability rates (4.73) and a substantial proportion of high-severity vulnerabilities (37.8\%), making them a particularly dangerous category for direct financial loss. LLMs frequently generate AMM contracts with unprotected swap functions and missing slippage checks.
+
+\subsection{ERC721, Flash Loan, and Proxy Contracts: High-Severity Concentration}
+
+While ERC721 NFT contracts have a moderate mean vulnerability count (3.36), they exhibit the second-highest high-severity rate (64.4\%) among all categories. This is driven by access control vulnerabilities in minting and transfer functions. Flash loan contracts (3.06 mean vulns) show the highest high-severity concentration (69.2\%), reflecting the critical nature of callback validation and reentrancy prevention in flash loan architectures~\cite{qin2021attacking}. Proxy/upgradeable contracts show a 50.0\% high-severity rate, primarily from unprotected initializer functions and missing upgrade authorization checks.
+
+\subsection{Standard Contracts: Lower but Non-Zero Risk}
+
+The relatively lower vulnerability rates in ERC20 tokens (0.41) and ERC1155 multi-tokens (0.65) suggest that LLMs have been trained on sufficient examples of these well-established patterns. However, even these ``simple'' contracts exhibit high-severity vulnerabilities in 3.8\% and 9.1\% of cases respectively, indicating that no contract category should be considered safe by default.
+
+Access control contracts have the lowest mean vulnerability rate (0.74), likely because their focused scope limits the attack surface. Cross-chain messaging contracts are similarly low (1.52) with a very low high-severity rate (3.2\%), suggesting that LLMs handle message-passing patterns reasonably well when the contracts are simple enough to compile.
+
+%======================================================================
+\section{Supplementary Figures}
+\label{sec:appendix_figures}
+%======================================================================
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{../visualization/figures/fig10_compilation_rates.pdf}
+    \caption{Compilation success rate by LLM. GPT-5 and GPT-4o achieve $>$90\%, while code-specialized models CodeLlama and Codestral compile fewer than half their outputs.}
+    \label{fig:compilation}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{../visualization/figures/fig4_severity_distribution.pdf}
+    \caption{Vulnerability severity distribution by LLM. Codestral has the highest proportion of high-severity findings (29.5\%), while CodeLlama has the lowest (8.6\%). Low-severity findings dominate across all models.}
+    \label{fig:severity}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{../visualization/figures/fig9_loc_vs_vulns_scatter.pdf}
+    \caption{Contract size (LOC) vs.\ vulnerability count with per-LLM regression lines. Larger contracts contain more vulnerabilities, but the slope varies by model---Claude generates the largest contracts with correspondingly more findings.}
+    \label{fig:loc_scatter}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{../visualization/figures/fig7_tool_agreement.pdf}
+    \caption{Pairwise tool agreement scatter plots. Low Spearman correlations across all three tool pairs confirm complementary detection capabilities.}
+    \label{fig:tool_agreement}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{../visualization/figures/fig5_adversarial_triggers.pdf}
+    \caption{Vulnerability induction by adversarial trigger category. Misleading context produces the widest spread, but no category significantly outperforms others ($H = 5.04$, $p = 0.656$).}
+    \label{fig:adv_triggers}
+\end{figure}

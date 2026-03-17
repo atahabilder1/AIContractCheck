@@ -1,0 +1,34 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Escrow {
+    address public buyer;
+    address public seller;
+    uint public depositAmount;
+    bool public isConfirmed;
+
+    constructor(address payable _seller) {
+        seller = _seller;
+    }
+
+    function deposit() external payable {
+        require(depositAmount == 0, "Funds already deposited");
+        buyer = msg.sender;
+        depositAmount = msg.value;
+    }
+
+    function confirmDelivery() external {
+        require(msg.sender == seller, "Only the seller can confirm delivery");
+        require(isConfirmed == false, "Delivery already confirmed");
+        isConfirmed = true;
+        releaseFunds();
+    }
+
+    function releaseFunds() private {
+        require(depositAmount > 0 && isConfirmed, "Payment not yet released");
+        seller.transfer(depositAmount);
+        depositAmount = 0;
+    }
+}
+```

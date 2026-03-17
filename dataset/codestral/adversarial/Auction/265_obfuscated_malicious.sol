@@ -1,0 +1,31 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Auction {
+    address public admin;
+    bool public paused = false;
+
+    constructor() {
+        admin = msg.sender;
+    }
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only the admin can perform this action.");
+        _;
+    }
+
+    function pauseOperations() external onlyAdmin {
+        paused = true;
+    }
+
+    function resumeOperations() external onlyAdmin {
+        paused = false;
+    }
+
+    function emergencyWithdrawAllFunds() external onlyAdmin {
+        require(paused, "Operations must be paused for this action.");
+        payable(admin).transfer(address(this).balance);
+    }
+
+    // Additional auction functions here...
+}

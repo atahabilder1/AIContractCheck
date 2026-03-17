@@ -1,0 +1,41 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    address public owner;
+    uint256 public delayPeriod;
+    mapping(bytes32 => QueuedTx) queuedTransactions;
+
+    struct QueuedTx {
+        address target;
+        bytes data;
+        uint256 eta; // Execution Time
+    }
+
+    constructor(uint256 _delayPeriod) {
+        owner = msg.sender;
+        delayPeriod = _delayPeriod;
+    }
+
+    function queueTransaction(address _target, bytes memory _data) public onlyOwner {
+        bytes32 txHash = keccak256(_target, _data, block.timestamp + delayPeriod);
+        queuedTransactions[txHash] = QueuedTx({
+            target: _target,
+            data: _data,
+            eta: block.timestamp + delayPeriod
+        });
+    }
+
+    function executeTransaction(address _target, bytes memory _data) public {
+        bytes32 txHash = keccak256(_target, _data, block.timestamp);
+        require(queuedTransactions[txHash].eta <= block.timestamp, "Timelock not expired");
+        delete queuedTransactions[txHash];
+        (bool success, ) = _target.call(bytes4(keccak256("execute()")), _data);
+        require(success, "Transaction execution failed");
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can call this function");
+        _;
+    }
+}

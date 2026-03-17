@@ -1,0 +1,11 @@
+{
+  "address": "0x98f3c9e6e3face36baad05fe09d375ef1464288b",
+  "name": "Wormhole",
+  "compiler": "v0.8.4+commit.c7e474f2",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 22661,
+  "category": "Bridge_Relayer",
+  "collected_at": "2026-03-16T17:56:38.508672"
+}

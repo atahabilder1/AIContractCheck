@@ -1,0 +1,18 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainMessenger {
+    address payable public otherChainReceiver;
+
+    constructor(address _otherChainReceiver) {
+        otherChainReceiver = payable(_otherChainReceiver);
+    }
+
+    function sendMessage(bytes memory message, uint256 amount) external payable {
+        (bool success, ) = otherChainReceiver.call{value: amount}(message);
+        require(success, "Message sending failed");
+    }
+}
+```
+This is a basic example of a Cross-Chain Messaging contract. It allows you to send messages and ether to another chain by calling the `sendMessage` function with the message data and amount of ether to be sent. The `otherChainReceiver` address must be set in the constructor or through a separate function not shown here for simplicity.

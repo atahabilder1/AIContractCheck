@@ -1,0 +1,11 @@
+{
+  "address": "0x1ec9b94b4bbcd46699f9b4c9140e0b2b6c73a5be",
+  "name": "Hyperlane",
+  "compiler": "v0.8.24+commit.e11b9ed9",
+  "license": "MIT",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 7894,
+  "category": "Bridge_Relayer",
+  "collected_at": "2026-03-16T17:56:38.515006"
+}

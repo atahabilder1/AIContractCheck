@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrossChainBridge {
+    address public sourceToken;
+    mapping(address => uint256) public balances;
+
+    constructor(address _sourceToken) {
+        sourceToken = _sourceToken;
+    }
+
+    function deposit(uint256 amount) external {
+        IERC20(sourceToken).transferFrom(msg.sender, address(this), amount);
+        balances[msg.sender] += amount;
+    }
+
+    function withdraw(address destination, uint256 amount) external {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        IERC20(sourceToken).transfer(destination, amount);
+        balances[msg.sender] -= amount;
+    }
+}
+
+interface IERC20 {
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+}

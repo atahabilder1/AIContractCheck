@@ -1,0 +1,11 @@
+{
+  "address": "0xa0246c9032bc3a600820415ae600c6388619a14d",
+  "name": "RewardToken",
+  "compiler": "v0.5.16+commit.9c3226ce",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "150",
+  "source_length": 28179,
+  "category": "Crowdfunding_ICO",
+  "collected_at": "2026-03-16T17:56:12.565786"
+}

@@ -1,0 +1,45 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.7;
+
+contract DAO {
+    mapping(address => bool) public members;
+    uint[] public proposals;
+    uint quorumPercentage = 51;
+
+    modifier onlyMember() {
+        require(members[msg.sender], "Not a member");
+        _;
+    }
+
+    function joinDAO() public {
+        members[msg.sender] = true;
+    }
+
+    function createProposal(uint proposalId) public onlyMember {
+        proposals.push(proposalId);
+    }
+
+    struct Vote {
+        bool voted;
+        bool voteValue;
+    }
+
+    mapping(address => mapping(uint => Vote)) private votes;
+
+    function vote(uint proposalId, bool support) public onlyMember {
+        if (proposalId >= proposals.length || votes[msg.sender][proposalId].voted) revert();
+        votes[msg.sender][proposalId] = Vote(true, support);
+    }
+
+    function executeProposal(uint proposalId) public onlyMember {
+        uint totalVotes = 0;
+        uint approvedVotes = 0;
+        for (address voter in votes) {
+            if (votes[voter][proposalId].voted) {
+                totalVotes++;
+                if (votes[voter][proposalId].voteValue) approvedVotes++;
+            }
+        }
+        require(approvedVotes * 100 / totalVotes >= quorumPercentage, "Proposal not approved");
+    }
+}

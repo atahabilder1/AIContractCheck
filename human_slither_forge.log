@@ -1,0 +1,513 @@
+Found 241 Solidity files
+[1/241] Access_Control_RBAC/000_OpenZeppelinContracts_0x338e3410.sol (solc 0.8.20)
+  OK: 2 findings
+[2/241] Access_Control_RBAC/001_FRAXShares_0x3432b6a6.sol (solc 0.6.12)
+  FAILED: unknown
+[3/241] Auction/002_NounsAuctionHouse_0xf15a9437.sol (solc 0.8.20)
+  OK: 0 findings
+[4/241] Auction/003_AuctionHouse_0xd657686a.sol (solc 0.8.20)
+  OK: 0 findings
+[5/241] Auction/004_AuctionHouse_0xe468ce99.sol (solc 0.6.12)
+  FAILED: unknown
+[6/241] Auction/005_AdminUpgradeabilityProxy_0xcda72070.sol (solc 0.6.12)
+  OK: 10 findings
+[7/241] Auction/006_WyvernExchange_0x7be8076f.sol (solc 0.8.20)
+  FAILED: unknown
+[8/241] Auction/007_BlurSwap_0x39da4174.sol (solc 0.8.20)
+  FAILED: unknown
+[9/241] Auction/008_LooksRareProtocol_0x00000000.sol (solc 0.8.20)
+  FAILED: unknown
+[10/241] Auction/009_LooksRareExchange_0x59728544.sol (solc 0.8.20)
+  OK: 0 findings
+[11/241] Auction/010_ExchangeV1_0xcd4ec7b6.sol (solc 0.5.17)
+  OK: 9 findings
+[12/241] Auction/011_TransparentUpgradeableProxy_0x9757f2d2.sol (solc 0.8.20)
+  OK: 12 findings
+[13/241] Auction/013_ERC1967Proxy_0xb2ecfe4e.sol (solc 0.8.20)
+  FAILED: unknown
+[14/241] Bridge_Relayer/015_Endpoint_0x66a71dce.sol (solc 0.5.17)
+  FAILED: unknown
+[15/241] Bridge_Relayer/016_EndpointV2_0x1a440760.sol (solc 0.8.20)
+  OK: 0 findings
+[16/241] Bridge_Relayer/017_Wormhole_0x98f3c9e6.sol (solc 0.8.20)
+  FAILED: unknown
+[17/241] Bridge_Relayer/018_TokenBridge_0x3ee18b22.sol (solc 0.8.20)
+  FAILED: unknown
+[18/241] Bridge_Relayer/019_AxelarGatewayProxyMultisig_0x4f449524.sol (solc 0.8.20)
+  OK: 11 findings
+[19/241] Bridge_Relayer/020_UltraLightNodeV2_0x4d73adb7.sol (solc 0.8.20)
+  FAILED: unknown
+[20/241] Bridge_Relayer/021_Router_0x80226fc0.sol (solc 0.8.20)
+  OK: 0 findings
+[21/241] Bridge_Relayer/022_TransparentUpgradeableProxy_0xc005dc82.sol (solc 0.8.20)
+  OK: 123 findings
+[22/241] Bridge_Relayer/023_Lib_ResolvedDelegateProxy_0x25ace71c.sol (solc 0.8.20)
+  FAILED: unknown
+[23/241] Bridge_Relayer/024_TransparentUpgradeableProxy_0x4dbd4fc5.sol (solc 0.8.20)
+  FAILED: unknown
+[24/241] Bridge_Relayer/025_TransparentUpgradeableProxy_0x72ce9c84.sol (solc 0.8.20)
+  FAILED: unknown
+[25/241] Bridge_Relayer/026_BurnableMintableCappedERC20_0x467719ad.sol (solc 0.8.20)
+  FAILED: unknown
+[26/241] Bridge_Relayer/027_InterchainProxy_0xb5fb4be0.sol (solc 0.8.20)
+  OK: 0 findings
+[27/241] Bridge_Relayer/028_SushiXSwap_0x011e52e4.sol (solc 0.8.20)
+  FAILED: unknown
+[28/241] Bridge_Relayer/029_Hyperlane_0x1ec9b94b.sol (solc 0.8.20)
+  OK: 0 findings
+[29/241] Cross-Chain_Bridge/030_TransparentUpgradeableProxy_0xa3a7b6f8.sol (solc 0.8.20)
+  FAILED: unknown
+[30/241] Cross-Chain_Bridge/031_L1_ETH_Bridge_0xb8901acb.sol (solc 0.8.20)
+  FAILED: unknown
+[31/241] Cross-Chain_Bridge/032_L1_ERC20_Bridge_0x3666f603.sol (solc 0.8.20)
+  FAILED: unknown
+[32/241] Cross-Chain_Bridge/033_L1_HOP_Bridge_0x914f986a.sol (solc 0.8.20)
+  FAILED: unknown
+[33/241] Cross-Chain_Bridge/034_L1_ERC20_Bridge_0x3e4a3a47.sol (solc 0.8.20)
+  FAILED: unknown
+[34/241] Cross-Chain_Bridge/035_L1_ERC20_Bridge_0x3d4cc8a6.sol (solc 0.8.20)
+  FAILED: unknown
+[35/241] Cross-Chain_Bridge/036_Proxy_0x5a7749f8.sol (solc 0.8.20)
+  FAILED: unknown
+[36/241] Cross-Chain_Bridge/037_RollupProxy_0x4dceb440.sol (solc 0.8.20)
+  OK: 9 findings
+[37/241] Cross-Chain_Bridge/038_Bridge_0x296f55f8.sol (solc 0.8.20)
+  FAILED: unknown
+[38/241] Cross-Chain_Bridge/039_TransparentUpgradeableProxy_0x2796317b.sol (solc 0.7.6)
+  OK: 9 findings
+[39/241] Cross-Chain_Bridge/040_NFTBridgeEntrypoint_0x6ffd7ede.sol (solc 0.8.20)
+  FAILED: unknown
+[40/241] Cross-Chain_Messaging/041_SequencerInbox_0x9685e728.sol (solc 0.6.12)
+  OK: 1 findings
+[41/241] Cross-Chain_Messaging/042_HyperlaneImplementation_0x8d64b4b4.sol (solc 0.8.20)
+  FAILED: unknown
+[42/241] Cross-Chain_Messaging/043_RollupProxy_0x5ef0d09d.sol (solc 0.8.20)
+  FAILED: unknown
+[43/241] Crowdfunding_ICO/044_TerminalV1_0xd569d3cc.sol (solc 0.8.20)
+  FAILED: unknown
+[44/241] Crowdfunding_ICO/045_TerminalV1_1_0x981c8ecd.sol (solc 0.8.20)
+  FAILED: unknown
+[45/241] Crowdfunding_ICO/046_FundingCycles_0xf507b2a1.sol (solc 0.8.20)
+  FAILED: unknown
+[46/241] Crowdfunding_ICO/047_ModStore_0xb9e4b658.sol (solc 0.8.20)
+  FAILED: unknown
+[47/241] Crowdfunding_ICO/048_ENJCrowdfund_0x9b73d177.sol (solc 0.8.20)
+  FAILED: unknown
+[48/241] Crowdfunding_ICO/049_StandardERC20_0x7b3d36eb.sol (solc 0.7.6)
+  OK: 4 findings
+[49/241] Crowdfunding_ICO/050_RewardToken_0xa0246c90.sol (solc 0.5.17)
+  FAILED: unknown
+[50/241] Crowdfunding_ICO/051_JuiceBox_0xaffe52f0.sol (solc 0.8.20)
+  OK: 1 findings
+[51/241] Crowdfunding_ICO/052_HavvenEscrow_0x971e78e0.sol (solc 0.8.20)
+  FAILED: unknown
+[52/241] Crowdfunding_ICO/053_AnyswapV6ERC20_0x5870700f.sol (solc 0.8.20)
+  OK: 14 findings
+[53/241] Crowdfunding_ICO/054_Banny_0x9984ab53.sol (solc 0.8.20)
+  FAILED: unknown
+[54/241] Crowdfunding_ICO/055_VaultProxy_0x1571ed0b.sol (solc 0.5.17)
+  FAILED: unknown
+[55/241] DeFi_DEX_AMM/056_UniswapV2Router02_0x7a250d56.sol (solc 0.6.12)
+  FAILED: unknown
+[56/241] DeFi_DEX_AMM/057_SwapRouter_0xE592427A.sol (solc 0.5.17)
+  FAILED: unknown
+[57/241] DeFi_DEX_AMM/058_UniswapV2Factory_0x5c69bee7.sol (solc 0.5.17)
+  FAILED: unknown
+[58/241] DeFi_DEX_AMM/059_UniswapV2Router02_0xd9e1cE17.sol (solc 0.5.17)
+  FAILED: unknown
+[59/241] DeFi_DEX_AMM/060_UniswapV3Factory_0x1f98431c.sol (solc 0.5.17)
+  OK: 0 findings
+[60/241] DeFi_DEX_AMM/061_SwapRouter02_0x68b34658.sol (solc 0.7.6)
+  OK: 0 findings
+[61/241] DeFi_DEX_AMM/062_UniswapV2Factory_0xc0aee478.sol (solc 0.5.17)
+  FAILED: unknown
+[62/241] DeFi_DEX_AMM/063_Vault_0xba122222.sol (solc 0.7.6)
+  OK: 1 findings
+[63/241] DeFi_DEX_AMM/064_Vault_0xba133333.sol (solc 0.8.20)
+  FAILED: unknown
+[64/241] DeFi_DEX_AMM/065_NonfungiblePositionManager_0xc36442b4.sol (solc 0.5.17)
+  FAILED: unknown
+[65/241] DeFi_DEX_AMM/066_UniswapV3Pool_0x88e6a0c2.sol (solc 0.5.17)
+  OK: 0 findings
+[66/241] DeFi_DEX_AMM/067_Quoter_0xb27308f9.sol (solc 0.7.6)
+  OK: 0 findings
+[67/241] DeFi_DEX_AMM/068_AggregationRouterV4_0x11111112.sol (solc 0.6.12)
+  FAILED: unknown
+[68/241] DeFi_DEX_AMM/069_WeightedPoolFactory_0x8e9aa87e.sol (solc 0.7.6)
+  FAILED: unknown
+[69/241] DeFi_Lending/070_InitializableImmutableAdminUpgradeabilit_0x87870bca.sol (solc 0.8.20)
+  FAILED: unknown
+[70/241] DeFi_Lending/071_InitializableImmutableAdminUpgradeabilit_0x7d2768de.sol (solc 0.6.12)
+  OK: 11 findings
+[71/241] DeFi_Lending/072_Unitroller_0x3d981921.sol (solc 0.5.17)
+  OK: 45 findings
+[72/241] DeFi_Lending/073_LendingPoolAddressesProvider_0xb53c1a33.sol (solc 0.6.12)
+  OK: 0 findings
+[73/241] DeFi_Lending/074_CErc20Delegator_0x5d3a536e.sol (solc 0.5.17)
+  OK: 6 findings
+[74/241] DeFi_Lending/075_CEther_0x4ddc2d19.sol (solc 0.5.17)
+  OK: 49 findings
+[75/241] DeFi_Lending/076_CErc20_0x39aa39c0.sol (solc 0.5.17)
+  OK: 46 findings
+[76/241] DeFi_Lending/077_CErc20Delegator_0xf650c3d8.sol (solc 0.5.17)
+  OK: 6 findings
+[77/241] DeFi_Lending/078_Vat_0x35d1b3f3.sol (solc 0.5.17)
+  FAILED: unknown
+[78/241] DeFi_Lending/079_Pot_0x197e90f9.sol (solc 0.5.17)
+  FAILED: unknown
+[79/241] DeFi_Lending/080_Morpho_0xbbbbbbbb.sol (solc 0.5.17)
+  OK: 0 findings
+[80/241] DeFi_Lending/081_TransparentUpgradeableProxy_0x8888882f.sol (solc 0.8.20)
+  OK: 9 findings
+[81/241] DeFi_Lending/082_EthereumBundler_0xa7995f71.sol (solc 0.8.20)
+  FAILED: unknown
+[82/241] DeFi_Lending/083_TransparentUpgradeableProxy_0x9aee0b04.sol (solc 0.8.20)
+  OK: 8 findings
+[83/241] DeFi_Staking/084_AppProxyUpgradeable_0xae7ab965.sol (solc 0.8.20)
+  FAILED: unknown
+[84/241] DeFi_Staking/085_DepositContract_0x00000000.sol (solc 0.6.12)
+  FAILED: unknown
+[85/241] DeFi_Staking/086_WstETH_0x7f39c581.sol (solc 0.6.12)
+  OK: 6 findings
+[86/241] DeFi_Staking/087_RocketTokenRETH_0xae78736c.sol (solc 0.6.12)
+  FAILED: unknown
+[87/241] DeFi_Staking/088_Booster_0xf403c135.sol (solc 0.6.12)
+  OK: 30 findings
+[88/241] DeFi_Staking/089_ConvexToken_0x4e3fbd56.sol (solc 0.6.12)
+  OK: 1 findings
+[89/241] DeFi_Staking/090_cvxCrvToken_0x62b9c735.sol (solc 0.6.12)
+  OK: 1 findings
+[90/241] DeFi_Staking/091_BaseRewardPool_0x3fe65692.sol (solc 0.6.12)
+  OK: 32 findings
+[91/241] DeFi_Staking/092_TransparentUpgradeableProxy_0x85864637.sol (solc 0.8.20)
+  OK: 9 findings
+[92/241] DeFi_Staking/093_TransparentUpgradeableProxy_0x39053d51.sol (solc 0.8.20)
+  OK: 9 findings
+[93/241] DeFi_Staking/094_RewardEscrow_0xb671f221.sol (solc 0.8.20)
+  FAILED: unknown
+[94/241] DeFi_Staking/095_StakingRewards_0x3f27c540.sol (solc 0.5.17)
+  OK: 14 findings
+[95/241] DeFi_Staking/096_StakingRewards_0x167009dc.sol (solc 0.5.17)
+  OK: 13 findings
+[96/241] DeFi_Staking/097_StakingRewards_0xfbaedde7.sol (solc 0.5.17)
+  OK: 10 findings
+[97/241] DeFi_Staking/098_CvxLocker_0xd18140b4.sol (solc 0.6.12)
+  OK: 49 findings
+[98/241] DeFi_Staking/099_SavingsDai_0x83f20f44.sol (solc 0.8.20)
+  OK: 24 findings
+[99/241] ERC1155_Multi-Token/100_TransparentUpgradeableProxy_0xb66a603f.sol (solc 0.8.20)
+  OK: 12 findings
+[100/241] ERC1155_Multi-Token/101_AdminUpgradeabilityProxy_0xa342f5d8.sol (solc 0.8.20)
+  FAILED: unknown
+[101/241] ERC1155_Multi-Token/102_BatchWrapper_0x0e3a2a1f.sol (solc 0.5.17)
+  FAILED: unknown
+[102/241] ERC1155_Multi-Token/103_Mintvial_0x348fc118.sol (solc 0.8.20)
+  OK: 0 findings
+[103/241] ERC1155_Multi-Token/104_ENJToken_0xf629cbd9.sol (solc 0.8.20)
+  FAILED: unknown
+[104/241] ERC1155_Multi-Token/105_Cards_0x564cb55c.sol (solc 0.5.17)
+  FAILED: unknown
+[105/241] ERC1155_Multi-Token/106_RaribleToken_0xd07dc426.sol (solc 0.5.17)
+  OK: 10 findings
+[106/241] ERC1155_Multi-Token/107_ERC1967Proxy_0x7daec605.sol (solc 0.8.20)
+  OK: 13 findings
+[107/241] ERC1155_Multi-Token/108_RaribleUserToken_0x76be3b62.sol (solc 0.5.17)
+  OK: 16 findings
+[108/241] ERC1155_Multi-Token/109_Planets_0x7deb7bce.sol (solc 0.8.20)
+  OK: 11 findings
+[109/241] ERC1155_Multi-Token/110_DigitalMediaCore_0x2a46f2ff.sol (solc 0.8.20)
+  FAILED: unknown
+[110/241] ERC1155_Multi-Token/111_MEMES_0x33fd4269.sol (solc 0.8.20)
+  FAILED: unknown
+[111/241] ERC20_Token/112_TetherToken_0xdac17f95.sol (solc 0.8.20)
+  FAILED: unknown
+[112/241] ERC20_Token/113_FiatTokenProxy_0xa0b86991.sol (solc 0.8.20)
+  FAILED: unknown
+[113/241] ERC20_Token/114_Dai_0x6b175474.sol (solc 0.5.17)
+  FAILED: unknown
+[114/241] ERC20_Token/115_LinkToken_0x51491077.sol (solc 0.8.20)
+  FAILED: unknown
+[115/241] ERC20_Token/116_Uni_0x1f9840a8.sol (solc 0.5.17)
+  OK: 7 findings
+[116/241] ERC20_Token/117_InitializableAdminUpgradeabilityProxy_0x7fc66500.sol (solc 0.6.12)
+  OK: 12 findings
+[117/241] ERC20_Token/118_WBTC_0x2260fac5.sol (solc 0.8.20)
+  FAILED: unknown
+[118/241] ERC20_Token/119_TokenMintERC20Token_0x95ad61b0.sol (solc 0.5.17)
+  OK: 5 findings
+[119/241] ERC20_Token/120_SimpleToken_0x4d224452.sol (solc 0.8.20)
+  FAILED: unknown
+[120/241] ERC20_Token/121_Sand_0x3845bada.sol (solc 0.5.17)
+  FAILED: unknown
+[121/241] ERC20_Token/122_DSToken_0x9f8f72aa.sol (solc 0.8.20)
+  FAILED: unknown
+[122/241] ERC20_Token/123_ProxyERC20_0xc011a73e.sol (solc 0.8.20)
+  FAILED: unknown
+[123/241] ERC20_Token/124_Comp_0xc00e94cb.sol (solc 0.5.17)
+  OK: 2 findings
+[124/241] ERC20_Token/125_MiniMeToken_0x5a98fcbe.sol (solc 0.8.20)
+  FAILED: unknown
+[125/241] ERC20_Token/126_FRAXStablecoin_0x853d955a.sol (solc 0.6.12)
+  FAILED: unknown
+[126/241] ERC721_NFT/127_BoredApeYachtClub_0xbc4ca0ed.sol (solc 0.6.12)
+  FAILED: unknown
+[127/241] ERC721_NFT/128_WrappedPunk_0xb7f7f6c5.sol (solc 0.5.17)
+  OK: 10 findings
+[128/241] ERC721_NFT/129_Azuki_0xed5af388.sol (solc 0.8.20)
+  OK: 14 findings
+[129/241] ERC721_NFT/130_Doodles_0x8a90cab2.sol (solc 0.8.20)
+  OK: 3 findings
+[130/241] ERC721_NFT/131_CloneX_0x49cf6f5d.sol (solc 0.8.20)
+  OK: 0 findings
+[131/241] ERC721_NFT/132_Moonbirds_0x23581767.sol (solc 0.8.20)
+  FAILED: unknown
+[132/241] ERC721_NFT/133_Land_0x34d85c9c.sol (solc 0.8.20)
+  FAILED: unknown
+[133/241] ERC721_NFT/134_PudgyPenguins_0xbd3531da.sol (solc 0.8.20)
+  FAILED: unknown
+[134/241] ERC721_NFT/135_GenArt721Core_0xa7d8d9ef.sol (solc 0.5.17)
+  OK: 5 findings
+[135/241] ERC721_NFT/136_Loot_0xff9c1b15.sol (solc 0.8.20)
+  OK: 3 findings
+[136/241] ERC721_NFT/137_MutantApeYachtClub_0x60e4d786.sol (solc 0.8.20)
+  FAILED: unknown
+[137/241] ERC721_NFT/138_Meebits_0x7bd29408.sol (solc 0.7.6)
+  OK: 10 findings
+[138/241] ERC721_NFT/139_WorldOfWomen_0xe785e823.sol (solc 0.8.20)
+  OK: 0 findings
+[139/241] ERC721_NFT/140_NounsToken_0x9c8ff314.sol (solc 0.8.20)
+  OK: 7 findings
+[140/241] ERC721_NFT/141_TransparentUpgradeableProxy_0x5cc5b05a.sol (solc 0.7.6)
+  OK: 9 findings
+[141/241] Escrow/142_PaymentSplitter_0x15afa5b8.sol (solc 0.8.20)
+  OK: 2 findings
+[142/241] Escrow/143_PaymentSplitter_0xd28dbd19.sol (solc 0.8.20)
+  OK: 1 findings
+[143/241] Escrow/144_PaymentSplitter_0x5fa0cae2.sol (solc 0.8.20)
+  OK: 0 findings
+[144/241] Escrow/145_PaymentSplitter_0x097ee00f.sol (solc 0.6.12)
+  OK: 4 findings
+[145/241] Escrow/146_TheConnorsPaymentSplitter_0x505cfce6.sol (solc 0.8.20)
+  OK: 4 findings
+[146/241] Escrow/147_DepositHelper_0xf8ce90c2.sol (solc 0.5.17)
+  FAILED: unknown
+[147/241] Escrow/148_SynthetixBridgeEscrow_0x5fd79d46.sol (solc 0.5.17)
+  OK: 6 findings
+[148/241] Escrow/149_RootChainManagerProxy_0xa0c68c63.sol (solc 0.6.12)
+  FAILED: unknown
+[149/241] Escrow/150_L1ChugSplashProxy_0x3154cf16.sol (solc 0.8.20)
+  FAILED: unknown
+[150/241] Escrow/151_VaultProxy_0x053c80ea.sol (solc 0.5.17)
+  FAILED: unknown
+[151/241] Escrow/152_NoMintRewardPool_0xf9e5f902.sol (solc 0.5.17)
+  FAILED: unknown
+[152/241] Escrow/153_ERC1155LazyPayableClaim_0x44e94034.sol (solc 0.8.20)
+  OK: 0 findings
+[153/241] Flash_Loan_Provider/154_InitializableAdminUpgradeabilityProxy_0x398eC734.sol (solc 0.5.17)
+  OK: 85 findings
+[154/241] Flash_Loan_Provider/155_SoloMargin_0x1e0447b1.sol (solc 0.5.17)
+  FAILED: unknown
+[155/241] Flash_Loan_Provider/156_PayableProxyForSoloMargin_0xa8b39829.sol (solc 0.5.17)
+  FAILED: unknown
+[156/241] Flash_Loan_Provider/157_InitializableAdminUpgradeabilityProxy_0x3dfd23a6.sol (solc 0.5.17)
+  OK: 85 findings
+[157/241] Flash_Loan_Provider/158_LendingPoolAddressesProvider_0x24a42fd2.sol (solc 0.5.17)
+  OK: 85 findings
+[158/241] Flash_Loan_Provider/159_DssFlash_0x60744434.sol (solc 0.6.12)
+  OK: 5 findings
+[159/241] Flash_Loan_Provider/160_LendingPool_0x987115c3.sol (solc 0.6.12)
+  OK: 16 findings
+[160/241] Governance_DAO/161_GovernorBravoDelegator_0xc0da0293.sol (solc 0.5.17)
+  OK: 3 findings
+[161/241] Governance_DAO/162_GovernorAlpha_0xc0da01a0.sol (solc 0.5.17)
+  OK: 20 findings
+[162/241] Governance_DAO/163_AaveGovernanceV2_0xec568fff.sol (solc 0.7.6)
+  FAILED: unknown
+[163/241] Governance_DAO/164_GovernorBravoDelegator_0x408ed635.sol (solc 0.5.17)
+  OK: 3 findings
+[164/241] Governance_DAO/165_GovernorAlpha_0x5e4be8bc.sol (solc 0.5.17)
+  OK: 17 findings
+[165/241] Governance_DAO/166_ENSGovernor_0x323a7639.sol (solc 0.8.20)
+  FAILED: unknown
+[166/241] Governance_DAO/167_GovernorAlpha_0xdbd27635.sol (solc 0.6.12)
+  OK: 17 findings
+[167/241] Governance_DAO/168_NounsDAOProxy_0x6f3e6272.sol (solc 0.8.20)
+  FAILED: unknown
+[168/241] Governance_DAO/169_NounsDAOExecutor_0x0bc3807e.sol (solc 0.8.20)
+  OK: 6 findings
+[169/241] Governance_DAO/170_Governance_0xac43e14c.sol (solc 0.8.20)
+  FAILED: unknown
+[170/241] Governance_DAO/171_Executor_0x5300a1a1.sol (solc 0.8.20)
+  OK: 0 findings
+[171/241] Governance_DAO/172_Executor_0x17dd33ed.sol (solc 0.8.20)
+  OK: 0 findings
+[172/241] Governance_DAO/173_AppProxyUpgradeable_0x3e40d73e.sol (solc 0.8.20)
+  FAILED: unknown
+[173/241] Governance_DAO/174_GTC_0xde30da39.sol (solc 0.6.12)
+  OK: 8 findings
+[174/241] Multisig_Wallet/175_GnosisSafe_0xd9db270c.sol (solc 0.8.20)
+  OK: 0 findings
+[175/241] Multisig_Wallet/176_GnosisSafeProxyFactory_0xa6b71e26.sol (solc 0.8.20)
+  OK: 1 findings
+[176/241] Multisig_Wallet/177_Proxy_0xafc2f2d8.sol (solc 0.5.17)
+  OK: 1 findings
+[177/241] Multisig_Wallet/178_GnosisSafeProxy_0x5a0aae59.sol (solc 0.7.6)
+  OK: 1 findings
+[178/241] Multisig_Wallet/179_ERC20PredicateProxy_0x40ec5b33.sol (solc 0.6.12)
+  FAILED: unknown
+[179/241] Multisig_Wallet/180_DepositManagerProxy_0x401f6c98.sol (solc 0.5.17)
+  OK: 8 findings
+[180/241] Multisig_Wallet/181_GnosisSafe_0x34cfac64.sol (solc 0.5.17)
+  OK: 3 findings
+[181/241] Multisig_Wallet/182_SafeProxyFactory_0x4e1dcf7a.sol (solc 0.8.20)
+  OK: 1 findings
+[182/241] Multisig_Wallet/183_ProxyFactory_0x76e2cfc1.sol (solc 0.5.17)
+  OK: 1 findings
+[183/241] Multisig_Wallet/184_Proxy_0x0da0c3e5.sol (solc 0.5.17)
+  OK: 1 findings
+[184/241] Multisig_Wallet/185_TreasuryFunds_0x1389388d.sol (solc 0.6.12)
+  OK: 4 findings
+[185/241] Multisig_Wallet/186_TreasuryVault_0x93a62da5.sol (solc 0.5.17)
+  OK: 6 findings
+[186/241] Multisig_Wallet/187_GnosisSafeProxy_0xa06c2b67.sol (solc 0.7.6)
+  OK: 1 findings
+[187/241] Multisig_Wallet/188_GnosisSafeProxy_0x81698f87.sol (solc 0.7.6)
+  OK: 1 findings
+[188/241] Proxy_Upgradeable_UUPS/189_ERC1967Proxy_0xA7AeFeaD.sol (solc 0.8.20)
+  OK: 13 findings
+[189/241] Proxy_Upgradeable_UUPS/190_TransparentUpgradeableProxy_0xee6a57ec.sol (solc 0.7.6)
+  OK: 9 findings
+[190/241] Proxy_Upgradeable_UUPS/191_TransparentUpgradeableProxy_0xe140bb5f.sol (solc 0.8.20)
+  OK: 9 findings
+[191/241] Proxy_Upgradeable_UUPS/192_TransparentUpgradeableProxy_0x3d3d0a78.sol (solc 0.8.20)
+  OK: 9 findings
+[192/241] Proxy_Upgradeable_UUPS/193_TransparentUpgradeableProxy_0xc68421f2.sol (solc 0.8.20)
+  OK: 9 findings
+[193/241] Proxy_Upgradeable_UUPS/194_TransparentUpgradeableProxy_0xa5565d26.sol (solc 0.8.20)
+  OK: 9 findings
+[194/241] Proxy_Upgradeable_UUPS/195_TransparentUpgradeableProxy_0xa7c21fd9.sol (solc 0.8.20)
+  OK: 9 findings
+[195/241] Proxy_Upgradeable_UUPS/196_L1ChugSplashProxy_0x99c9fc46.sol (solc 0.8.20)
+  FAILED: unknown
+[196/241] Proxy_Upgradeable_UUPS/197_NounsAuctionHouseProxy_0x830bd73e.sol (solc 0.8.20)
+  OK: 13 findings
+[197/241] Proxy_Upgradeable_UUPS/198_RootChainManager_0x7cfa0f10.sol (solc 0.6.12)
+  FAILED: unknown
+[198/241] Proxy_Upgradeable_UUPS/199_TransparentUpgradeableProxy_0x8315177a.sol (solc 0.8.20)
+  OK: 9 findings
+[199/241] Proxy_Upgradeable_UUPS/200_TransparentUpgradeableProxy_0xd5f7838f.sol (solc 0.8.20)
+  OK: 5 findings
+[200/241] Proxy_Upgradeable_UUPS/201_PoolAddressesProvider_0x2f39d218.sol (solc 0.8.20)
+  FAILED: unknown
+[201/241] Proxy_Upgradeable_UUPS/202_ERC1967Proxy_0x5c7bcd6e.sol (solc 0.8.20)
+  OK: 5 findings
+[202/241] Proxy_Upgradeable_UUPS/203_FiatTokenProxy_0xbe989514.sol (solc 0.6.12)
+  OK: 5 findings
+[203/241] Proxy_Upgradeable_UUPS/204_Seaport_0x00000000.sol (solc 0.8.20)
+  OK: 0 findings
+[204/241] Timelock/205_Timelock_0x6d903f60.sol (solc 0.5.17)
+  OK: 6 findings
+[205/241] Timelock/206_Timelock_0x1a9c8182.sol (solc 0.5.17)
+  OK: 6 findings
+[206/241] Timelock/207_Executor_0xee56e2b3.sol (solc 0.7.6)
+  FAILED: unknown
+[207/241] Timelock/208_NounsDAOExecutorProxy_0xb1a32fc9.sol (solc 0.8.20)
+  FAILED: unknown
+[208/241] Timelock/209_LiquidatorProxyV1ForSoloMargin_0xd4b6cd14.sol (solc 0.5.17)
+  FAILED: unknown
+[209/241] Timelock/210_Unitroller_0x3d5bc3c8.sol (solc 0.5.17)
+  OK: 50 findings
+[210/241] Timelock/211_Stake_FXS_WETH_0xda2c3383.sol (solc 0.6.12)
+  FAILED: unknown
+[211/241] Timelock/212_TerminalDirectory_0x46c9999a.sol (solc 0.8.20)
+  FAILED: unknown
+[212/241] Timelock/213_StakingRewards_0x8302fe9f.sol (solc 0.5.17)
+  OK: 10 findings
+[213/241] Timelock/214_Timelock_0x9a8541dd.sol (solc 0.6.12)
+  OK: 6 findings
+[214/241] Timelock/215_DSPause_0xbe286431.sol (solc 0.8.20)
+  FAILED: unknown
+[215/241] Timelock/216_DSPauseProxy_0xbe8e3e36.sol (solc 0.8.20)
+  FAILED: unknown
+[216/241] Timelock/217_Vow_0xa9505244.sol (solc 0.5.17)
+  FAILED: unknown
+[217/241] Timelock/218_Executor_0x61910ecd.sol (solc 0.7.6)
+  FAILED: unknown
+[218/241] Timelock/219_TokenLock_0xd7a029db.sol (solc 0.8.20)
+  OK: 5 findings
+[219/241] Wrapped_Token/220_WETH9_0xc02aaa39.sol (solc 0.8.20)
+  FAILED: unknown
+[220/241] Wrapped_Token/221_frxETH_0x5e842234.sol (solc 0.8.20)
+  OK: 15 findings
+[221/241] Wrapped_Token/222_sfrxETH_0xac3e0184.sol (solc 0.8.20)
+  OK: 11 findings
+[222/241] Wrapped_Token/223_TransparentUpgradeableProxy_0xf951e335.sol (solc 0.8.20)
+  OK: 12 findings
+[223/241] Wrapped_Token/224_AdminUpgradeabilityProxy_0xe95a203b.sol (solc 0.6.12)
+  OK: 10 findings
+[224/241] Wrapped_Token/225_OETHProxy_0x856c4efb.sol (solc 0.8.20)
+  OK: 0 findings
+[225/241] Wrapped_Token/226_UUPSProxy_0xcd5fe23c.sol (solc 0.8.20)
+  FAILED: unknown
+[226/241] Wrapped_Token/227_PENDLE_0x80850712.sol (solc 0.8.20)
+  FAILED: unknown
+[227/241] Wrapped_Token/228_InitializeGovernedUpgradeabilityProxy_0x2a8e1e67.sol (solc 0.5.17)
+  FAILED: unknown
+[228/241] Wrapped_Token/229_ANKRToken_0x8290333c.sol (solc 0.8.20)
+  FAILED: unknown
+[229/241] Wrapped_Token/230_FiatTokenProxy_0xcbb7c000.sol (solc 0.6.12)
+  FAILED: unknown
+[230/241] Yield_Aggregator/231_yVault_0x5dbcf33d.sol (solc 0.5.17)
+  OK: 10 findings
+[231/241] Yield_Aggregator/232_VaultRegistry_0xaf1f5e1c.sol (solc 0.8.20)
+  OK: 5 findings
+[232/241] Yield_Aggregator/233_BeefyVaultV7_0xa7739fd3.sol (solc 0.8.20)
+  OK: 12 findings
+[233/241] Yield_Aggregator/234_VaultProxy_0xab7fa2b2.sol (solc 0.5.17)
+  FAILED: unknown
+[234/241] Yield_Aggregator/235_VaultProxy_0xfe09e53a.sol (solc 0.5.17)
+  FAILED: unknown
+[235/241] Yield_Aggregator/236_CrvDepositor_0x8014595f.sol (solc 0.6.12)
+  OK: 15 findings
+[236/241] Yield_Aggregator/237_CvxCrvStakingWrapper_0xaa0c3f5f.sol (solc 0.6.12)
+  OK: 40 findings
+[237/241] Yield_Aggregator/238_YearnRewards_0x0001fb05.sol (solc 0.5.17)
+  OK: 9 findings
+[238/241] Yield_Aggregator/239_yVault_0xacd43e62.sol (solc 0.5.17)
+  OK: 10 findings
+[239/241] Yield_Aggregator/240_VaultProxy_0xf0358e8c.sol (solc 0.5.17)
+  FAILED: unknown
+[240/241] Yield_Aggregator/241_PendleRouterV3_0x00000000.sol (solc 0.8.20)
+  OK: 54 findings
+[241/241] Yield_Aggregator/242_PendleRouter_0x1b6d3e5d.sol (solc 0.8.20)
+  FAILED: unknown
+
+============================================================
+SLITHER ANALYSIS COMPLETE
+============================================================
+Total: 241
+Compiled: 132 (54.8%)
+Failed: 109 (45.2%)
+Total findings: 1519
+
+Per-category:
+  Access_Control_RBAC: 1/2 compiled (50%)
+  Auction: 6/11 compiled (55%)
+  Bridge_Relayer: 6/15 compiled (40%)
+  Cross-Chain_Bridge: 2/11 compiled (18%)
+  Cross-Chain_Messaging: 1/3 compiled (33%)
+  Crowdfunding_ICO: 3/12 compiled (25%)
+  DeFi_DEX_AMM: 5/14 compiled (36%)
+  DeFi_Lending: 10/14 compiled (71%)
+  DeFi_Staking: 12/16 compiled (75%)
+  ERC1155_Multi-Token: 6/12 compiled (50%)
+  ERC20_Token: 4/15 compiled (27%)
+  ERC721_NFT: 10/15 compiled (67%)
+  Escrow: 7/12 compiled (58%)
+  Flash_Loan_Provider: 5/7 compiled (71%)
+  Governance_DAO: 9/14 compiled (64%)
+  Multisig_Wallet: 13/14 compiled (93%)
+  Proxy_Upgradeable_UUPS: 13/16 compiled (81%)
+  Timelock: 6/15 compiled (40%)
+  Wrapped_Token: 5/11 compiled (45%)
+  Yield_Aggregator: 8/12 compiled (67%)

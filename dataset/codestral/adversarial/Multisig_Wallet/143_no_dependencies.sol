@@ -1,0 +1,74 @@
+SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.9;
+
+contract MultiSigWallet {
+    address[] public owners;
+    uint requiredConfirmations;
+    mapping(address => mapping(uint => bool)) public isConfirmed;
+    mapping(uint => Transaction) public transactions;
+
+    struct Transaction {
+        address to;
+        uint value;
+        bytes data;
+        bool executed;
+    }
+
+    constructor(address[] memory _owners, uint _requiredConfirmations) {
+        require(_owners.length > 0, "There must be at least one owner");
+        require(_requiredConfirmations <= _owners.length, "Required confirmations cannot exceed number of owners");
+
+        for (uint i = 0; i < _owners.length; ++i) {
+            owners.push(_owners[i]);
+        }
+
+        requiredConfirmations = _requiredConfirmations;
+    }
+
+    function submitTransaction(address _to, uint _value, bytes memory _data) public onlyOwner {
+        transactions.push(Transaction({
+            to: _to,
+            value: _value,
+            data: _data,
+            executed: false
+        }));
+    }
+
+    function confirmTransaction(uint transactionId) public onlyOwner {
+        require(!transactions[transactionId].executed, "Transaction already executed");
+        isConfirmed[msg.sender][transactionId] = true;
+
+        if (getConfirmationsCount(transactionId) >= requiredConfirmations) {
+            executeTransaction(transactionId);
+        }
+    }
+
+    function executeTransaction(uint transactionId) internal {
+        Transaction memory txn = transactions[transactionId];
+        require(!txn.executed, "Transaction already executed");
+
+        txn.to.call{value: txn.value}(txn.data);
+        txn.executed = true;
+    }
+
+    function getConfirmationsCount(uint transactionId) private view returns (uint count) {
+        for (uint i = 0; i < owners.length; ++i) {
+            if (isConfirmed[owners[i]][transactionId]) {
+                count++;
+            }
+        }
+    }
+
+    modifier onlyOwner() {
+        bool isOwner = false;
+        for (uint i = 0; i < owners.length; ++i) {
+            if (msg.sender == owners[i]) {
+                isOwner = true;
+                break;
+            }
+        }
+        require(isOwner, "Sender must be an owner");
+        _;
+    }
+}

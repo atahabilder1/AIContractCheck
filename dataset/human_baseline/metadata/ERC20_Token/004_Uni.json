@@ -1,0 +1,11 @@
+{
+  "address": "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984",
+  "name": "Uni",
+  "compiler": "v0.5.16+commit.9c3226ce",
+  "license": "None",
+  "optimization": "1",
+  "runs": "999999",
+  "source_length": 23858,
+  "category": "ERC20_Token",
+  "collected_at": "2026-03-16T17:54:41.455483"
+}

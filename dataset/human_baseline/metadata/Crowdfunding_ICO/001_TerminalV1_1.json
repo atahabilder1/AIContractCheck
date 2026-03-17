@@ -1,0 +1,11 @@
+{
+  "address": "0x981c8ecd009e3e84ee1ff99266bf1461a12e5c68",
+  "name": "TerminalV1_1",
+  "compiler": "v0.8.6+commit.11564f7e",
+  "license": "",
+  "optimization": "1",
+  "runs": "10000",
+  "source_length": 157730,
+  "category": "Crowdfunding_ICO",
+  "collected_at": "2026-03-16T17:56:12.562104"
+}

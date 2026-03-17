@@ -1,0 +1,11 @@
+{
+  "address": "0x408ed6354d4973f66138c91495f2f2fcbd8724c3",
+  "name": "GovernorBravoDelegator",
+  "compiler": "v0.5.16+commit.9c3226ce",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 9950,
+  "category": "Governance_DAO",
+  "collected_at": "2026-03-16T17:55:37.609367"
+}

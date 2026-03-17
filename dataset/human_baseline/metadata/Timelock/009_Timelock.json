@@ -1,0 +1,11 @@
+{
+  "address": "0x9a8541ddf3a932a9a922b607e9cf7301f1d47bd1",
+  "name": "Timelock",
+  "compiler": "v0.6.12+commit.27d51765",
+  "license": "None",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 12318,
+  "category": "Timelock",
+  "collected_at": "2026-03-16T18:22:51.881254"
+}

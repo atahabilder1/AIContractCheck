@@ -1,0 +1,78 @@
+ SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract AuctionHouse is ReentrancyGuard, Ownable {
+    using MerkleProof for bytes32[];
+
+    IERC721 public nftContract;
+    uint256 public baseExtensionTime = 15 minutes;
+    uint256 public minBidIncrement = 1 ether;
+    address payable public feeRecipient;
+    bytes32 public merkleRoot;
+
+    enum AuctionType { English, SealedBid, Batch }
+
+    struct Auction {
+        uint256 tokenId;
+        address seller;
+        address payable creator;
+        AuctionType auctionType;
+        uint256 startingPrice;
+        uint256 highestBid;
+        address highestBidder;
+        uint256 endTime;
+    }
+
+    mapping(uint256 => Auction) public auctions;
+    mapping(address => uint256) public auctionCounter;
+    mapping(bytes32[] => bool) public usedProofs;
+
+    constructor(IERC721 _nftContract, bytes32 _merkleRoot, address payable _feeRecipient) {
+        nftContract = _nftContract;
+        merkleRoot = _merkleRoot;
+        feeRecipient = _feeRecipient;
+    }
+
+    function createAuction(uint256 tokenId, AuctionType auctionType, uint256 startingPrice, bytes32[] memory proof) external {
+        require(_verifyProof(proof), "Invalid proof");
+        require(!usedProofs[proof], "Already used proof");
+        _createAuction(tokenId, auctionType, startingPrice);
+    }
+
+    function bid(uint256 auctionId) external payable {
+        Auction storage auction = auctions[auctionId];
+        require(block.timestamp < auction.endTime, "Auction has ended");
+        if (auction.auctionType == AuctionType.English) {
+            _makeBid(auctionId);
+        } else if (auction.auctionType == AuctionType.SealedBid) {
+            require(block.timestamp >= auction.endTime - baseExtensionTime, "Auction has not entered final phase");
+            _makeBid(auctionId);
+        }
+    }
+
+    function revealBid(uint256 auctionId, uint256 bidAmount) external {
+        Auction storage auction = auctions[auctionId];
+        require(block.timestamp >= auction.endTime, "Auction has not ended");
+        require(auction.auctionType == AuctionType.SealedBid, "Invalid auction type");
+        require(bidAmount > auction.highestBid, "Bid amount is too low");
+        _revealBid(auctionId, bidAmount);
+    }
+
+    function closeAuction(uint256 auctionId) external {
+        Auction storage auction = auctions[auctionId];
+        require(block.timestamp >= auction.endTime, "Auction has not ended");
+        _closeAuction(auctionId);
+    }
+
+    function withdrawFunds() external onlyOwner {
+        uint256 balance = address(this).balance;
+        feeRecipient.transfer(balance);
+    }
+
+    // Helper functions and modifiers omitted for brevity

@@ -1,0 +1,11 @@
+{
+  "address": "0xa8b39829ce2246f89b31c013b8cde15506fb9a76",
+  "name": "PayableProxyForSoloMargin",
+  "compiler": "v0.5.7+commit.6da8b019",
+  "license": "",
+  "optimization": "1",
+  "runs": "10000",
+  "source_length": 159823,
+  "category": "Flash_Loan_Provider",
+  "collected_at": "2026-03-16T17:56:20.442751"
+}

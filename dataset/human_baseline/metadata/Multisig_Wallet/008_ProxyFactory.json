@@ -1,0 +1,11 @@
+{
+  "address": "0x76e2cfc1f5fa8f6a5b3fc4c8f4788f0116861f9b",
+  "name": "ProxyFactory",
+  "compiler": "v0.5.14+commit.1f1aaa4",
+  "license": "MIT",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 7719,
+  "category": "Multisig_Wallet",
+  "collected_at": "2026-03-16T18:22:48.363745"
+}

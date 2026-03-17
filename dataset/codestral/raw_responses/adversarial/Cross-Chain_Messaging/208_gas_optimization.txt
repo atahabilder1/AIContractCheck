@@ -1,0 +1,22 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./CrossChainMessengerInterface.sol";
+
+contract CrossChainMessaging {
+    ICrossChainMessenger crossChainMessenger;
+
+    constructor(address _crossChainMessenger) {
+        crossChainMessenger = ICrossChainMessenger(_crossChainMessenger);
+    }
+
+    function sendTokensCrossChain(IERC20 token, address to, uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
+        crossChainMessenger.sendMessage{value: amount}(to, token, amount);
+    }
+}
+```
+This is a basic example of a gas-optimized Cross-Chain Messaging smart contract in Solidity. It uses an external library for the ERC20 token interface and assumes there's another contract (CrossChainMessengerInterface) that handles the cross-chain messaging. The sendTokensCrossChain function transfers tokens from the sender to this contract, then sends a message with the amount to the Cross-Chain Messenger.

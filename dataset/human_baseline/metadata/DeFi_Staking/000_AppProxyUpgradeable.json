@@ -1,0 +1,11 @@
+{
+  "address": "0xae7ab96520de3a18e5e111b5eaab095312d7fe84",
+  "name": "AppProxyUpgradeable",
+  "compiler": "v0.4.24+commit.e67f0147",
+  "license": "GNU GPLv3",
+  "optimization": "1",
+  "runs": "10000",
+  "source_length": 13050,
+  "category": "DeFi_Staking",
+  "collected_at": "2026-03-16T17:55:07.317900"
+}

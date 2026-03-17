@@ -1,0 +1,11 @@
+{
+  "address": "0xe95a203b1a91a908f9b9ce46459d101078c2c3cb",
+  "name": "AdminUpgradeabilityProxy",
+  "compiler": "v0.6.8+commit.0bbfe453",
+  "license": "MIT",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 10680,
+  "category": "Wrapped_Token",
+  "collected_at": "2026-03-16T18:23:33.840191"
+}

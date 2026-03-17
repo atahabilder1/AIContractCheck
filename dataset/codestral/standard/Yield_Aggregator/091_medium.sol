@@ -1,0 +1,35 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IYieldStrategy {
+    function deposit(address user, uint256 amount) external returns (uint256);
+    function withdraw(address user, uint256 amount) external returns (uint256);
+    function autoCompound() external;
+}
+
+contract YieldAggregatorVault {
+    IYieldStrategy public yieldStrategy;
+
+    uint256 public depositFee = 1; // 1% fee on deposits
+    uint256 public withdrawFee = 1; // 1% fee on withdrawals
+
+    constructor(IYieldStrategy _yieldStrategy) {
+        yieldStrategy = _yieldStrategy;
+    }
+
+    function deposit(uint256 amount) public returns (uint256) {
+        uint256 fee = amount * depositFee / 100;
+        yieldStrategy.deposit(msg.sender, amount - fee);
+        return amount - fee;
+    }
+
+    function withdraw(uint256 amount) public returns (uint256) {
+        uint256 fee = amount * withdrawFee / 100;
+        uint256 withdrawnAmount = yieldStrategy.withdraw(msg.sender, amount - fee);
+        return withdrawnAmount + fee;
+    }
+
+    function autoCompound() public {
+        yieldStrategy.autoCompound();
+    }
+}

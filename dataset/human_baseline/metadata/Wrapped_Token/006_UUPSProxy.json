@@ -1,0 +1,11 @@
+{
+  "address": "0xcd5fe23c85820f7b72d0926fc9b05b43e359b7ee",
+  "name": "UUPSProxy",
+  "compiler": "v0.8.13+commit.abaa5c0e",
+  "license": "",
+  "optimization": "1",
+  "runs": "2000",
+  "source_length": 25042,
+  "category": "Wrapped_Token",
+  "collected_at": "2026-03-16T18:23:33.841405"
+}

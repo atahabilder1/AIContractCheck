@@ -1,0 +1,11 @@
+{
+  "address": "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d",
+  "name": "BoredApeYachtClub",
+  "compiler": "v0.7.0+commit.9e61f92b",
+  "license": "MIT",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 70902,
+  "category": "ERC721_NFT",
+  "collected_at": "2026-03-16T17:54:50.013070"
+}

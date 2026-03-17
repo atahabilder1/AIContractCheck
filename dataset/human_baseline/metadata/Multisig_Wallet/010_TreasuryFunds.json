@@ -1,0 +1,11 @@
+{
+  "address": "0x1389388d01708118b497f59521f6943be2541bb7",
+  "name": "TreasuryFunds",
+  "compiler": "v0.6.12+commit.27d51765",
+  "license": "MIT",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 23277,
+  "category": "Multisig_Wallet",
+  "collected_at": "2026-03-16T18:22:48.364883"
+}

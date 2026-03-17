@@ -1,0 +1,30 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract YieldAggregator {
+    uint256 public totalAssets;
+    mapping(address => uint256) public userBalances;
+
+    constructor() {
+        totalAssets = 0;
+    }
+
+    function deposit() public payable {
+        require(msg.value > 0, "Deposit amount must be greater than zero");
+        totalAssets += msg.value;
+        userBalances[msg.sender] += msg.value;
+    }
+
+    function withdraw(uint256 amount) public {
+        require(amount > 0, "Withdrawal amount must be greater than zero");
+        require(userBalances[msg.sender] >= amount, "Insufficient balance");
+        userBalances[msg.sender] -= amount;
+        totalAssets -= amount;
+        (bool sent, ) = msg.sender.call{value: amount}("");
+        require(sent, "Failed to send Ether");
+    }
+
+    function getUserBalance() public view returns (uint256) {
+        return userBalances[msg.sender];
+    }
+}

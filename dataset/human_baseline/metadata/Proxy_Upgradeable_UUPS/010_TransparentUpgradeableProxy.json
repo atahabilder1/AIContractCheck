@@ -1,0 +1,11 @@
+{
+  "address": "0xd5f7838f5c461feff7fe49ea5ebaf7728bb0adfa",
+  "name": "TransparentUpgradeableProxy",
+  "compiler": "v0.8.20+commit.a1b79de6",
+  "license": "",
+  "optimization": "1",
+  "runs": "1000000",
+  "source_length": 35003,
+  "category": "Proxy_Upgradeable_UUPS",
+  "collected_at": "2026-03-16T18:22:55.316640"
+}

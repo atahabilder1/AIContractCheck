@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleGovernance {
+    address public owner;
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the contract owner can call this function.");
+        _;
+    }
+
+    struct Proposal {
+        string description;
+        uint votesFor;
+        uint votesAgainst;
+        bool executed;
+    }
+
+    mapping(uint => Proposal) public proposals;
+    uint public proposalCount = 0;
+
+    function createProposal(string memory _description) public {
+        proposalCount++;
+        proposals[proposalCount] = Proposal(_description, 0, 0, false);
+    }
+
+    function voteFor(uint _proposalId) public {
+        require(!proposals[_proposalId].executed, "This proposal has already been executed.");
+        proposals[_proposalId].votesFor++;
+    }
+
+    function voteAgainst(uint _proposalId) public {
+        require(!proposals[_proposalId].executed, "This proposal has already been executed.");
+        proposals[_proposalId].votesAgainst++;
+    }
+
+    function executeProposal(uint _proposalId) public onlyOwner {
+        Proposal memory proposal = proposals[_proposalId];
+        require(!proposal.executed, "This proposal has already been executed.");
+        require(proposal.votesFor > proposal.votesAgainst, "Not enough votes for this proposal.");
+        // Execute the proposal logic here
+        proposal.executed = true;
+    }
+}

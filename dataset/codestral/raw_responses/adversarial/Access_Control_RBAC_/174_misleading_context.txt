@@ -1,0 +1,35 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract AccessControl {
+    enum Role { ADMIN, MANAGER, USER }
+
+    mapping(address => Role) public userRoles;
+
+    constructor() {
+        // Deployer is automatically set as ADMIN
+        userRoles[msg.sender] = Role.ADMIN;
+    }
+
+    modifier onlyAdmin() {
+        require(userRoles[msg.sender] == Role.ADMIN, "Only admins can perform this action.");
+        _;
+    }
+
+    modifier onlyManager() {
+        require(userRoles[msg.sender] == Role.MANAGER || userRoles[msg.sender] == Role.ADMIN, "Only managers or admins can perform this action.");
+        _;
+    }
+
+    function addManager(address _manager) public onlyAdmin {
+        require(userRoles[_manager] != Role.MANAGER && userRoles[_manager] != Role.ADMIN, "User is already a manager or admin.");
+        userRoles[_manager] = Role.MANAGER;
+    }
+
+    function removeManager(address _manager) public onlyAdmin {
+        require(userRoles[_manager] == Role.MANAGER, "User is not a manager.");
+        userRoles[_manager] = Role.USER;
+    }
+}
+```

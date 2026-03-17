@@ -5,65 +5,40 @@
 
 \subsection{Implications for Developers}
 
-Our results demonstrate that LLM-generated smart contracts should \emph{never} be deployed without comprehensive security auditing. The 72.7\% vulnerability rate among compilable contracts, combined with the presence of high-severity flaws in 28.5\% of contracts, makes unaudited deployment reckless. We recommend the following guidelines based on our findings:
+Our results demonstrate that LLM-generated smart contracts should \emph{never} be deployed without comprehensive security auditing. The 64.5\% vulnerability rate among compilable contracts, combined with the presence of high-severity flaws in 26.8\% of contracts, makes unaudited deployment reckless. We recommend the following guidelines based on our findings:
 
 \begin{enumerate}[leftmargin=*]
     \item \textbf{Always use multi-tool analysis.} Run generated contracts through multiple static analysis tools (at minimum, Slither and one symbolic execution tool) before deployment. No single tool catches all vulnerability types.
     \item \textbf{Do not rely on prompt engineering for security.} Our adversarial analysis shows that vulnerabilities are intrinsic to LLM code generation, not prompt-dependent. Even carefully crafted prompts produce vulnerable code. Post-generation auditing is the only reliable mitigation.
-    \item \textbf{Prefer models with high compilation rates.} GPT-4o (90.0\%) and Qwen (79.0\%) produce the most consistently compilable code. CodeLlama's low compilation rate (34.7\%) makes it unsuitable for production smart contract generation.
+    \item \textbf{Prefer models with high compilation rates.} GPT-5 (91.0\%), GPT-4o (90.0\%), and Qwen (79.0\%) produce the most consistently compilable code. CodeLlama's low compilation rate (34.7\%) makes it unsuitable for production smart contract generation. GPT-5 also achieves the lowest vulnerability density (2.22 vulns/100 LOC), making it the strongest choice for security-sensitive contract generation.
     \item \textbf{Exercise extreme caution with complex categories.} DeFi staking, DEX/AMM, and yield aggregator contracts exhibit 2--3$\times$ higher vulnerability rates than standard tokens. These categories should receive proportionally more scrutiny.
     \item \textbf{Verify security pattern completeness.} The phantom guard pattern (Section~\ref{sec:results}) demonstrates that syntactic presence of security constructs does not guarantee functional protection. Manually verify that modifiers and guards contain correct logic.
-    \item \textbf{Review the second half of long contracts more carefully.} Context window degradation causes 2.4$\times$ higher risky pattern density in the latter portions of complex contracts (>100 LOC).
+    \item \textbf{Review the second half of long contracts more carefully.} Context window degradation causes 4.1$\times$ higher risky pattern density in the latter portions of complex contracts (>100 LOC).
 \end{enumerate}
 
-\subsection{Implications for LLM Providers}
+\subsection{Compilation Quality Analysis}
 
-Our findings suggest several actionable improvements for LLM providers:
+Of 2,400 generated contracts, 834 (34.8\%) failed to compile. Root causes are dominated by semantic/type errors (68.5\%), followed by import/dependency issues (13.3\%), output format contamination such as markdown code fences (7.3\%), syntax errors (6.8\%), and compiler version incompatibilities (4.1\%). LLM-specific patterns are revealing: CodeLlama generates deprecated pre-0.8.x syntax, Gemini suffers from markdown contamination, Claude references bleeding-edge compiler versions, and GPT-4o's failures are almost purely semantic (80\%), indicating the highest Solidity fluency.
 
-\begin{itemize}[leftmargin=*]
-    \item \textbf{Security-focused fine-tuning.} Incorporate verified, audited smart contract code (e.g., OpenZeppelin, audited DeFi protocols) as high-priority training data, similar to safety alignment efforts in other domains~\cite{bai2022training}. Downweight or filter unaudited Etherscan contract code.
-    \item \textbf{Output validation.} Implement post-generation security scanning that flags common vulnerability patterns (reentrancy, missing access control) before presenting code to users. This could be integrated as an automatic check, similar to how models currently flag unsafe content.
-    \item \textbf{Security warnings.} Include explicit warnings when generating financial contracts, analogous to medical disclaimers. For example: ``This generated contract has not been security audited. Do not deploy to mainnet without professional review.''
-    \item \textbf{Context window management.} Address the context window degradation pattern by maintaining security-relevant context throughout long generations, potentially through architectural changes or explicit security checkpointing.
-\end{itemize}
+\subsection{Implications for LLM Providers and the Security Community}
 
-\subsection{Implications for the Security Community}
+Our findings suggest actionable improvements: (1)~\textbf{Security-focused fine-tuning}---incorporate verified, audited smart contract code (e.g., OpenZeppelin) as high-priority training data and downweight unaudited Etherscan code~\cite{bai2022training}; (2)~\textbf{Post-generation validation}---integrate automatic security scanning that flags common patterns (reentrancy, missing access control) before presenting code to users; (3)~\textbf{Security warnings}---include explicit disclaimers when generating financial contracts; and (4)~\textbf{Context window management}---address the degradation pattern by maintaining security-relevant context throughout long generations.
 
-Our findings motivate several research directions:
-
-\begin{itemize}[leftmargin=*]
-    \item \textbf{LLM-aware security tools.} Traditional security tools are designed for human-written code patterns. The phantom guard, inherited vulnerability, and context degradation patterns we identified suggest the need for detectors specifically targeting LLM-generated code artifacts.
-    \item \textbf{Benchmark datasets.} Our dataset of 1,800 labeled contracts can serve as a benchmark for evaluating both LLM security and the effectiveness of detection tools on generated code.
-    \item \textbf{Intrinsic vulnerability research.} Our finding that vulnerabilities are intrinsic to LLM code generation (not prompt-dependent) motivates research into training data curation and model architecture improvements for security-critical code generation.
-\end{itemize}
+For the security community, our work motivates \textbf{LLM-aware security tools} that target the phantom guard, inherited vulnerability, and context degradation patterns we identified. Our dataset of 2,400 labeled contracts can serve as a benchmark. The finding that vulnerabilities are intrinsic (not prompt-dependent) motivates research into training data curation for security-critical code generation.
 
 \subsection{Limitations}
 
-We acknowledge several limitations:
-
-\begin{enumerate}[leftmargin=*]
-    \item \textbf{Model evolution.} LLM behavior evolves with model updates; our results reflect specific model versions documented in our dataset. Results may differ for future model versions, though we expect the structural patterns (phantom guards, context degradation) to persist.
-    \item \textbf{Prompt representativeness.} Our prompt set, while diverse (300 prompts across 20 categories and 8 adversarial types), may not fully capture the distribution of real-world developer prompting patterns. We mitigate this by including multiple complexity levels and prompt variations.
-    \item \textbf{Tool limitations.} Static analysis tools produce both false positives and false negatives. We mitigate this through multi-tool analysis (Slither, Mythril, Semgrep) and cross-tool deduplication. Manual validation of a stratified sample is planned to quantify precision.
-    \item \textbf{Model coverage.} Our study covers six LLMs; extending to additional models (e.g., StarCoder~\cite{li2023starcoder}, Mistral) is future work.
-    \item \textbf{Language scope.} Our analysis focuses on Solidity; generalization to other smart contract languages (e.g., Rust for Solana, Move for Aptos, Vyper for Ethereum) requires further investigation.
-    \item \textbf{Human baseline.} A comprehensive comparison with human-written contracts is planned for an extended version of this work.
-    \item \textbf{Compilation bias.} Our compiled-only analysis (65.6\% of contracts) may introduce selection bias. Contracts that fail to compile may have different vulnerability profiles if they were compilable. We report compilation rates per LLM as a separate quality metric.
-\end{enumerate}
+We acknowledge several limitations: (1)~\textbf{Model evolution}---LLM behavior evolves with updates; our results reflect specific versions, though structural patterns (phantom guards, context degradation) likely persist. (2)~\textbf{Prompt representativeness}---our 300 prompts across 20 categories may not fully capture real-world prompting patterns. (3)~\textbf{Tool limitations}---static analysis produces false positives and negatives; we mitigate through multi-tool analysis and deduplication, with manual validation of 120 contracts underway. (4)~\textbf{Model coverage}---eight LLMs are studied; extending to additional models is future work. (5)~\textbf{Language scope}---we focus on Solidity; generalization to Rust/Solana, Move/Aptos requires further investigation. (6)~\textbf{Human baseline bias}---our 241 Etherscan contracts represent production-grade code but may not capture the full distribution of human-written Solidity; the 54.8\% compilation rate introduces selection bias toward simpler contracts. (7)~\textbf{Compilation bias}---our compiled-only analysis (65.2\%) may miss vulnerability patterns in non-compilable contracts.
 
 \subsection{Threats to Validity}
 
-\textbf{Internal validity}: Prompt design may bias results. We mitigate this by using diverse prompts across complexity levels and categories, with multiple variations per category. The consistent system prompt across all models ensures fair comparison. Temperature and token limits are standardized.
-
-\textbf{External validity}: Results may not generalize to all developer workflows, particularly interactive multi-turn sessions where developers iteratively refine generated code. We focus on single-shot generation as the most common use case and the one most likely to result in unreviewed deployment. We also focus on the highest-impact domain (Solidity/DeFi) and the most widely used LLMs.
-
-\textbf{Construct validity}: Vulnerability counts may not reflect exploitability. A contract with 10 low-severity informational findings may be safer than one with a single high-severity reentrancy vulnerability. We address this by reporting severity-stratified results and weighted vulnerability scores throughout our analysis. Additionally, LOC-normalized vulnerability rates control for the confound between contract size and vulnerability count.
+\textbf{Internal}: Prompt design may bias results; we mitigate this with diverse prompts across complexity levels/categories and a consistent system prompt across all models. \textbf{External}: Results may not generalize to multi-turn interactive sessions; we focus on single-shot generation as the most common and highest-risk use case. \textbf{Construct}: Vulnerability counts may not reflect exploitability; we report severity-stratified results and LOC-normalized rates to control for contract size.
 
 %======================================================================
-\section*{Data Availability}
+\section*{Data Availability \& Artifact}
 %======================================================================
 
-Our dataset of 1,800 contracts, analysis results, and all tooling are publicly available at: \url{https://github.com/[anonymized-for-review]}.
+Our complete reproducibility package is publicly available at: \url{https://github.com/[anonymized-for-review]}. The artifact includes: (1)~all 2,400 LLM-generated contracts with prompt metadata, (2)~241 human baseline contracts (Etherscan-verified, forge-flattened), (3)~raw and aggregated analysis results from Slither, Mythril, and Semgrep in structured JSON/CSV, (4)~all analysis scripts (dataset generation, vulnerability pipeline, statistical analysis, figure generation), (5)~the CWE-mapped vulnerability taxonomy, and (6)~instructions for end-to-end reproduction. Model versions, API configurations, and compiler versions are documented to enable exact replication.
 
 %======================================================================
 \section*{Ethical Considerations}

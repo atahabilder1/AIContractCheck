@@ -1,0 +1,11 @@
+{
+  "address": "0xf629cbd94d3791c9250152bd8dfbdf380e2a3b9c",
+  "name": "ENJToken",
+  "compiler": "v0.4.15+commit.bbb8e64f",
+  "license": "",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 18285,
+  "category": "ERC1155_Multi-Token",
+  "collected_at": "2026-03-16T17:54:58.825720"
+}

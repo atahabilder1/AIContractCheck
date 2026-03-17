@@ -1,0 +1,46 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Timelock {
+    address public timelock;
+    uint256 public delay;
+
+    constructor(address _timelock, uint256 _delay) {
+        timelock = _timelock;
+        delay = _delay;
+    }
+
+    function setTimelock(address _newTimelock) public {
+        schedule(_newTimelock);
+    }
+
+    function setDelay(uint256 _newDelay) public {
+        schedule(_newDelay);
+    }
+
+    function execute() external {
+        require(block.timestamp >= delay, "Timelock: time not expired");
+        address newTimelock = address(uint160(queued));
+        uint256 newDelay = queued;
+
+        if (newTimelock != address(0)) {
+            timelock = newTimelock;
+        } else if (newDelay > 0) {
+            delay = newDelay;
+        }
+    }
+
+    function schedule(address _newTimelock) internal {
+        queued = uint256(_newTimelock);
+        execute();
+    }
+
+    function schedule(uint256 _newDelay) internal {
+        queued = _newDelay;
+        execute();
+    }
+
+    uint256 private queued;
+}
+```

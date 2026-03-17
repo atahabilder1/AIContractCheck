@@ -1,0 +1,11 @@
+{
+  "address": "0x83f20f44975d03b1b09e64809b757c47f942beea",
+  "name": "SavingsDai",
+  "compiler": "v0.8.17+commit.8df45f5f",
+  "license": "GNU GPLv3",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 15088,
+  "category": "DeFi_Staking",
+  "collected_at": "2026-03-16T17:55:07.327793"
+}

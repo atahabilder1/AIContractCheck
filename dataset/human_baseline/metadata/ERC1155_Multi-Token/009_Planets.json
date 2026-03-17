@@ -1,0 +1,11 @@
+{
+  "address": "0x7deb7bce4d360ebe68278dee6054b882aa62d19c",
+  "name": "Planets",
+  "compiler": "v0.8.4+commit.c7e474f2",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 74153,
+  "category": "ERC1155_Multi-Token",
+  "collected_at": "2026-03-16T17:54:58.828716"
+}

@@ -1,0 +1,11 @@
+{
+  "address": "0xd28dbd19b93b6cc55d85debe9d93644097fed773",
+  "name": "PaymentSplitter",
+  "compiler": "v0.8.6+commit.11564f7e",
+  "license": "",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 20484,
+  "category": "Escrow",
+  "collected_at": "2026-03-16T17:56:16.715563"
+}

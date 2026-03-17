@@ -1,0 +1,66 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultiSigWallet {
+    address[] public owners;
+    uint public requiredSignatures;
+    mapping(bytes32 => TransactionData) private transactions;
+    struct TransactionData {
+        address to;
+        uint value;
+        bytes data;
+        bool executed;
+        uint numApprovals;
+    }
+    constructor(uint _requiredSignatures, address[] memory _owners) {
+        requiredSignatures = _requiredSignatures;
+        for (uint i = 0; i < _owners.length; i++) {
+            owners.push(_owners[i]);
+        }
+    }
+    function addOwner(address newOwner) external {
+        require(msg.sender == owner(), "Only existing owners can add new owners");
+        owners.push(newOwner);
+    }
+    function removeOwner(address ownerToRemove) external {
+        require(msg.sender == owner(), "Only existing owners can remove owners");
+        for (uint i = 0; i < owners.length; i++) {
+            if (owners[i] == ownerToRemove) {
+                owners[i] = owners[owners.length - 1];
+                owners.pop();
+                return;
+            }
+        }
+    }
+    function submitTransaction(address _to, uint _value, bytes memory _data) external returns (bytes32 txHash) {
+        require(owner(), "Only owners can submit transactions");
+        TransactionData memory transaction = TransactionData(_to, _value, _data, false, 0);
+        txHash = keccak256(abi.encodePacked(_to, _value, _data));
+        transactions[txHash] = transaction;
+    }
+    function approveTransaction(bytes32 txHash) external {
+        require(owner(), "Only owners can approve transactions");
+        TransactionData memory transaction = transactions[txHash];
+        require(!transaction.executed, "Transaction already executed");
+        require(msg.sender != transaction.to, "Cannot approve own transaction");
+        for (uint i = 0; i < owners.length; i++) {
+            if (owners[i] == msg.sender) {
+                transaction.numApprovals++;
+                transactions[txHash] = transaction;
+                if (transaction.numApprovals >= requiredSignatures) {
+                    executeTransaction(txHash);
+                }
+                return;
+            }
+        }
+    }
+    function executeTransaction(bytes32 txHash) internal {
+        TransactionData memory transaction = transactions[txHash];
+        require(!transaction.executed, "Transaction already executed");
+        transaction.to.call{value: transaction.value}(abi.decode(transaction.data, (bool)));
+        transaction.executed = true;
+        transactions[txHash] = transaction;
+    }
+}
+```

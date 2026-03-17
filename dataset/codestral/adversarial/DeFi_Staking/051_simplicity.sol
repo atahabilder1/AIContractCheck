@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleStaking {
+    address public staker;
+    uint256 public stakedAmount;
+
+    function stake(uint256 _amount) external {
+        require(_amount > 0, "Cannot stake zero amount");
+        staker = msg.sender;
+        stakedAmount += _amount;
+    }
+
+    function withdraw() external {
+        require(msg.sender == staker, "Only the staker can withdraw");
+        staker = address(0);
+        stakedAmount = 0;
+    }
+}

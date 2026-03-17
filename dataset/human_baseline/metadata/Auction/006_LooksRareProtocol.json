@@ -1,0 +1,11 @@
+{
+  "address": "0x0000000000e655fae4d56241588680f86e3b2377",
+  "name": "LooksRareProtocol",
+  "compiler": "v0.8.17+commit.8df45f5f",
+  "license": "",
+  "optimization": "1",
+  "runs": "888888",
+  "source_length": 128517,
+  "category": "Auction",
+  "collected_at": "2026-03-16T18:23:06.833807"
+}

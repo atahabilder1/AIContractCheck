@@ -1,0 +1,11 @@
+{
+  "address": "0x3e40d73eb977dc6a537af587d48316fee66e9c8c",
+  "name": "AppProxyUpgradeable",
+  "compiler": "v0.4.24+commit.e67f0147",
+  "license": "GNU GPLv3",
+  "optimization": "1",
+  "runs": "10000",
+  "source_length": 13050,
+  "category": "Governance_DAO",
+  "collected_at": "2026-03-16T17:55:37.615304"
+}

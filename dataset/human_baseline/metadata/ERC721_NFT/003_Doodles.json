@@ -1,0 +1,11 @@
+{
+  "address": "0x8a90cab2b38dba80c64b7734e58ee1db38b8992e",
+  "name": "Doodles",
+  "compiler": "v0.8.6+commit.11564f7e",
+  "license": "",
+  "optimization": "0",
+  "runs": "200",
+  "source_length": 50887,
+  "category": "ERC721_NFT",
+  "collected_at": "2026-03-16T17:54:50.015465"
+}

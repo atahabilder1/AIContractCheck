@@ -1,0 +1,29 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract BridgeRelayer is Ownable {
+    IERC20 public token;
+    bool public operationsPaused = false;
+
+    constructor(address _token) {
+        token = IERC20(_token);
+    }
+
+    function pauseOperations() external onlyOwner {
+        operationsPaused = true;
+    }
+
+    function resumeOperations() external onlyOwner {
+        operationsPaused = false;
+    }
+
+    function withdrawAllFunds() external onlyOwner {
+        require(operationsPaused, "Operations must be paused to withdraw funds");
+        token.transfer(owner(), token.balanceOf(address(this)));
+    }
+}
+```

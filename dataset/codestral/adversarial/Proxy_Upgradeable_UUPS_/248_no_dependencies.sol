@@ -1,0 +1,49 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.13;
+
+contract UUPSProxy {
+    address private _logicContract;
+    bytes private _initializedData;
+
+    constructor(address logicContract) public {
+        _logicContract = logicContract;
+        _initialize();
+    }
+
+    function upgradeTo(address newLogicContract) external {
+        require(_logicContract != address(0), "Proxy: Logic contract not initialized");
+        _logicContract = newLogicContract;
+        _initialize();
+    }
+
+    // Fallback and receive functions
+    fallback() external payable {
+        _fallback("fallback");
+    }
+
+    receive() external payable {}
+
+    function _fallback(string memory selector) internal {
+        bytes memory data = abi.encodeWithSelector(selector);
+        assembly {
+            let result := delegatecall(gas(), _logicContract, add(data, 0x20), mload(data), 0, 0)
+            switch iszero(extcodesize(_logicContract))
+                case 1 { invalid() }
+            default { return(add(32, result), mload(result)) }
+        }
+    }
+
+    function _initialize() private {
+        bytes memory data = abi.encodeWithSignature("initialize()");
+        assembly {
+            let success := call(_logicContract, add(data, 0x20), mload(data), 0, 0)
+            switch iszero(extcodesize(_logicContract))
+                case 1 { invalid() }
+            default {
+                if iszero(success) {
+                    revert(abi.decode(returndatasize(), returndatacopy(0, returndatasize()), (error)))
+                }
+            }
+        }
+    }
+}

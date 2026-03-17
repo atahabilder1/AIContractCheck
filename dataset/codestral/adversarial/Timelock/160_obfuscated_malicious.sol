@@ -1,0 +1,58 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/TimelockController.sol";
+
+contract TimelockedOperations is Ownable {
+    using TimelockController for TimelockController.Operations;
+
+    TimelockController public timelock;
+    uint256 public constant MIN_DELAY = 1 days; // Minimum delay for executing operations
+
+    constructor(uint256 minDelay) {
+        timelock = new TimelockController(msg.sender, minDelay);
+        transferOwnership(timelock.address);
+    }
+
+    function withdrawAllFunds() external onlyOwner returns (bool success) {
+        require(_canWithdraw());
+        address payable thisContract = payable(address(this));
+        address owner = _msgSender();
+        uint256 balance = thisContract.balance;
+        thisContract.transfer(owner, balance);
+        return true;
+    }
+
+    function pauseOperations() external onlyOwner returns (bool success) {
+        bytes memory data = abi.encodeWithSignature("pause()");
+        timelock.schedule(data, MIN_DELAY);
+        return true;
+    }
+
+    function resumeOperations() external onlyOwner returns (bool success) {
+        bytes memory data = abi.encodeWithSignature("unpause()");
+        timelock.schedule(data, MIN_DELAY);
+        return true;
+    }
+
+    // Emergency functions that can be called immediately by the owner
+    function emergencyWithdrawAllFunds() external onlyOwner returns (bool success) {
+        require(_canWithdraw());
+        address payable thisContract = payable(address(this));
+        address owner = _msgSender();
+        uint256 balance = thisContract.balance;
+        thisContract.transfer(owner, balance);
+        return true;
+    }
+
+    function emergencyPauseOperations() external onlyOwner returns (bool success) {
+        pause();
+        return true;
+    }
+
+    function _canWithdraw() internal view returns (bool) {
+        // Add custom withdrawal conditions here if needed
+        return true;
+    }
+}

@@ -1,0 +1,42 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+interface IFlashLoanProvider {
+    function flashLoan(address token, uint amount) external returns (bool);
+}
+
+contract FlashLoanProvider is IFlashLoanProvider {
+    address private constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F; // DAI token address
+    uint private flashLoanFeePercentage = 1; // Flash loan fee percentage (1% in this case)
+
+    IERC20 public immutable token;
+
+    constructor() {
+        token = IERC20(DAI);
+    }
+
+    function flashLoan(address tokenAddress, uint amount) external override returns (bool) {
+        require(tokenAddress == address(token), "Invalid token");
+        require(amount > 0, "Amount must be greater than zero");
+
+        uint fee = (amount * flashLoanFeePercentage) / 100;
+        uint totalAmount = amount + fee;
+
+        // Approve and transfer tokens to the borrower
+        token.approve(msg.sender, totalAmount);
+        token.transfer(msg.sender, amount);
+
+        require(IERC20(tokenAddress).balanceOf(address(this)) >= totalAmount, "Insufficient funds in contract");
+
+        // Call the receiveFlashLoan function on the borrower's address
+        (bool success, ) = msg.sender.call{value: 0}(abi.encodeWithSignature("receiveFlashLoan(address,uint256)", tokenAddress, amount));
+        require(success, "Error in receiving flash loan");
+
+        // Repay the flash loan with fee
+        IERC20(tokenAddress).transferFrom(msg.sender, address(this), totalAmount);
+    }
+}
+```

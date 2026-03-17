@@ -1,0 +1,11 @@
+{
+  "address": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+  "name": "WBTC",
+  "compiler": "v0.4.24+commit.e67f0147",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 18286,
+  "category": "ERC20_Token",
+  "collected_at": "2026-03-16T17:54:41.455766"
+}

@@ -1,0 +1,24 @@
+ ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transferFrom(address sender, address recipient, uint amount) external returns (bool);
+}
+
+contract YieldAggregator {
+    mapping(address => uint) public userBalances;
+
+    function deposit(address tokenAddress, uint amount) public {
+        IERC20(tokenAddress).transferFrom(msg.sender, address(this), amount);
+        userBalances[msg.sender] += amount;
+    }
+
+    function withdraw(uint amount) public {
+        require(userBalances[msg.sender] >= amount, "Insufficient balance");
+        IERC20(tokenAddress).transferFrom(address(this), msg.sender, amount);
+        userBalances[msg.sender] -= amount;
+    }
+}
+```
+This is a simple gas-optimized Yield Aggregator contract in Solidity. It uses an ERC20 token interface to handle deposits and withdrawals, minimizing gas costs by directly transferring tokens between users and the contract without unnecessary intermediate steps. The user's balance is updated using a mapping to avoid redundant storage reads and writes.

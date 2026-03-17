@@ -1,0 +1,54 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.14;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract StakingRewards {
+    IERC20 public stakingToken;
+    uint256 public rewardRate;
+    mapping(address => uint256) public rewards;
+    mapping(address => uint256) public balanceOfStaker;
+
+    constructor(IERC20 _stakingToken, uint256 _rewardRate) {
+        stakingToken = _stakingToken;
+        rewardRate = _rewardRate;
+    }
+
+    function stake(uint256 amount) public {
+        require(amount > 0, "Amount must be greater than zero");
+        stakingToken.transferFrom(msg.sender, address(this), amount);
+        balanceOfStaker[msg.sender] += amount;
+    }
+
+    function withdraw(uint256 amount) public {
+        require(amount > 0, "Amount must be greater than zero");
+        require(balanceOfStaker[msg.sender] >= amount, "Insufficient balance to withdraw");
+
+        balanceOfStaker[msg.sender] -= amount;
+        stakingToken.transfer(msg.sender, amount);
+    }
+
+    function claimRewards() public {
+        uint256 reward = rewards[msg.sender];
+        if (reward > 0) {
+            rewards[msg.sender] = 0;
+            stakingToken.transfer(msg.sender, reward);
+        }
+    }
+
+    function updateRewardRate(uint256 newRate) public onlyOwner {
+        rewardRate = newRate;
+    }
+
+    function distributeRewards() public {
+        uint256 totalSupply = stakingToken.totalSupply();
+        for (address staker in balanceOfStaker) {
+            rewards[staker] += (balanceOfStaker[staker] * rewardRate) / totalSupply;
+        }
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner(), "Ownable: caller is not the owner");
+        _;
+    }
+}

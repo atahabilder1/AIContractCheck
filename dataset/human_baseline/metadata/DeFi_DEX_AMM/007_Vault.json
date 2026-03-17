@@ -1,0 +1,11 @@
+{
+  "address": "0xba12222222228d8ba445958a75a0704d566bf2c8",
+  "name": "Vault",
+  "compiler": "v0.7.1+commit.f4a555be",
+  "license": "",
+  "optimization": "1",
+  "runs": "1500",
+  "source_length": 292847,
+  "category": "DeFi_DEX_AMM",
+  "collected_at": "2026-03-16T17:55:28.275706"
+}

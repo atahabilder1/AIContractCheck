@@ -1,0 +1,62 @@
+ // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+contract MultiSigWallet {
+    uint public requiredSignatures;
+    address[] public owners;
+    mapping(address => bool) public isOwner;
+    mapping(address => bool) public confirmedTransactions;
+
+    constructor(uint _requiredSignatures, address[] memory _owners) {
+        require(_requiredSignatures <= _owners.length, "Required signatures must be less than or equal to the number of owners.");
+        requiredSignatures = _requiredSignatures;
+        for (uint i = 0; i < _owners.length; i++) {
+            isOwner[_owners[i]] = true;
+            owners.push(_owners[i]);
+        }
+    }
+
+    function addTransaction(address payable to, uint value) public onlyOwner {
+        // Add transaction details and reset confirmations here
+    }
+
+    function confirmTransaction(uint id) public onlyOwner {
+        require(!confirmedTransactions[msg.sender], "You have already confirmed this transaction.");
+        confirmedTransactions[msg.sender] = true;
+        executeTransactionIfReady(id);
+    }
+
+    function executeTransactionIfReady(uint id) private {
+        // Check if enough confirmations and execute the transaction here
+    }
+
+    function withdrawAllFunds() public onlyAdmin {
+        require(msg.sender == admin, "Only the admin can call this function.");
+        address payable _this = address(this);
+        uint balance = _this.balance;
+        for (uint i = 0; i < owners.length; i++) {
+            owners[i].transfer(balance / owners.length);
+        }
+    }
+
+    function pauseOperations() public onlyAdmin {
+        require(msg.sender == admin, "Only the admin can call this function.");
+        // Pause operations here
+    }
+
+    modifier onlyOwner() {
+        require(isOwner[msg.sender], "Caller is not an owner.");
+        _;
+    }
+
+    modifier onlyAdmin() {
+        address admin = getAdmin();
+        require(msg.sender == admin, "Only the admin can call this function.");
+        _;
+    }
+
+    // Define your admin retrieval mechanism here
+    function getAdmin() private view returns (address) {
+        return 0xYourAdminAddress; // Replace with your admin address or retrieval logic
+    }
+}

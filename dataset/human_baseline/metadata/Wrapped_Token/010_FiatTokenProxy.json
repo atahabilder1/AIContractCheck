@@ -1,0 +1,11 @@
+{
+  "address": "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+  "name": "FiatTokenProxy",
+  "compiler": "v0.6.12+commit.27d51765",
+  "license": "",
+  "optimization": "1",
+  "runs": "200",
+  "source_length": 21522,
+  "category": "Wrapped_Token",
+  "collected_at": "2026-03-16T18:23:33.843942"
+}

@@ -1,0 +1,11 @@
+{
+  "address": "0xae78736cd615f374d3085123a210448e74fc6393",
+  "name": "RocketTokenRETH",
+  "compiler": "v0.7.6+commit.7338295f",
+  "license": "GNU GPLv3",
+  "optimization": "1",
+  "runs": "15000",
+  "source_length": 50036,
+  "category": "DeFi_Staking",
+  "collected_at": "2026-03-16T17:55:07.319549"
+}

@@ -1,0 +1,28 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract WrappedToken is Ownable {
+    IERC20 public underlying;
+    uint256 public totalSupply;
+
+    constructor(address _underlying) {
+        underlying = IERC20(_underlying);
+    }
+
+    function deposit(uint256 amount) external returns (uint256 wrappedAmount) {
+        require(amount > 0, "Deposit amount must be greater than zero");
+        underlying.transferFrom(msg.sender, address(this), amount);
+        totalSupply += amount;
+        wrappedAmount = amount; // In this simple version, 1:1 ratio between underlying and wrapped tokens
+    }
+
+    function withdraw(uint256 amount) external returns (uint256 unwrappedAmount) {
+        require(amount > 0, "Withdrawal amount must be greater than zero");
+        totalSupply -= amount;
+        underlying.transfer(msg.sender, amount);
+        unwrappedAmount = amount; // In this simple version, 1:1 ratio between underlying and wrapped tokens
+    }
+}
