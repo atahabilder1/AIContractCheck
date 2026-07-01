@@ -1,0 +1,32 @@
+\frametitle{RQ2: LLM-Specific Patterns}
+\begin{columns}
+\begin{column}{0.52\textwidth}
+
+\textbf{1. Phantom Guards}\\
+\small Empty \texttt{nonReentrant} --- looks safe, isn't.
+
+\vspace{0.3cm}
+\textbf{2. Unnecessary Reimplementations}\\
+\small SafeMath on Solidity 0.8+ (4\% of contracts). DeepSeek worst.
+
+\vspace{0.3cm}
+\textbf{3. Context Window Degradation}\\
+\small In long contracts, \textbf{4.1$\times$ more} risky code in the second half.
+
+\end{column}
+\begin{column}{0.46\textwidth}
+\begin{lstlisting}[language=Solidity, caption={Phantom guard}]
+// LLM-generated (VULNERABLE)
+modifier nonReentrant() {
+    _; // No lock!
+}
+
+function withdraw(uint amt)
+    nonReentrant {
+    payable(msg.sender)
+      .call{value: amt}("");
+    balances[msg.sender] -= amt;
+}
+\end{lstlisting}
+\end{column}
+\end{columns}

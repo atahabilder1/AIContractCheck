@@ -10,6 +10,18 @@ import pandas as pd
 
 from .categorize import CWE_MAPPING, CWE_CATEGORIES, SEVERITY_WEIGHTS, get_cwe
 
+# Noisy detectors that produce high false-positive rates and inflate counts.
+# - timestamp / block-timestamp-dependence: flags any use of block.timestamp,
+#   but most uses (e.g., timelocks, vesting) are not exploitable.
+# - reentrancy-benign: reentrancy patterns with no security impact.
+# - reentrancy-events: only affects event emission ordering after external calls.
+EXCLUDED_DETECTORS = {
+    "timestamp",
+    "reentrancy-benign",
+    "reentrancy-events",
+    "analysis.semgrep_rules.block-timestamp-dependence",
+}
+
 
 def load_results(filepath: str) -> dict:
     """Load analysis results and index by file path."""
@@ -41,6 +53,8 @@ def extract_slither_vulns(findings: dict) -> list:
     detectors = findings.get("results", {}).get("detectors", [])
     for d in detectors:
         check = d.get("check", "unknown")
+        if check in EXCLUDED_DETECTORS:
+            continue
         vulns.append({
             "tool": "slither",
             "detector": check,
@@ -77,6 +91,8 @@ def extract_semgrep_vulns(findings: dict) -> list:
     results = findings.get("results", [])
     for r in results:
         rule_id = r.get("check_id", "unknown")
+        if rule_id in EXCLUDED_DETECTORS:
+            continue
         metadata = r.get("extra", {}).get("metadata", {})
         severity_map = {"ERROR": "High", "WARNING": "Medium", "INFO": "Low"}
         vulns.append({

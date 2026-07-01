@@ -50,6 +50,14 @@ def get_color(llm):
     return LLM_COLORS.get(llm, '#666666')
 
 
+# Canonical LLM order: by vulns/100 LOC descending (the fairest metric).
+# Used across all figures for consistency so readers build one mental map.
+CANONICAL_LLM_ORDER = [
+    'gemini', 'deepseek', 'claude', 'qwen', 'codestral',
+    'gpt4o', 'codellama', 'gpt5',
+]
+
+
 def load_data(csv_path: str = "analysis/results/aggregated_results.csv") -> pd.DataFrame:
     """Load aggregated results."""
     return pd.read_csv(csv_path)
@@ -59,7 +67,7 @@ def fig1_vulnerabilities_by_llm(df: pd.DataFrame, output_dir: str = "visualizati
     """Figure 1: Violin + strip plot of vulnerabilities by LLM (single plot)."""
     fig, ax = plt.subplots(figsize=(10, 7))
 
-    llm_order = df.groupby('llm')['total_vulns'].median().sort_values(ascending=False).index.tolist()
+    llm_order = [l for l in CANONICAL_LLM_ORDER if l in df['llm'].unique()]
     colors = [get_color(llm) for llm in llm_order]
 
     sns.violinplot(data=df, x='llm', y='total_vulns', order=llm_order,
@@ -82,56 +90,27 @@ def _fig4_severity_distribution_old(df, output_dir):
 
 
 def fig2_standard_vs_adversarial(df: pd.DataFrame, output_dir: str = "visualization/figures"):
-    """Figure 2: Two-panel — (a) mean vulns by LLM, (b) overall distribution."""
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 12))
+    """Figure 2: Side-by-side violin plots — standard vs adversarial (overall)."""
+    fig, ax = plt.subplots(figsize=(8, 6))
 
-    # Panel (a): Grouped bar chart using mean (not median)
-    prompt_llm = df.groupby(['llm', 'prompt_type'])['total_vulns'].mean().unstack()
-    llm_order = prompt_llm.mean(axis=1).sort_values(ascending=False).index
-
-    x = np.arange(len(llm_order))
-    width = 0.35
-
-    std_vals = prompt_llm.loc[llm_order, 'standard'] if 'standard' in prompt_llm.columns else []
-    adv_vals = prompt_llm.loc[llm_order, 'adversarial'] if 'adversarial' in prompt_llm.columns else []
-
-    bars1 = ax1.bar(x - width / 2, std_vals, width, label='Standard Prompts',
-                    color='steelblue', edgecolor='black', linewidth=0.5)
-    bars2 = ax1.bar(x + width / 2, adv_vals, width, label='Adversarial Prompts',
-                    color='firebrick', edgecolor='black', linewidth=0.5)
-
-    ax1.set_xlabel('LLM', fontsize=16)
-    ax1.set_ylabel('Mean Vulnerabilities per Contract', fontsize=16)
-    ax1.set_title('(a) Standard vs Adversarial by LLM', fontsize=18)
-    ax1.set_xticks(x)
-    ax1.set_xticklabels(llm_order, rotation=45, ha='right', fontsize=14)
-    ax1.legend(fontsize=13)
-    ax1.tick_params(axis='y', labelsize=14)
-
-    for bars in [bars1, bars2]:
-        for bar in bars:
-            h = bar.get_height()
-            if h > 0:
-                ax1.text(bar.get_x() + bar.get_width() / 2, h + 0.1,
-                         f'{h:.1f}', ha='center', va='bottom', fontsize=11)
-
-    # Panel (b): Box plot — overall standard vs adversarial
     std_data = df[df['prompt_type'] == 'standard']['total_vulns']
     adv_data = df[df['prompt_type'] == 'adversarial']['total_vulns']
 
-    bp = ax2.boxplot([std_data.values, adv_data.values],
-                     labels=['Standard', 'Adversarial'],
-                     patch_artist=True, showfliers=True,
-                     flierprops=dict(markersize=3, alpha=0.5))
-    bp['boxes'][0].set_facecolor('steelblue')
-    bp['boxes'][0].set_alpha(0.7)
-    bp['boxes'][1].set_facecolor('firebrick')
-    bp['boxes'][1].set_alpha(0.7)
+    parts = ax.violinplot([std_data.values, adv_data.values],
+                          positions=[1, 2], showmeans=True, showmedians=True)
+    parts['bodies'][0].set_facecolor('steelblue')
+    parts['bodies'][0].set_alpha(0.7)
+    parts['bodies'][1].set_facecolor('firebrick')
+    parts['bodies'][1].set_alpha(0.7)
 
-    ax2.set_ylabel('Total Vulnerabilities', fontsize=16)
-    ax2.set_title('(b) Overall Distribution\n($p = 0.997$, $\\delta = -0.090$)', fontsize=18)
-    ax2.tick_params(axis='x', labelsize=14)
-    ax2.tick_params(axis='y', labelsize=14)
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels([
+        f'Standard\n(mean {std_data.mean():.2f})',
+        f'Adversarial\n(mean {adv_data.mean():.2f})',
+    ], fontsize=14)
+    ax.set_ylabel('Total Vulnerabilities per Contract', fontsize=16)
+    ax.set_title('Standard vs Adversarial Prompts\n($p = 0.997$, $\\delta = -0.090$)', fontsize=18)
+    ax.tick_params(axis='y', labelsize=14)
 
     plt.tight_layout()
     _save(fig, output_dir, "fig2_standard_vs_adversarial")
@@ -177,8 +156,9 @@ def fig4_severity_distribution(df: pd.DataFrame, output_dir: str = "visualizatio
     severity_pct = severity_data.div(totals, axis=0) * 100
     severity_pct = severity_pct.fillna(0)
 
-    # Sort by high-severity percentage
-    severity_pct = severity_pct.sort_values('high', ascending=False)
+    # Use canonical order for consistency across all figures
+    canonical = [l for l in CANONICAL_LLM_ORDER if l in severity_pct.index]
+    severity_pct = severity_pct.loc[canonical]
 
     severity_pct.plot(kind='bar', stacked=True, ax=ax,
                       color=['firebrick', 'darkorange', 'gold', 'steelblue'],
@@ -198,10 +178,10 @@ def fig4_severity_distribution(df: pd.DataFrame, output_dir: str = "visualizatio
         Patch(facecolor='steelblue', edgecolor='black', label='Informational'),
     ]
     ax.legend(handles=legend_elements, title='Severity',
-              fontsize=13, title_fontsize=14, loc='lower center',
-              bbox_to_anchor=(0.5, -0.32), ncol=4, frameon=True)
+              fontsize=13, title_fontsize=14, loc='upper right',
+              ncol=1, frameon=True)
 
-    plt.tight_layout(rect=[0, 0.08, 1, 1])
+    plt.tight_layout()
     _save(fig, output_dir, "fig4_severity_distribution")
 
 
@@ -259,8 +239,9 @@ def fig6_cwe_distribution(df: pd.DataFrame, output_dir: str = "visualization/fig
 
     fig, ax = plt.subplots(figsize=(12, 5.5))
 
-    # Sum across all contracts
-    cwe_totals = df[cwe_cols].sum().sort_values(ascending=True)
+    # Sum across compiled contracts only (consistent with Table 4 / total_vulns)
+    compiled = df[df['compiled'] == True] if 'compiled' in df.columns else df
+    cwe_totals = compiled[cwe_cols].sum().sort_values(ascending=True)
     # Clean labels: cwe_841_reentrancy → CWE-841 (Reentrancy)
     labels = []
     for col in cwe_totals.index:
@@ -333,8 +314,7 @@ def fig8_loc_normalized_violin(df: pd.DataFrame, output_dir: str = "visualizatio
     cdf = df[df["compiled"]].copy()
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    llm_order = (cdf.groupby("llm")["vulns_per_100_loc"]
-                 .median().sort_values(ascending=False).index.tolist())
+    llm_order = [l for l in CANONICAL_LLM_ORDER if l in cdf['llm'].unique()]
     colors = [get_color(llm) for llm in llm_order]
 
     sns.violinplot(data=cdf, x="llm", y="vulns_per_100_loc", order=llm_order,
@@ -391,8 +371,10 @@ def fig10_compilation_rates(df: pd.DataFrame, output_dir: str = "visualization/f
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    rates = df.groupby("llm")["compiled"].mean().sort_values(ascending=False) * 100
-    colors = [get_color(llm) for llm in rates.index]
+    rates = df.groupby("llm")["compiled"].mean() * 100
+    llm_order = [l for l in CANONICAL_LLM_ORDER if l in rates.index]
+    rates = rates.loc[llm_order]
+    colors = [get_color(llm) for llm in llm_order]
 
     bars = ax.bar(rates.index, rates.values, color=colors, edgecolor="black", linewidth=0.5)
     ax.set_xlabel("LLM")

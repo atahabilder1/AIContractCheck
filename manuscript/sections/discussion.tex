@@ -5,12 +5,12 @@
 
 \subsection{Implications for Developers}
 
-Our results demonstrate that LLM-generated smart contracts should \emph{never} be deployed without comprehensive security auditing. The 64.5\% vulnerability rate among compilable contracts, combined with the presence of high-severity flaws in 26.8\% of contracts, makes unaudited deployment reckless. We recommend the following guidelines based on our findings:
+Our results demonstrate that LLM-generated smart contracts should \emph{never} be deployed without comprehensive security auditing. The 54.7\% vulnerability rate among compilable contracts, combined with the presence of high-severity flaws in 26.8\% of contracts, makes unaudited deployment reckless. We recommend the following guidelines based on our findings:
 
 \begin{enumerate}[leftmargin=*]
     \item \textbf{Always use multi-tool analysis.} Run generated contracts through multiple static analysis tools (at minimum, Slither and one symbolic execution tool) before deployment. No single tool catches all vulnerability types.
     \item \textbf{Do not rely on prompt engineering for security.} Our adversarial analysis shows that vulnerabilities are intrinsic to LLM code generation, not prompt-dependent. Even carefully crafted prompts produce vulnerable code. Post-generation auditing is the only reliable mitigation.
-    \item \textbf{Prefer models with high compilation rates.} GPT-5 (91.0\%), GPT-4o (90.0\%), and Qwen (79.0\%) produce the most consistently compilable code. CodeLlama's low compilation rate (34.7\%) makes it unsuitable for production smart contract generation. GPT-5 also achieves the lowest vulnerability density (2.22 vulns/100 LOC), making it the strongest choice for security-sensitive contract generation.
+    \item \textbf{Prefer models with high compilation rates.} GPT-5 (91.0\%), GPT-4o (90.0\%), and Qwen (79.0\%) produce the most consistently compilable code. CodeLlama's low compilation rate (34.7\%) makes it unsuitable for production smart contract generation. GPT-5 also achieves the lowest vulnerability density (0.99 vulns/100 LOC), making it the strongest choice for security-sensitive contract generation.
     \item \textbf{Exercise extreme caution with complex categories.} DeFi staking, DEX/AMM, and yield aggregator contracts exhibit 2--3$\times$ higher vulnerability rates than standard tokens. These categories should receive proportionally more scrutiny.
     \item \textbf{Verify security pattern completeness.} The phantom guard pattern (Section~\ref{sec:results}) demonstrates that syntactic presence of security constructs does not guarantee functional protection. Manually verify that modifiers and guards contain correct logic.
     \item \textbf{Review the second half of long contracts more carefully.} Context window degradation causes 4.1$\times$ higher risky pattern density in the latter portions of complex contracts (>100 LOC).

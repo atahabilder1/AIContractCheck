@@ -5,9 +5,9 @@
 
 \subsection{RQ1: Vulnerability Prevalence}
 
-\textbf{Finding: 64.5\% of compilable LLM-generated contracts contain at least one vulnerability.}
+\textbf{Finding: 54.7\% of compilable LLM-generated contracts contain at least one vulnerability.}
 
-Across 2,400 generated contracts, 1,566 (65.2\%) compiled successfully. Our analysis considers only compilable contracts; contracts that fail compilation represent a separate quality dimension analyzed in Section~\ref{sec:discussion}. On the compiled subset, our pipeline detected a total of 5,134 vulnerabilities after cross-tool deduplication. Table~\ref{tab:overall} summarizes the overall prevalence by severity.
+Across 2,400 generated contracts, 1,566 (65.2\%) compiled successfully. Our analysis considers only compilable contracts; contracts that fail compilation represent a separate quality dimension analyzed in Section~\ref{sec:discussion}. On the compiled subset, our pipeline detected a total of 2,493 vulnerabilities after cross-tool deduplication and detector filtering (see Section~\ref{sec:methodology}). Table~\ref{tab:overall} summarizes the overall prevalence by severity.
 
 \begin{table}[t]
 \caption{Vulnerability Prevalence ($n=1{,}566$ compiled)}
@@ -18,17 +18,17 @@ Across 2,400 generated contracts, 1,566 (65.2\%) compiled successfully. Our anal
 \toprule
 \textbf{Severity} & \textbf{Count} & \textbf{\% of Total} & \textbf{Contracts Affected} \\
 \midrule
-High & 804 & 15.7\% & 419 (26.8\%) \\
-Medium & 1,743 & 34.0\% & 597 (38.1\%) \\
-Low & 2,587 & 50.4\% & 871 (55.6\%) \\
+High & 804 & 32.3\% & 419 (26.8\%) \\
+Medium & 619 & 24.8\% & 597 (38.1\%) \\
+Low & 987 & 39.6\% & 871 (55.6\%) \\
 \midrule
-\textbf{Total} & \textbf{5,134} & \textbf{100\%} & \textbf{1,010 (64.5\%)} \\
+\textbf{Total} & \textbf{2,493} & \textbf{100\%} & \textbf{856 (54.7\%)} \\
 \bottomrule
 \end{tabular}%
 }
 \end{table}
 
-On average, each compiled contract contains 3.28 vulnerabilities (SD = 4.48), with a median of 2 and a heavily right-skewed distribution, with a long tail of contracts containing 10+ vulnerabilities, predominantly in complex categories such as DeFi staking and auctions.
+On average, each compiled contract contains 1.54 vulnerabilities, with a heavily right-skewed distribution and a long tail of contracts containing 10+ vulnerabilities, predominantly in complex categories such as DeFi staking and auctions.
 
 \textbf{Compilation rates vary dramatically across LLMs}, representing a critical and previously unreported quality dimension. GPT-5 achieves the highest compilation rate (91.0\%), followed closely by GPT-4o (90.0\%), while CodeLlama compiles only 34.7\% of contracts (Fig.~\ref{fig:compilation} in Appendix). This means that CodeLlama's apparently low vulnerability counts in raw analyses are an artifact of compilation failure, not superior security. When analyzing only compiled contracts, the vulnerability landscape changes substantially.
 
@@ -36,9 +36,9 @@ On average, each compiled contract contains 3.28 vulnerabilities (SD = 4.48), wi
 
 \subsection{RQ2: Cross-LLM Comparison}
 
-\textbf{Finding: Significant differences exist across LLMs ($H = 249.2$, $p < 10^{-50}$).}
+\textbf{Finding: Significant differences exist across LLMs ($H = 132.65$, $p = 1.75 \times 10^{-25}$).}
 
-Table~\ref{tab:llm_comparison} presents the per-LLM vulnerability statistics for compiled contracts only. A Kruskal-Wallis test confirms statistically significant differences in vulnerability counts across LLMs ($H = 249.2$, $p < 10^{-50}$).
+Table~\ref{tab:llm_comparison} presents the per-LLM vulnerability statistics for compiled contracts only. A Kruskal-Wallis test confirms statistically significant differences in vulnerability counts across LLMs ($H = 132.65$, $p = 1.75 \times 10^{-25}$).
 
 \begin{table*}[t]
 \caption{Vulnerability Statistics by LLM (Compiled Contracts Only)}
@@ -50,10 +50,8 @@ Table~\ref{tab:llm_comparison} presents the per-LLM vulnerability statistics for
 \textbf{Metric} & \textbf{GPT-4o} & \textbf{GPT-5} & \textbf{Claude} & \textbf{Gemini} & \textbf{DeepSeek} & \textbf{Qwen} & \textbf{CodeLlama} & \textbf{Codestral} \\
 \midrule
 Compiled ($n$) & 270 & 273 & 205 & 149 & 205 & 237 & 104 & 123 \\
-Total Vulns & 824 & 488 & 1,566 & 674 & 610 & 651 & 128 & 193 \\
-Mean/Contract & 3.05 & 1.79 & 7.64 & 4.52 & 2.98 & 2.75 & 1.23 & 1.57 \\
-Median & 2 & 0 & 6 & 3 & 2 & 2 & 0 & 1 \\
-\% with Vuln & 73.0\% & 35.5\% & 84.9\% & 80.5\% & 73.2\% & 66.2\% & 49.0\% & 52.0\% \\
+Mean/Contract & 1.65 & 0.63 & 3.22 & 1.85 & 1.44 & 1.40 & 0.95 & 1.06 \\
+\% with Vuln & 62.2\% & 26.7\% & 69.3\% & 66.4\% & 62.0\% & 58.2\% & 48.1\% & 48.0\% \\
 High-Sev & 79 & 47 & 69 & 46 & 61 & 68 & 12 & 37 \\
 \% High-Sev & 29.3\% & 17.2\% & 33.7\% & 30.9\% & 29.8\% & 28.7\% & 11.5\% & 30.1\% \\
 Compile Rate & 90.0\% & 91.0\% & 68.3\% & 49.7\% & 68.3\% & 79.0\% & 34.7\% & 41.0\% \\
@@ -61,9 +59,9 @@ Compile Rate & 90.0\% & 91.0\% & 68.3\% & 49.7\% & 68.3\% & 79.0\% & 34.7\% & 41
 \end{tabular}
 \end{table*}
 
-\textbf{Raw vulnerability counts are confounded by contract size.} Claude generates the largest contracts (mean 113 LOC), which partly explains its highest raw vulnerability count (mean 7.64). When normalized by lines of code, the picture changes substantially: Gemini exhibits the highest vulnerability density (8.43 vulns/100 LOC), followed by DeepSeek (7.96), Claude (6.98), Qwen (6.95), Codestral (6.88), GPT-4o (6.61), CodeLlama (5.16), and GPT-5 (2.22). A Kruskal-Wallis test on LOC-normalized rates remains significant ($H = 172.2$, $p < 10^{-34}$), confirming that cross-LLM differences persist even after controlling for contract size. Contract size correlates moderately with vulnerability count (Spearman $\rho = 0.506$, $p < 10^{-102}$).
+\textbf{Raw vulnerability counts are confounded by contract size.} Claude generates the largest contracts (mean 113 LOC), which partly explains its highest raw vulnerability count (mean 3.22). When normalized by lines of code, the picture changes substantially: Codestral exhibits the highest vulnerability density (4.88 vulns/100 LOC), followed by Gemini (4.25), DeepSeek (4.24), Qwen (4.10), CodeLlama (4.09), GPT-4o (3.86), Claude (2.75), and GPT-5 (0.99). A Kruskal-Wallis test on LOC-normalized rates remains significant ($H = 125.49$, $p = 5.50 \times 10^{-24}$), confirming that cross-LLM differences persist even after controlling for contract size. Contract size correlates moderately with vulnerability count (Spearman $\rho = 0.506$, $p < 10^{-102}$).
 
-GPT-5 stands out as an outlier: it combines the highest compilation rate (91.0\%) with the lowest vulnerability density (2.22 vulns/100 LOC), suggesting that newer-generation models may incorporate improved security awareness. However, even GPT-5 produces contracts where 35.5\% have at least one vulnerability.
+GPT-5 stands out as an outlier: it combines the highest compilation rate (91.0\%) with the lowest vulnerability density (0.99 vulns/100 LOC), suggesting that newer-generation models may incorporate improved security awareness. However, even GPT-5 produces contracts where 26.7\% have at least one vulnerability.
 
 Fig.~\ref{fig:boxplot} shows the distribution of vulnerability counts per contract across all eight LLMs. Fig.~\ref{fig:loc_normalized} presents the LOC-normalized vulnerability rates, which control for contract size differences. Additional figures showing contract size vs.\ vulnerability count (Fig.~\ref{fig:loc_scatter}) and severity distribution by LLM (Fig.~\ref{fig:severity}) are provided in Appendix~\ref{sec:appendix_figures}.
 
@@ -77,7 +75,7 @@ Fig.~\ref{fig:boxplot} shows the distribution of vulnerability counts per contra
 \begin{figure}[t]
     \centering
     \includegraphics[width=\columnwidth]{../visualization/figures/fig8_loc_normalized_violin.pdf}
-    \caption{LOC-normalized vulnerability rate (compiled contracts). Gemini exhibits the highest density (8.43 vulns/100 LOC) despite moderate raw counts; GPT-5 achieves the lowest (2.22 vulns/100 LOC).}
+    \caption{LOC-normalized vulnerability rate (compiled contracts). Codestral exhibits the highest density (4.88 vulns/100 LOC); GPT-5 achieves the lowest (0.99 vulns/100 LOC).}
     \label{fig:loc_normalized}
 \end{figure}
 
@@ -109,13 +107,13 @@ The effect size between Claude and CodeLlama is large ($\delta = 0.64$), but thi
 Fig.~\ref{fig:severity} (Appendix) shows the severity breakdown across LLMs.
 
 \subsubsection{General-Purpose vs.\ Code-Specialized}
-Grouping models by type reveals that general-purpose LLMs compile more frequently (74.8\% vs.\ 55.8\%) and produce more total vulnerabilities per contract (mean 3.96 vs.\ 2.36, $U = 339{,}493$, $p < 10^{-5}$). However, when normalized by lines of code, the difference vanishes entirely: 6.66 vs.\ 6.97 vulns/100 LOC ($p = 0.094$, Cliff's $\delta = 0.05$, negligible). The raw vulnerability gap is explained by general-purpose models producing larger contracts (65.3 vs.\ 34.9 mean LOC). High-severity rates are virtually identical (26.9\% vs.\ 26.6\%). Thus, the General/Code distinction does not predict vulnerability density---model-to-model variation dominates.
+Grouping models by type reveals that general-purpose LLMs compile more frequently (74.8\% vs.\ 55.8\%) and produce more total vulnerabilities per contract. However, when normalized by lines of code, the difference narrows substantially. The raw vulnerability gap is explained by general-purpose models producing larger contracts (65.3 vs.\ 34.9 mean LOC). Thus, the General/Code distinction does not predict vulnerability density---model-to-model variation dominates.
 
 \subsection{RQ3: Vulnerability Taxonomy}
 
-\textbf{Finding: Reentrancy and timestamp dependence dominate LLM-generated contracts.}
+\textbf{Finding: Unchecked return values and reentrancy dominate LLM-generated contracts.}
 
-Table~\ref{tab:taxonomy} presents the top vulnerability types identified across all compiled contracts. Timestamp dependence (CWE-829) produces the most findings by count (1,865), while reentrancy (CWE-841) affects the most contracts (30.6\% of all compiled contracts vs.\ 25.2\% for timestamp).
+Table~\ref{tab:taxonomy} presents the top vulnerability types identified across all compiled contracts after filtering noisy detectors. Unchecked return values (CWE-252) and reentrancy (CWE-841) are the most prevalent vulnerability classes.
 
 \begin{table}[t]
 \caption{Top Vulnerability Types in LLM-Generated Contracts}
@@ -126,14 +124,14 @@ Table~\ref{tab:taxonomy} presents the top vulnerability types identified across 
 \toprule
 \textbf{\#} & \textbf{Vulnerability} & \textbf{CWE} & \textbf{Count} & \textbf{\% Contracts} \\
 \midrule
-1 & Timestamp Depend. & 829 & 1,865 & 25.2\% \\
-2 & Reentrancy & 841 & 1,201 & 30.6\% \\
-3 & Unchecked Return & 252 & 461 & 11.6\% \\
-4 & Access Control & 284 & 153 & 8.8\% \\
+1 & Unchecked Return & 252 & 461 & 11.6\% \\
+2 & Reentrancy & 841 & 346 & 22.1\% \\
+3 & Access Control & 284 & 173 & 8.8\% \\
+4 & Timestamp Depend. & 829 & 52 & 3.3\% \\
 5 & Uninitialized State & 909 & 35 & 1.6\% \\
 6 & Weak Randomness & 330 & 4 & 0.3\% \\
 7 & tx.origin Auth. & 477 & 1 & 0.1\% \\
-8 & Other & --- & 1,414 & --- \\
+8 & Other & --- & 1,421 & --- \\
 \bottomrule
 \end{tabular*}
 \end{table}
@@ -143,7 +141,7 @@ Fig.~\ref{fig:cwe_dist} shows the overall CWE distribution, and Fig.~\ref{fig:he
 \begin{figure}[t]
     \centering
     \includegraphics[width=\columnwidth]{../visualization/figures/fig6_cwe_distribution.pdf}
-    \caption{CWE vulnerability type distribution across all LLMs. Timestamp dependence (CWE-829) and reentrancy (CWE-841) dominate, accounting for 71.6\% of all mapped findings.}
+    \caption{CWE vulnerability type distribution across all LLMs (after filtering noisy detectors). Unchecked return values (CWE-252) and reentrancy (CWE-841) are the most prevalent vulnerability classes.}
     \label{fig:cwe_dist}
 \end{figure}
 
@@ -155,7 +153,7 @@ Fig.~\ref{fig:cwe_dist} shows the overall CWE distribution, and Fig.~\ref{fig:he
 \end{figure*}
 
 \subsubsection{Tool Agreement Analysis}
-Our multi-tool approach is essential: Slither dominates detection (4,342 total findings), followed by Semgrep (1,296) and Mythril (262). The low inter-tool agreement (Spearman correlations: Slither--Semgrep $\rho = 0.307$, Slither--Mythril $\rho = 0.186$, Mythril--Semgrep $\rho = 0.141$; Fig.~\ref{fig:tool_agreement} in Appendix) confirms that no single tool provides adequate coverage, validating our multi-tool pipeline design.
+Our multi-tool approach is essential: Slither dominates detection after filtering, followed by Semgrep and Mythril. The low inter-tool agreement (Spearman correlations: Slither--Semgrep $\rho = 0.307$, Slither--Mythril $\rho = 0.186$, Mythril--Semgrep $\rho = 0.141$; Fig.~\ref{fig:tool_agreement} in Appendix) confirms that no single tool provides adequate coverage, validating our multi-tool pipeline design.
 
 \subsection{RQ4: Adversarial Prompt Effectiveness}
 
@@ -181,14 +179,14 @@ Mean LOC & 59.6 & 49.6 \\
 \end{tabular*}
 \end{table}
 
-The overall effect is not statistically significant ($p = 0.997$, Cliff's $\delta = -0.090$, negligible effect). Standard prompts yield numerically more vulnerabilities, but this is fully explained by code complexity: standard prompts produce larger contracts (mean 59.6 LOC vs.\ 49.6 LOC). The direction is opposite to what adversarial prompt literature would predict, yet the effect size is negligible.
+The overall effect is not statistically significant ($p = 0.965$, Cliff's $\delta = -0.056$, negligible effect). Standard prompts yield numerically more vulnerabilities, but this is fully explained by code complexity: standard prompts produce larger contracts (mean 59.6 LOC vs.\ 49.6 LOC). The direction is opposite to what adversarial prompt literature would predict, yet the effect size is negligible.
 
 Per-LLM analysis reveals no consistent pattern: adversarial prompts produce marginally fewer vulnerabilities for most LLMs (Claude: 6.79 vs.\ 10.22; GPT-4o: 2.59 vs.\ 4.08; Qwen: 2.33 vs.\ 3.85), but marginally more for GPT-5 (1.92 vs.\ 1.53). No individual LLM shows a significant adversarial effect after Bonferroni correction.
 
 \begin{figure}[t]
     \centering
     \includegraphics[width=\columnwidth]{../visualization/figures/fig2_standard_vs_adversarial.pdf}
-    \caption{Vulnerability count by LLM for standard vs.\ adversarial prompts. (a) Per-LLM mean vulnerabilities show standard prompts produce slightly more across most models. (b) Overall distributions are nearly identical ($p = 0.997$, Cliff's $\delta = -0.090$), supporting the intrinsic vulnerability hypothesis.}
+    \caption{Vulnerability count by LLM for standard vs.\ adversarial prompts. (a) Per-LLM mean vulnerabilities show standard prompts produce slightly more across most models. (b) Overall distributions are nearly identical ($p = 0.965$, Cliff's $\delta = -0.056$), supporting the intrinsic vulnerability hypothesis.}
     \label{fig:adversarial_bar}
 \end{figure}
 
@@ -269,20 +267,20 @@ To contextualize our findings, we compare LLM-generated contracts against 241 ve
 \midrule
 Total contracts & 241 & 2,400 \\
 Compiled & 132 (54.8\%) & 1,566 (65.2\%) \\
-With vulnerabilities & 82.6\% & 64.5\% \\
-Mean findings/contract & 11.51 & 3.28 \\
+With vulnerabilities & 82.6\% & 54.7\% \\
+Mean findings/contract & 11.51 & 1.54 \\
 Mean LOC & 446.7 & 57.2 \\
-Vulns/100 LOC & 2.69 & 2.22--8.43 \\
-High-sev \% of findings & 16.0\% & 15.7\% \\
+Vulns/100 LOC & 2.69 & 0.99--4.88 \\
+High-sev \% of findings & 16.0\% & 32.3\% \\
 \bottomrule
 \end{tabular}%
 }
 \end{table}
 
-Three key observations emerge. First, human-written contracts exhibit a \emph{higher} absolute vulnerability count (mean 11.51 vs.\ 3.28) and a higher percentage of contracts with at least one finding (82.6\% vs.\ 64.5\%). This is primarily explained by contract complexity: human contracts average 446.7 LOC compared to 57.2 for LLM-generated code---a 7.8$\times$ difference. When normalized by lines of code, vulnerability density is comparable: 2.69 vulns/100 LOC for human contracts falls within the LLM range of 2.22--8.43.
+Three key observations emerge. First, human-written contracts exhibit a \emph{higher} absolute vulnerability count (mean 11.51 vs.\ 1.54) and a higher percentage of contracts with at least one finding (82.6\% vs.\ 54.7\%). This is primarily explained by contract complexity: human contracts average 446.7 LOC compared to 57.2 for LLM-generated code---a 7.8$\times$ difference. When normalized by lines of code, vulnerability density is comparable: 2.69 vulns/100 LOC for human contracts falls within the LLM range of 0.99--4.88.
 
-Second, both datasets trigger the \emph{same} dominant detectors: \texttt{reentrancy-events}, \texttt{missing-zero-check}, \texttt{timestamp}, and \texttt{shadowing-local} appear in the top findings for both human and LLM code. This confirms that our tools measure consistent patterns across both populations and that many findings represent stylistic issues rather than exploitable vulnerabilities.
+Second, both datasets trigger the \emph{same} dominant detectors: \texttt{missing-zero-check}, \texttt{reentrancy-eth}, and \texttt{shadowing-local} appear in the top findings for both human and LLM code. This confirms that our tools measure consistent patterns across both populations.
 
-Third, the high-severity proportion is nearly identical (16.0\% human vs.\ 15.7\% LLM), suggesting that LLMs do not introduce fundamentally different vulnerability classes. However, the critical distinction is not in code quality but in the \emph{deployment pipeline}: human-written mainnet contracts have undergone professional auditing, testing, and monitoring, while LLM-generated contracts bypass these safeguards entirely. The danger of LLM-generated smart contracts lies not in their vulnerability density---which is comparable to human code---but in the security infrastructure they encourage developers to skip.
+Third, the LLM-generated code shows a higher proportion of high-severity findings (32.3\% vs.\ 16.0\% for human), which is expected given that the filtering of noisy low-signal detectors disproportionately removed low-severity findings, concentrating the remaining vulnerabilities toward higher severities. However, the critical distinction is not in code quality but in the \emph{deployment pipeline}: human-written mainnet contracts have undergone professional auditing, testing, and monitoring, while LLM-generated contracts bypass these safeguards entirely. The danger of LLM-generated smart contracts lies not in their vulnerability density---which is comparable to human code---but in the security infrastructure they encourage developers to skip.
 
 We note that the 54.8\% human baseline compilation rate introduces selection bias toward simpler contracts. To mitigate this, we performed a Semgrep-only comparison across all 241 human contracts (which does not require compilation), yielding consistent results: both populations trigger the same dominant detectors at similar rates.
