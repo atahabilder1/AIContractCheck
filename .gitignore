@@ -50,3 +50,16 @@ analysis/results/slither_results.json
 # Large models (if running CodeLlama locally)
 *.bin
 *.safetensors
+
+# SecureGen large regenerable artifacts (activation caches, model pulls)
+securegen/probe/activations*.pt
+securegen/results/pull_*.log
+*.aux
+*.nav
+*.snm
+*.toc
+*.out
+
+# Node
+node_modules/
+# scratch

@@ -1,0 +1,18 @@
+/home/anik/.local/lib/python3.10/site-packages/huggingface_hub/constants.py:298: FutureWarning: The `HF_HUB_ENABLE_HF_TRANSFER` environment variable is deprecated as 'hf_transfer' is not used anymore. Please use `HF_XET_HIGH_PERFORMANCE` instead to enable high performance transfer with Xet. Visit https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables#hfxethighperformance for more details.
+  warnings.warn(
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+Fetching 4 files:   0%|          | 0/4 [00:00<?, ?it/s]Fetching 4 files:  25%|██▌       | 1/4 [16:46<50:20, 1006.74s/it]Fetching 4 files:  75%|███████▌  | 3/4 [19:42<05:25, 325.95s/it] Fetching 4 files: 100%|██████████| 4/4 [19:42<00:00, 295.52s/it]
+[transformers] The following generation flags are not valid and may be ignored: ['output_hidden_states']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+Loading weights:   0%|          | 0/339 [00:00<?, ?it/s]Loading weights:   0%|          | 1/339 [00:00<02:38,  2.14it/s]Loading weights:  10%|█         | 34/339 [00:00<00:04, 75.23it/s]Loading weights:  15%|█▌        | 52/339 [00:00<00:02, 99.99it/s]Loading weights:  22%|██▏       | 76/339 [00:00<00:02, 124.04it/s]Loading weights:  29%|██▉       | 100/339 [00:00<00:01, 144.40it/s]Loading weights:  37%|███▋      | 124/339 [00:01<00:01, 109.72it/s]Loading weights:  44%|████▍     | 149/339 [00:01<00:01, 134.45it/s]Loading weights:  51%|█████     | 172/339 [00:01<00:01, 140.09it/s]Loading weights:  58%|█████▊    | 196/339 [00:01<00:00, 158.85it/s]Loading weights:  65%|██████▍   | 220/339 [00:01<00:00, 154.30it/s]Loading weights:  70%|███████   | 238/339 [00:02<00:00, 123.47it/s]Loading weights:  75%|███████▍  | 253/339 [00:02<00:00, 124.84it/s]Loading weights:  79%|███████▉  | 267/339 [00:02<00:00, 124.35it/s]Loading weights:  85%|████████▍ | 288/339 [00:02<00:00, 142.13it/s]Loading weights:  90%|████████▉ | 305/339 [00:02<00:00, 143.37it/s]Loading weights:  97%|█████████▋| 328/339 [00:02<00:00, 150.00it/s]Loading weights: 100%|██████████| 339/339 [00:02<00:00, 129.46it/s]
+237 compiled qwen contracts to probe
+  25/237 contracts, 845 line-samples
+  50/237 contracts, 1470 line-samples
+  75/237 contracts, 2597 line-samples
+  100/237 contracts, 3481 line-samples
+  125/237 contracts, 4367 line-samples
+  150/237 contracts, 5805 line-samples
+  175/237 contracts, 6848 line-samples
+  200/237 contracts, 8170 line-samples
+  225/237 contracts, 9515 line-samples
+Saved 10287 line-samples (0.131 positive) from 237 contracts -> securegen/probe/activations.pt

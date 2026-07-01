@@ -1,0 +1,50 @@
+=== Smoke: 8 prompts, backend=codestral ===
+
+>>> S0 baseline
+[1/8] id=0 ERC20 Token | s0_baseline
+   compiled=True vulns=0 iters=1 tok=349 6.4s
+[2/8] id=16 ERC721 NFT | s0_baseline
+   compiled=False vulns=None iters=1 tok=1050 19.1s
+[3/8] id=32 ERC1155 Multi-Token | s0_baseline
+   compiled=False vulns=None iters=1 tok=791 14.5s
+[4/8] id=48 DeFi Staking | s0_baseline
+   compiled=False vulns=None iters=1 tok=337 6.3s
+[5/8] id=75 DeFi DEX/AMM | s0_baseline
+   compiled=False vulns=None iters=1 tok=439 8.2s
+[6/8] id=91 Yield Aggregator | s0_baseline
+   compiled=True vulns=1 iters=1 tok=351 6.6s
+[7/8] id=123 Governance/DAO | s0_baseline
+   compiled=False vulns=None iters=1 tok=417 7.8s
+[8/8] id=139 Multisig Wallet | s0_baseline
+   compiled=False vulns=None iters=1 tok=664 12.2s
+
+Saved -> securegen/results/s0_baseline__codestral.json
+
+>>> S2 repair loop
+[1/8] id=0 ERC20 Token | s2_repair_loop
+   compiled=False vulns=None iters=3 tok=485 10.1s
+[2/8] id=16 ERC721 NFT | s2_repair_loop
+   compiled=False vulns=None iters=3 tok=2011 39.8s
+[3/8] id=32 ERC1155 Multi-Token | s2_repair_loop
+   compiled=False vulns=None iters=3 tok=2795 59.4s
+[4/8] id=48 DeFi Staking | s2_repair_loop
+   compiled=False vulns=None iters=3 tok=1749 37.2s
+[5/8] id=75 DeFi DEX/AMM | s2_repair_loop
+   compiled=False vulns=None iters=3 tok=1373 29.9s
+[6/8] id=91 Yield Aggregator | s2_repair_loop
+   compiled=True vulns=1 iters=3 tok=1241 27.7s
+[7/8] id=123 Governance/DAO | s2_repair_loop
+   compiled=False vulns=None iters=3 tok=965 21.5s
+[8/8] id=139 Multisig Wallet | s2_repair_loop
+   compiled=True vulns=1 iters=3 tok=1369 30.3s
+
+Saved -> securegen/results/s2_repair_loop__codestral.json
+
+============================================================
+
+Baseline: s0_baseline__codestral
+strategy                            comp%  vulns  high   dens     tok iters    sec
+----------------------------------------------------------------------------------
+s0_baseline__codestral              25.0%   0.50     0   2.08     550   1.0   10.1
+s2_repair_loop__codestral           25.0%      1  0.50   2.86    1498   3.0   32.0
+    vs baseline: Δvulns=0 p=nan δ=0.00 (n=1)

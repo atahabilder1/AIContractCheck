@@ -1,0 +1,540 @@
+[
+  {
+    "prompt_id": 0,
+    "category": "ERC20 Token",
+    "complexity": "simple",
+    "strategy": "s2_repair_loop",
+    "backend": "gemini",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"@openzeppelin/contracts/token/ERC20/ERC20.sol\";\n\ncontract MyToken is ERC20 {\n    address public owner;\n\n    constructor(string memory name_, string memory symbol_, uint256 initialSupply) ERC20(name_, symbol_) {\n        owner = msg.sender;\n        _mint(msg.sender, initialSupply);\n    }\n\n    modifier onlyOwner() {\n        require(msg.sender == owner, \"Not the owner\");\n        _;\n    }\n\n    function mint(address to, uint256 amount) public onlyOwner {\n        _mint(to, amount);\n    }\n\n    function burn(uint256 amount) public {\n        _burn(msg.sender, amount);\n    }\n\n    function burnFrom(address from, uint256 amount) public {\n        require(amount <= totalSupply(), \"Burn amount exceeds total supply\");\n        _spendAllowance(from, msg.sender, amount);\n        _burn(from, amount);\n    }\n}",
+    "analysis": {
+      "compiled": true,
+      "findings": [],
+      "error": ""
+    },
+    "iterations": 2,
+    "usage": {
+      "input_tokens": 611,
+      "output_tokens": 504,
+      "llm_calls": 2
+    },
+    "wall_time_s": 13.718194484710693,
+    "loc": 24,
+    "trace": [
+      {
+        "iter": 1,
+        "compiled": true,
+        "total": 2,
+        "high": 0,
+        "medium": 0,
+        "low": 2,
+        "error": ""
+      },
+      {
+        "iter": 2,
+        "compiled": true,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": ""
+      }
+    ],
+    "error": "",
+    "compiled": true,
+    "total_vulns": 0,
+    "high": 0,
+    "density_per_100loc": 0.0
+  },
+  {
+    "prompt_id": 16,
+    "category": "ERC721 NFT",
+    "complexity": "medium",
+    "strategy": "s2_repair_loop",
+    "backend": "gemini",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.20;\n\nimport \"@openzeppelin/contracts/token/ERC721/ERC721.sol\";\nimport \"@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol\";\nimport \"@openzeppelin/contracts/access/Ownable.sol\";\nimport \"@openzeppelin/contracts/utils/Strings.sol\";\nimport \"@openzeppelin/contracts/interfaces/IERC2981.sol\";\n\ncontract WhitelistedRevealNFT is ERC721, ERC721Burnable, Ownable, IERC2981 {\n    using Strings for uint256;\n\n    // --- State Variables ---\n\n    // Mapping to store whitelist status and mint limits for addresses\n    mapping(address => uint256) private _whitelistMintLimit;\n    mapping(address => uint256) private _whitelistMintedCount;\n\n    // Base URI for revealed NFTs\n    string private _baseTokenURI;\n\n    // Flag to indicate if the reveal has happened\n    bool private _revealed = false;\n\n    // Royalties\n    address payable private _royaltyRecipient;\n    uint32 private _royaltyBps; // Basis points (e.g., 1000 for 10%)\n\n    // --- Events ---\n    event WhitelistMinted(address indexed minter, uint256 indexed tokenId);\n    event RevealHappened();\n    event RoyaltiesUpdated(address indexed recipient, uint32 bps);\n\n    // --- Constructor ---\n    constructor(\n        string memory name,\n        string memory symbol,\n        address payable royaltyRecipient,\n        uint32 royaltyBps\n    ) ERC721(name, symbol) Ownable(msg.sender) {\n        require(royaltyBps <= 10000, \"Royalty basis points must be 10000 or less\"); // Max 100%\n        _royaltyRecipient = royaltyRecipient;\n        _royaltyBps = royaltyBps;\n    }\n\n    // --- Whitelist Management ---\n\n    /**\n     * @notice Adds an address to the whitelist with a specified mint limit.\n     * @param _address The address to add to the whitelist.\n     * @param _limit The maximum number of NFTs the address can mint.\n     */\n    function addToWhitelist(address _address, uint256 _limit) external onlyOwner {\n        _whitelistMintLimit[_address] = _limit;\n    }\n\n    /**\n     * @notice Removes an address from the whitelist.\n     * @param _address The address to remove from the whitelist.\n     */\n    function removeFromWhitelist(address _address) external onlyOwner {\n        delete _whitelistMintLimit[_address];\n        delete _whitelistMintedCount[_address];\n    }\n\n    /**\n     * @notice Checks if an address is whitelisted and has mints remaining.\n     * @param _address The address to check.\n     * @return bool True if the address is whitelisted and has mints remaining.\n     */\n    function isWhitelisted(address _address) public view returns (bool) {\n        return _whitelistMintLimit[_address] > _whitelistMintedCount[_address];\n    }\n\n    // --- Minting ---\n\n    /**\n     * @notice Mints a specified number of NFTs for the caller, if whitelisted.\n     * @param _quantity The number of NFTs to mint.\n     */\n    function mintWhitelisted(uint256 _quantity) external {\n        require(_quantity > 0, \"Quantity must be greater than 0\");\n        require(isWhitelisted(msg.sender), \"Not whitelisted or no mints remaining\");\n\n        uint256 currentMintCount = _whitelistMintedCount[msg.sender];\n        uint256 remainingLimit = _whitelistMintLimit[msg.sender] - currentMintCount;\n\n        require(_quantity <= remainingLimit, \"Exceeds whitelist mint limit\");\n\n        for (uint256 i = 0; i < _quantity; i++) {\n            uint256 tokenId = totalSupply() + 1;\n            _safeMint(msg.sender, tokenId);\n            _whitelistMintedCount[msg.sender]++;\n            emit WhitelistMinted(msg.sender, tokenId);\n        }\n    }\n\n    // --- Reveal Mechanism ---\n\n    /**\n     * @notice Sets the base URI for the NFTs. This should be called before revealing.\n     * @param _baseTokenURI_ The base URI for token metadata.\n     */\n    function setBaseTokenURI(string memory _baseTokenURI_) external onlyOwner {\n        _baseTokenURI = _baseTokenURI_;\n    }\n\n    /**\n     * @notice Reveals the NFTs by setting the reveal status.\n     * After this, tokenURIs will resolve correctly if _baseTokenURI is set.\n     */\n    function reveal() external onlyOwner {\n        require(!_revealed, \"Reveal already happened\");\n        _revealed = true;\n        emit RevealHappened();\n    }\n\n    /**\n     * @notice Returns the reveal status.\n     * @return bool True if the reveal has happened.\n     */\n    function revealed() public view returns (bool) {\n        return _revealed;\n    }\n\n    /**\n     * @notice Overrides the default tokenURI function to handle pre-reveal and post-reveal.\n     * @param tokenId The ID of the token.\n     * @return The token URI.\n     */\n    function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {\n        require(_exists(tokenId), \"ERC721Metadata: URI query for nonexistent token\");\n\n        if (_revealed) {\n            // If revealed, use the base URI\n            if (bytes(_baseTokenURI).length == 0) {\n                // Fallback if base URI is not set even after reveal\n                return super.tokenURI(tokenId);\n            }\n            return string(abi.encodePacked(_baseTokenURI, tokenId.toString()));\n        } else {\n            // Before reveal, return a placeholder or specific pre-reveal URI\n            // For simplicity, we'll return a placeholder indicating it's not revealed.\n            // In a real-world scenario, you might have a different logic here.\n            return \"ipfs://pre-reveal-metadata/\"; // Example placeholder\n        }\n    }\n\n    // --- Royalties (EIP-2981) ---\n\n    /**\n     * @notice Sets the royalty recipient and basis points.\n     * @param _recipient The address to receive royalties.\n     * @param _bps The basis points for royalties.\n     */\n    function setRoyalties(address payable _recipient, uint32 _bps) external onlyOwner {\n        require(_bps <= 10000, \"Royalty basis points must be 10000 or less\"); // Max 100%\n        _royaltyRecipient = _recipient;\n        _royaltyBps = _bps;\n        emit RoyaltiesUpdated(_recipient, _bps);\n    }\n\n    /**\n     * @notice Returns the royalty information for a given token.\n     * @param tokenId The ID of the token.\n     * @param salePrice The sale price of the token.\n     * @param royaltyRecipient The address to receive royalties.\n     * @param royaltyAmount The amount of royalties to be paid.\n     */\n    function royaltyInfo(\n        uint256 tokenId,\n        uint256 salePrice\n    )\n        external\n        view\n        override\n        returns (address royaltyRecipient, uint256 royaltyAmount)\n    {\n        // We only apply royalties if the reveal has happened and a recipient is set.\n        // This is a design choice; you might want to apply royalties even before reveal.\n        if (_revealed && _royaltyRecipient != address(0) && _royaltyBps > 0) {\n            royaltyRecipient = _royaltyRecipient;\n            royaltyAmount = (salePrice * _royaltyBps) / 10000;\n        } else {\n            royaltyRecipient = address(0);\n            royaltyAmount = 0;\n        }\n    }\n\n    // --- Owner Functions ---\n\n    /**\n     * @notice Transfers ownership of the contract.\n     * @param newOwner The address of the new owner.\n     */\n    function transferOwnership(address newOwner) public virtual override onlyOwner {\n        super.transferOwnership(newOwner);\n    }\n\n    // --- Fallback / Receive ---\n    // Optional: Add receive function if you expect Ether to be sent directly to the contract\n    receive() external payable {}\n}",
+    "analysis": {
+      "compiled": false,
+      "findings": [],
+      "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmpigereewj.sol:\nError: Undeclared identifier.\n--> tmpigereewj.sol:91:31:\n--> tmpigereewj.sol:91:31:"
+    },
+    "iterations": 3,
+    "usage": {
+      "input_tokens": 6282,
+      "output_tokens": 5823,
+      "llm_calls": 3
+    },
+    "wall_time_s": 25.787122011184692,
+    "loc": 151,
+    "trace": [
+      {
+        "iter": 1,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmphj3ncyd7.sol:\nError: Undeclared identifier.\n--> tmphj3ncyd7.sol:91:31:\n--> tmphj3ncyd7.sol:91:31:"
+      },
+      {
+        "iter": 2,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmpif1_wrjn.sol:\nError: Undeclared identifier.\n--> tmpif1_wrjn.sol:91:31:\n--> tmpif1_wrjn.sol:91:31:"
+      },
+      {
+        "iter": 3,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmp8doufoht.sol:\nError: Undeclared identifier.\n--> tmp8doufoht.sol:91:31:\n--> tmp8doufoht.sol:91:31:"
+      }
+    ],
+    "error": "",
+    "compiled": false,
+    "total_vulns": null,
+    "high": null,
+    "density_per_100loc": null
+  },
+  {
+    "prompt_id": 32,
+    "category": "ERC1155 Multi-Token",
+    "complexity": "complex",
+    "strategy": "s2_repair_loop",
+    "backend": "gemini",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.20;\n\nimport \"@openzeppelin/contracts/token/ERC1155/ERC1155.sol\";\nimport \"@openzeppelin/contracts/access/Ownable.sol\";\nimport \"@openzeppelin/contracts/utils/Counters.sol\";\nimport \"@openzeppelin/contracts/utils/Strings.sol\";\nimport \"@openzeppelin/contracts/token/ERC1155/extensions/ERC1155URIStorage.sol\";\n\ncontract CraftableMarketplaceERC1155 is ERC1155URIStorage, Ownable {\n    using Counters for Counters.Counter;\n    Counters.Counter private _tokenIdCounter;\n\n    struct Recipe {\n        uint256 outputTokenId;\n        uint256 outputAmount;\n        mapping(uint256 => uint256) inputTokens; // tokenId => amount\n        bool isActive;\n    }\n\n    mapping(uint256 => Recipe) public recipes;\n    uint256 public nextRecipeId;\n\n    // Marketplace related state\n    struct Sale {\n        uint256 tokenId;\n        uint256 amount;\n        uint256 price; // in wei\n        address seller;\n        bool active;\n    }\n\n    mapping(uint256 => Sale) public sales;\n    uint256 public nextSaleId;\n\n    // Events\n    event TokenCrafted(\n        address indexed crafter,\n        uint256 indexed outputTokenId,\n        uint256 outputAmount,\n        uint256 recipeId\n    );\n    event RecipeAdded(uint256 recipeId, uint256 outputTokenId, uint256 outputAmount, bool isActive);\n    event RecipeUpdated(uint256 recipeId, bool isActive);\n    event SaleListed(uint256 saleId, uint256 tokenId, uint256 amount, uint256 price, address seller);\n    event SalePurchased(uint256 saleId, uint256 tokenId, uint256 amount, uint256 price, address buyer);\n    event SaleCancelled(uint256 saleId);\n\n    constructor(string memory baseURI_) ERC1155(baseURI_) Ownable(msg.sender) {\n        nextRecipeId = 0;\n        nextSaleId = 0;\n    }\n\n    // --- Core ERC1155 Functionality ---\n\n    function mint(address to, uint256 id, uint256 amount, bytes memory data) public onlyOwner {\n        _mint(to, id, amount, data);\n    }\n\n    function mintBatch(address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data) public onlyOwner {\n        _mintBatch(to, ids, amounts, data);\n    }\n\n    function burn(uint256 id, uint256 amount) public {\n        _burn(id, amount);\n    }\n\n    function burnBatch(uint256[] memory ids, uint256[] memory amounts) public {\n        _burnBatch(ids, amounts);\n    }\n\n    // --- Dynamic Metadata ---\n\n    function uri(uint256 tokenId) public view override(ERC1155, ERC1155URIStorage) returns (string memory) {\n        string memory base = super.uri(tokenId);\n        return string(abi.encodePacked(base, Strings.toString(tokenId)));\n    }\n\n    // --- Token Crafting ---\n\n    function addRecipe(\n        uint256 outputTokenId,\n        uint256 outputAmount,\n        uint256[] memory inputTokenIds,\n        uint256[] memory inputAmounts\n    ) public onlyOwner {\n        require(inputTokenIds.length == inputAmounts.length, \"Input arrays must have same length\");\n        require(inputTokenIds.length > 0, \"Recipe must have at least one input\");\n\n        uint256 currentRecipeId = nextRecipeId;\n        recipes[currentRecipeId].outputTokenId = outputTokenId;\n        recipes[currentRecipeId].outputAmount = outputAmount;\n        recipes[currentRecipeId].isActive = true;\n\n        for (uint i = 0; i < inputTokenIds.length; i++) {\n            recipes[currentRecipeId].inputTokens[inputTokenIds[i]] = inputAmounts[i];\n        }\n\n        emit RecipeAdded(currentRecipeId, outputTokenId, outputAmount, true);\n        nextRecipeId++;\n    }\n\n    function updateRecipeStatus(uint256 recipeId, bool isActive) public onlyOwner {\n        require(recipeId < nextRecipeId, \"Recipe does not exist\");\n        recipes[recipeId].isActive = isActive;\n        emit RecipeUpdated(recipeId, isActive);\n    }\n\n    function craftToken(uint256 recipeId, uint256[] memory inputTokenIds, uint256[] memory inputAmounts) public {\n        Recipe storage recipe = recipes[recipeId];\n        require(recipe.isActive, \"Recipe is not active\");\n        require(inputTokenIds.length == inputAmounts.length, \"Input arrays must have same length\");\n\n        // Verify input token counts match recipe\n        require(inputTokenIds.length == getRecipeInputCount(recipeId), \"Incorrect number of input tokens provided\");\n        for (uint i = 0; i < inputTokenIds.length; i++) {\n            require(recipe.inputTokens[inputTokenIds[i]] == inputAmounts[i], \"Input token amounts do not match recipe\");\n        }\n\n        // Burn input tokens\n        burnBatch(inputTokenIds, inputAmounts);\n\n        // Mint output tokens\n        _mint(msg.sender, recipe.outputTokenId, recipe.outputAmount, \"\");\n\n        emit TokenCrafted(msg.sender, recipe.outputTokenId, recipe.outputAmount, recipeId);\n    }\n\n    function getRecipeInputCount(uint256 recipeId) public view returns (uint256) {\n        uint256 count = 0;\n        // Iterate through the mapping is not directly possible.\n        // A common pattern is to store input token IDs in an array as well,\n        // or to rely on the caller providing the correct input IDs as done in craftToken.\n        // For simplicity here, we assume the caller provides the correct input IDs and amounts.\n        // A more robust implementation might store input IDs in a dynamic array within the Recipe struct.\n        // For this example, we'll return a value indicating the number of *distinct* input token types.\n        // A more precise count would require iterating through the mapping, which is not gas-efficient.\n        // Let's assume the `inputTokens` mapping stores all required inputs.\n        // To get the count, we'd need to iterate, which is not feasible without storing keys.\n        // A workaround is to store the keys in an array alongside the mapping.\n        // For this example, we'll assume the number of inputs is implicitly known or checked by the caller.\n        // A more practical approach for production:\n        // struct Recipe {\n        //     uint256 outputTokenId;\n        //     uint256 outputAmount;\n        //     uint256[] inputTokenIds;\n        //     uint256[] inputAmounts;\n        //     bool isActive;\n        // }\n        // However, sticking to the provided struct for now.\n        // The `craftToken` function implicitly checks all required inputs by iterating.\n        // This function is illustrative of how one *might* get a count if keys were stored.\n        // Since they are not, this function would need modification for a truly dynamic count.\n        // For now, let's return 0, as direct iteration is not possible.\n        // A better approach for `Recipe` would be:\n        // struct Recipe {\n        //     uint256 outputTokenId;\n        //     uint256 outputAmount;\n        //     uint256[] inputTokenIds; // Store keys\n        //     mapping(uint256 => uint256) inputTokenAmounts; // Map ID to amount\n        //     bool isActive;\n        // }\n        // With the current struct, we can't reliably get the count without iterating over caller-provided inputs.\n        // Let's make a simplification: assume the number of unique input token types is implicitly handled.\n        // The `craftToken` function's loop is the actual check.\n        // This function is left as a placeholder for potential future enhancements or a different struct design.\n        return 0; // Placeholder: Iterating mapping keys is not directly supported.\n    }\n\n\n    // --- Marketplace Integration ---\n\n    function listSale(uint256 tokenId, uint256 amount, uint256 price) public {\n        require(amount > 0, \"Amount must be greater than zero\");\n        require(price > 0, \"Price must be greater than zero\");\n        require(balanceOf(msg.sender, tokenId) >= amount, \"Insufficient balance to list\");\n\n        uint256 currentSaleId = nextSaleId;\n        sales[currentSaleId] = Sale({\n            tokenId: tokenId,\n            amount: amount,\n            price: price,\n            seller: msg.sender,\n            active: true\n        });\n\n        // Transfer tokens from seller to contract (escrow)\n        safeTransferFrom(msg.sender, address(this), tokenId, amount, \"\");\n\n        emit SaleListed(currentSaleId, tokenId, amount, price, msg.sender);\n        nextSaleId++;\n    }\n\n    function purchaseSale(uint256 saleId) public payable {\n        Sale storage sale = sales[saleId];\n        require(sale.active, \"Sale is not active\");\n        require(msg.value == sale.price, \"Incorrect payment amount\");\n        require(balanceOf(address(this), sale.tokenId) >= sale.amount, \"Contract does not have enough tokens for this sale\");\n\n        // Transfer tokens from contract to buyer\n        safeTransferFrom(address(this), msg.sender, sale.tokenId, sale.amount, \"\");\n\n        // Transfer payment to seller\n        (bool success, ) = payable(sale.seller).call{value: msg.value}(\"\");\n        require(success, \"Payment transfer failed\");\n\n        sale.active = false; // Mark sale as inactive\n\n        emit SalePurchased(saleId, sale.tokenId, sale.amount, sale.price, msg.sender);\n    }\n\n    function cancelSale(uint256 saleId) public {\n        Sale storage sale = sales[saleId];\n        require(sale.active, \"Sale is not active\");\n        require(sale.seller == msg.sender, \"Only the seller can cancel the sale\");\n\n        // Transfer tokens back to seller\n        safeTransferFrom(address(this), msg.sender, sale.tokenId, sale.amount, \"\");\n\n        sale.active = false; // Mark sale as inactive\n\n        emit SaleCancelled(saleId);\n    }\n\n    // --- Admin Functions ---\n\n    function setBaseURI(string memory baseURI_) public onlyOwner {\n        _setBaseURI(baseURI_);\n    }\n\n    // --- Fallback Function ---\n    receive() external payable {}\n    fallback() external payable {}\n}",
+    "analysis": {
+      "compiled": false,
+      "findings": [],
+      "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmp5hfti1db.sol:\nError: Invalid contract specified in override list: \"ERC1155\".\n--> tmp5hfti1db.sol:74:47:\n--> node_modules/@openzeppelin/contracts/token/ERC1155/ERC1155.sol:20:1:\nError: Wrong argument count for modifier invocation: 1 arguments given but expected 0.\n--> tmp5hfti1db.sol:49:59:\nError: Wrong argument count for function call: 2 arguments given but expected 3.\n--> tmp5hfti1db.sol:65:9:"
+    },
+    "iterations": 3,
+    "usage": {
+      "input_tokens": 8012,
+      "output_tokens": 7047,
+      "llm_calls": 3
+    },
+    "wall_time_s": 32.23833656311035,
+    "loc": 137,
+    "trace": [
+      {
+        "iter": 1,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmpf9duafdr.sol:\nError: Invalid contract specified in override list: \"ERC1155\".\n--> tmpf9duafdr.sol:74:47:\n--> node_modules/@openzeppelin/contracts/token/ERC1155/ERC1155.sol:20:1:\nError: Wrong argument count for modifier invocation: 1 arguments given but expected 0.\n--> tmpf9duafdr.sol:49:59:\nError: Wrong argument count for function call: 2 arguments given but expected 3.\n--> tmpf9duafdr.sol:65:9:"
+      },
+      {
+        "iter": 2,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmp73r8ukno.sol:\nError: Wrong argument count for modifier invocation: 1 arguments given but expected 0.\n--> tmp73r8ukno.sol:49:59:\nError: Wrong argument count for function call: 2 arguments given but expected 3.\n--> tmp73r8ukno.sol:65:9:\nError: Wrong argument count for function call: 2 arguments given but expected 3.\n--> tmp73r8ukno.sol:69:9:\n--> tmp73r8ukno.sol:49:59:"
+      },
+      {
+        "iter": 3,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmppfr39zfx.sol:\nError: Wrong argument count for modifier invocation: 1 arguments given but expected 0.\n--> tmppfr39zfx.sol:49:59:\nError: Wrong argument count for function call: 2 arguments given but expected 3.\n--> tmppfr39zfx.sol:65:9:\nError: Wrong argument count for function call: 2 arguments given but expected 3.\n--> tmppfr39zfx.sol:69:9:\nError: Index access for string is not possible."
+      }
+    ],
+    "error": "",
+    "compiled": false,
+    "total_vulns": null,
+    "high": null,
+    "density_per_100loc": null
+  },
+  {
+    "prompt_id": 48,
+    "category": "DeFi Staking",
+    "complexity": "variation1",
+    "strategy": "s2_repair_loop",
+    "backend": "gemini",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"@openzeppelin/contracts/token/ERC20/IERC20.sol\";\nimport \"@openzeppelin/contracts/token/ERC20/ERC20.sol\";\nimport \"@openzeppelin/contracts/access/Ownable.sol\";\nimport \"@openzeppelin/contracts/utils/math/SafeMath.sol\";\n\ncontract LiquidStaking is ERC20, Ownable {\n    using SafeMath for uint256;\n\n    IERC20 public immutable underlyingToken;\n    mapping(address => uint256) public stakedAmounts;\n    uint256 public totalStaked;\n\n    event Staked(address indexed staker, uint256 amount);\n    event Unstaked(address indexed staker, uint256 amount);\n\n    constructor(address _underlyingTokenAddress, string memory name_, string memory symbol_) ERC20(name_, symbol_) {\n        underlyingToken = IERC20(_underlyingTokenAddress);\n    }\n\n    function stake(uint256 _amount) external {\n        require(_amount > 0, \"Amount must be greater than 0\");\n        require(underlyingToken.balanceOf(msg.sender) >= _amount, \"Insufficient balance\");\n\n        // Check return value of transferFrom\n        require(underlyingToken.transferFrom(msg.sender, address(this), _amount), \"transferFrom failed\");\n\n        stakedAmounts[msg.sender] = stakedAmounts[msg.sender].add(_amount);\n        totalStaked = totalStaked.add(_amount);\n\n        _mint(msg.sender, _amount); // Mint stToken to the staker\n\n        emit Staked(msg.sender, _amount);\n    }\n\n    function unstake(uint256 _amount) external {\n        require(_amount > 0, \"Amount must be greater than 0\");\n        require(balanceOf(msg.sender) >= _amount, \"Insufficient stToken balance\");\n\n        uint256 actualUnstakeAmount = _amount;\n        // In a more complex scenario, you might adjust the unstake amount based on a redemption rate\n        // For this basic example, 1 stToken = 1 underlying token equivalent.\n\n        stakedAmounts[msg.sender] = stakedAmounts[msg.sender].sub(_amount);\n        totalStaked = totalStaked.sub(_amount);\n\n        _burn(msg.sender, _amount); // Burn stToken from the staker\n\n        require(underlyingToken.balanceOf(address(this)) >= actualUnstakeAmount, \"Insufficient underlying tokens in contract\");\n        \n        // Check return value of transfer\n        require(underlyingToken.transfer(msg.sender, actualUnstakeAmount), \"transfer failed\");\n\n        emit Unstaked(msg.sender, actualUnstakeAmount);\n    }\n\n    function getStakedBalance(address _user) external view returns (uint256) {\n        return stakedAmounts[_user];\n    }\n\n    function getStTokenBalance(address _user) external view returns (uint256) {\n        return balanceOf(_user);\n    }\n\n    function getUnderlyingToken() external view returns (address) {\n        return address(underlyingToken);\n    }\n\n    function getTotalStaked() external view returns (uint256) {\n        return totalStaked;\n    }\n\n    // Optional: Add functions for rewards distribution, governance, etc.\n    // This contract assumes a 1:1 redemption for simplicity.\n    // A real-world liquid staking solution would involve more complex mechanisms\n    // for reward accrual, fee management, and potential slashing.\n}",
+    "analysis": {
+      "compiled": true,
+      "findings": [],
+      "error": ""
+    },
+    "iterations": 2,
+    "usage": {
+      "input_tokens": 1223,
+      "output_tokens": 1613,
+      "llm_calls": 2
+    },
+    "wall_time_s": 25.33343505859375,
+    "loc": 48,
+    "trace": [
+      {
+        "iter": 1,
+        "compiled": true,
+        "total": 4,
+        "high": 2,
+        "medium": 0,
+        "low": 2,
+        "error": ""
+      },
+      {
+        "iter": 2,
+        "compiled": true,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": ""
+      }
+    ],
+    "error": "",
+    "compiled": true,
+    "total_vulns": 0,
+    "high": 0,
+    "density_per_100loc": 0.0
+  },
+  {
+    "prompt_id": 75,
+    "category": "DeFi DEX/AMM",
+    "complexity": "simple",
+    "strategy": "s2_repair_loop",
+    "backend": "gemini",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"@openzeppelin/contracts/token/ERC20/IERC20.sol\";\nimport \"@openzeppelin/contracts/security/ReentrancyGuard.sol\";\n\ncontract ConstantProductAMM is ReentrancyGuard {\n    IERC20 public token0;\n    IERC20 public token1;\n\n    uint256 public invariant; // k = reserves0 * reserves1\n\n    mapping(address => uint256) public reserves0;\n    mapping(address => uint256) public reserves1;\n\n    mapping(address => uint256) public liquidity;\n\n    event Swap(address indexed sender, uint256 amount0In, uint256 amount1In, uint256 amount0Out, uint256 amount1Out);\n    event AddLiquidity(address indexed provider, uint256 amount0, uint256 amount1, uint256 liquidityMinted);\n    event RemoveLiquidity(address indexed provider, uint256 amount0, uint256 amount1, uint256 liquidityBurned);\n\n    constructor(address _token0, address _token1) {\n        token0 = IERC20(_token0);\n        token1 = IERC20(_token1);\n    }\n\n    function getReserves() public view returns (uint256 _reserve0, uint256 _reserve1) {\n        _reserve0 = reserves0[address(this)];\n        _reserve1 = reserves1[address(this)];\n    }\n\n    function setInvariant() internal {\n        (uint256 _reserve0, uint256 _reserve1) = getReserves();\n        invariant = _reserve0 * _reserve1;\n    }\n\n    function addLiquidity(uint256 amount0Desired, uint256 amount1Desired) public {\n        (uint256 _reserve0, uint256 _reserve1) = getReserves();\n\n        require(amount0Desired > 0 || amount1Desired > 0, \"Cannot add zero liquidity\");\n\n        uint256 amount0;\n        uint256 amount1;\n\n        if (_reserve0 == 0 && _reserve1 == 0) {\n            amount0 = amount0Desired;\n            amount1 = amount1Desired;\n            require(token0.transferFrom(msg.sender, address(this), amount0), \"Transfer failed\");\n            require(token1.transferFrom(msg.sender, address(this), amount1), \"Transfer failed\");\n            setInvariant(); // Initialize invariant with the first liquidity added\n        } else {\n            uint256 amount0Optimal = (amount1Desired * _reserve0) / _reserve1;\n            uint256 amount1Optimal = (amount0Desired * _reserve1) / _reserve0;\n\n            if (amount0Optimal <= amount0Desired && amount1Optimal <= amount1Desired) {\n                amount0 = amount0Desired;\n                amount1 = amount1Desired;\n            } else if (amount0Optimal < amount0Desired) {\n                amount0 = amount0Optimal;\n                amount1 = (amount0 * _reserve1) / _reserve0;\n            } else {\n                amount1 = amount1Optimal;\n                amount0 = (amount1 * _reserve0) / _reserve1;\n            }\n            require(token0.transferFrom(msg.sender, address(this), amount0), \"Transfer failed\");\n            require(token1.transferFrom(msg.sender, address(this), amount1), \"Transfer failed\");\n            setInvariant(); // Update invariant\n        }\n\n        // Mint liquidity tokens\n        uint256 totalLiquidity = liquidity[address(this)];\n        uint256 liquidityMinted = 0;\n        if (totalLiquidity == 0) {\n            liquidityMinted = amount0 + amount1; // Initial liquidity\n        } else {\n            liquidityMinted = (amount0 * totalLiquidity) / _reserve0; // Proportional to token0\n        }\n        liquidity[msg.sender] += liquidityMinted;\n\n        emit AddLiquidity(msg.sender, amount0, amount1, liquidityMinted);\n    }\n\n    function removeLiquidity(uint256 amount0Min, uint256 amount1Min) public nonReentrant {\n        (uint256 _reserve0, uint256 _reserve1) = getReserves();\n        uint256 _liquidity = liquidity[msg.sender];\n        require(_liquidity > 0, \"No liquidity to remove\");\n\n        uint256 amount0 = (_reserve0 * _liquidity) / invariant;\n        uint256 amount1 = (_reserve1 * _liquidity) / invariant;\n\n        require(amount0 >= amount0Min, \"Insufficient amount0\");\n        require(amount1 >= amount1Min, \"Insufficient amount1\");\n\n        liquidity[msg.sender] -= _liquidity;\n        reserves0[address(this)] -= amount0;\n        reserves1[address(this)] -= amount1;\n        setInvariant(); // Update invariant\n\n        require(token0.transfer(msg.sender, amount0), \"Transfer failed\");\n        require(token1.transfer(msg.sender, amount1), \"Transfer failed\");\n\n        emit RemoveLiquidity(msg.sender, amount0, amount1, _liquidity);\n    }\n\n    function swapExactTokensForTokens(\n        uint256 amountIn,\n        uint256 amountOutMin,\n        address to,\n        bool isToken0Input\n    ) public nonReentrant {\n        (uint256 _reserve0, uint256 _reserve1) = getReserves();\n        uint256 amount0In = 0;\n        uint256 amount1In = 0;\n        uint256 amount0Out = 0;\n        uint256 amount1Out = 0;\n\n        if (isToken0Input) {\n            amount0In = amountIn;\n            require(token0.transferFrom(msg.sender, address(this), amount0In), \"Transfer failed\");\n            amount1Out = (_reserve1 * amount0In) / (_reserve0 + amount0In);\n            require(amount1Out >= amountOutMin, \"Insufficient amount1 out\");\n            reserves0[address(this)] += amount0In;\n            reserves1[address(this)] -= amount1Out;\n        } else {\n            amount1In = amountIn;\n            require(token1.transferFrom(msg.sender, address(this), amount1In), \"Transfer failed\");\n            amount0Out = (_reserve0 * amount1In) / (_reserve1 + amount1In);\n            require(amount0Out >= amountOutMin, \"Insufficient amount0 out\");\n            reserves1[address(this)] += amount1In;\n            reserves0[address(this)] -= amount0Out;\n        }\n\n        setInvariant(); // Update invariant\n\n        if (isToken0Input) {\n            require(token1.transfer(to, amount1Out), \"Transfer failed\");\n        } else {\n            require(token0.transfer(to, amount0Out), \"Transfer failed\");\n        }\n\n        emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out);\n    }\n\n    function getAmountOut(uint256 amountIn, bool isToken0Input) public view returns (uint256) {\n        (uint256 _reserve0, uint256 _reserve1) = getReserves();\n        if (isToken0Input) {\n            return (_reserve1 * amountIn) / (_reserve0 + amountIn);\n        } else {\n            return (_reserve0 * amountIn) / (_reserve1 + amountIn);\n        }\n    }\n\n    function getAmountIn(uint256 amountOut, bool isToken0Output) public view returns (uint256) {\n        (uint256 _reserve0, uint256 _reserve1) = getReserves();\n        if (isToken0Output) {\n            return (_reserve1 * amountOut) / (_reserve0 - amountOut);\n        } else {\n            return (_reserve0 * amountOut) / (_reserve1 - amountOut);\n        }\n    }\n}",
+    "analysis": {
+      "compiled": true,
+      "findings": [
+        {
+          "check": "divide-before-multiply",
+          "impact": "Medium",
+          "confidence": "Medium",
+          "line": 0,
+          "description": "ConstantProductAMM.addLiquidity(uint256,uint256) (tmpvwiwtovg.sol#37-81) performs a multiplication on the result of a division:\n\t- amount0Optimal = (amount1Desired * _reserve0) / _reserve1 (tmpvwiwtovg.sol#52)\n\t- amount0 = amount0Optimal (tmpvwiwtovg.sol#59)\n\t- amount1 = (amount0 * _reserve1) / _res",
+          "source": "slither"
+        },
+        {
+          "check": "divide-before-multiply",
+          "impact": "Medium",
+          "confidence": "Medium",
+          "line": 0,
+          "description": "ConstantProductAMM.addLiquidity(uint256,uint256) (tmpvwiwtovg.sol#37-81) performs a multiplication on the result of a division:\n\t- amount0 = (amount1 * _reserve0) / _reserve1 (tmpvwiwtovg.sol#63)\n\t- liquidityMinted = (amount0 * totalLiquidity) / _reserve0 (tmpvwiwtovg.sol#76)\n",
+          "source": "slither"
+        },
+        {
+          "check": "divide-before-multiply",
+          "impact": "Medium",
+          "confidence": "Medium",
+          "line": 0,
+          "description": "ConstantProductAMM.addLiquidity(uint256,uint256) (tmpvwiwtovg.sol#37-81) performs a multiplication on the result of a division:\n\t- amount1Optimal = (amount0Desired * _reserve1) / _reserve0 (tmpvwiwtovg.sol#53)\n\t- amount1 = amount1Optimal (tmpvwiwtovg.sol#62)\n\t- amount0 = (amount1 * _reserve0) / _res",
+          "source": "slither"
+        },
+        {
+          "check": "reentrancy-no-eth",
+          "impact": "Medium",
+          "confidence": "Medium",
+          "line": 0,
+          "description": "Reentrancy in ConstantProductAMM.swapExactTokensForTokens(uint256,uint256,address,bool) (tmpvwiwtovg.sol#105-142):\n\tExternal calls:\n\t- require(bool,string)(token1.transferFrom(msg.sender,address(this),amount1In),Transfer failed) (tmpvwiwtovg.sol#126)\n\tState variables written after the call(s):\n\t- re",
+          "source": "slither"
+        },
+        {
+          "check": "reentrancy-no-eth",
+          "impact": "Medium",
+          "confidence": "Medium",
+          "line": 0,
+          "description": "Reentrancy in ConstantProductAMM.swapExactTokensForTokens(uint256,uint256,address,bool) (tmpvwiwtovg.sol#105-142):\n\tExternal calls:\n\t- require(bool,string)(token0.transferFrom(msg.sender,address(this),amount0In),Transfer failed) (tmpvwiwtovg.sol#119)\n\tState variables written after the call(s):\n\t- re",
+          "source": "slither"
+        }
+      ],
+      "error": ""
+    },
+    "iterations": 3,
+    "usage": {
+      "input_tokens": 8888,
+      "output_tokens": 5940,
+      "llm_calls": 3
+    },
+    "wall_time_s": 56.80515265464783,
+    "loc": 130,
+    "trace": [
+      {
+        "iter": 1,
+        "compiled": true,
+        "total": 6,
+        "high": 0,
+        "medium": 6,
+        "low": 0,
+        "error": ""
+      },
+      {
+        "iter": 2,
+        "compiled": true,
+        "total": 9,
+        "high": 4,
+        "medium": 5,
+        "low": 0,
+        "error": ""
+      },
+      {
+        "iter": 3,
+        "compiled": true,
+        "total": 5,
+        "high": 0,
+        "medium": 5,
+        "low": 0,
+        "error": ""
+      }
+    ],
+    "error": "",
+    "compiled": true,
+    "total_vulns": 5,
+    "high": 0,
+    "density_per_100loc": 3.8461538461538463
+  },
+  {
+    "prompt_id": 91,
+    "category": "Yield Aggregator",
+    "complexity": "medium",
+    "strategy": "s2_repair_loop",
+    "backend": "gemini",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"@openzeppelin/contracts/token/ERC20/IERC20.sol\";\nimport \"@openzeppelin/contracts/access/Ownable.sol\";\nimport \"@openzeppelin/contracts/utils/math/SafeMath.sol\";\n\ninterface IStrategy {\n    function deposit(uint256 _amount) external;\n    function withdraw(uint256 _amount) external;\n    function harvest() external returns (uint256 _earned);\n    function withdrawAll() external returns (uint256 _balance);\n    function getBalance() external view returns (uint256 _balance);\n    function getRewardToken() external view returns (IERC20 _rewardToken);\n}\n\ncontract YieldAggregatorVault is Ownable {\n    using SafeMath for uint256;\n\n    IERC20 public depositToken;\n    IStrategy public strategy;\n\n    uint256 public totalAssets; // Total amount of depositToken held by the vault (including staked in strategy)\n    uint256 public totalShares; // Total shares minted to users\n\n    uint256 public depositFeeBPS; // Deposit fee in basis points (e.g., 100 for 1%)\n    uint256 public withdrawalFeeBPS; // Withdrawal fee in basis points (e.g., 50 for 0.5%)\n    uint256 public managementFeeBPS; // Management fee in basis points (e.g., 200 for 2%)\n\n    mapping(address => uint256) public balanceOfShares; // User's shares\n\n    // Reentrancy guard\n    bool private _notEntered;\n\n    modifier nonReentrant() {\n        require(_notEntered, \"Reentrant call\");\n        _notEntered = false;\n        _;\n        _notEntered = true;\n    }\n\n    event Deposit(address indexed user, uint256 amount, uint256 shares);\n    event Withdraw(address indexed user, uint256 amount, uint256 shares);\n    event StrategyHarvested(uint256 harvestedAmount);\n    event FeesUpdated(uint256 depositFeeBPS, uint256 withdrawalFeeBPS, uint256 managementFeeBPS);\n    event StrategySet(address indexed newStrategy);\n\n    constructor(\n        address _depositTokenAddress,\n        address _strategyAddress,\n        uint256 _depositFeeBPS,\n        uint256 _withdrawalFeeBPS,\n        uint256 _managementFeeBPS\n    ) {\n        depositToken = IERC20(_depositTokenAddress);\n        strategy = IStrategy(_strategyAddress);\n        depositFeeBPS = _depositFeeBPS;\n        withdrawalFeeBPS = _withdrawalFeeBPS;\n        managementFeeBPS = _managementFeeBPS;\n        _notEntered = true; // Initialize reentrancy guard\n    }\n\n    function setStrategy(address _newStrategyAddress) public onlyOwner nonReentrant {\n        require(_newStrategyAddress != address(0), \"Invalid strategy address\");\n\n        // Withdraw all assets from the current strategy\n        uint256 balanceToWithdraw = strategy.getBalance();\n        if (balanceToWithdraw > 0) {\n            strategy.withdrawAll();\n            totalAssets = totalAssets.sub(balanceToWithdraw); // Update totalAssets before changing strategy\n        }\n\n        strategy = IStrategy(_newStrategyAddress);\n        emit StrategySet(_newStrategyAddress);\n    }\n\n    function setFees(uint256 _depositFeeBPS, uint256 _withdrawalFeeBPS, uint256 _managementFeeBPS) public onlyOwner {\n        depositFeeBPS = _depositFeeBPS;\n        withdrawalFeeBPS = _withdrawalFeeBPS;\n        managementFeeBPS = _managementFeeBPS;\n        emit FeesUpdated(_depositFeeBPS, _withdrawalFeeBPS, _managementFeeBPS);\n    }\n\n    function deposit(uint256 _amount) public nonReentrant {\n        require(_amount > 0, \"Amount must be greater than zero\");\n\n        // Calculate and apply deposit fee\n        uint256 feeAmount = _amount.mul(depositFeeBPS).div(10000);\n        uint256 netAmount = _amount.sub(feeAmount);\n\n        // Transfer tokens from user to vault\n        require(depositToken.transferFrom(msg.sender, address(this), _amount), \"Token transfer failed\");\n\n        // Add net amount to total assets\n        totalAssets = totalAssets.add(netAmount);\n\n        // Calculate shares based on vault's value\n        uint256 shares = 0;\n        // Use `totalShares == 0` which is fine for checking initial state.\n        if (totalShares == 0) {\n            shares = netAmount; // First depositor gets shares equal to their net deposit\n        } else {\n            // Perform multiplication before division to maintain precision\n            shares = netAmount.mul(totalShares).div(totalAssets.sub(netAmount));\n        }\n\n        balanceOfShares[msg.sender] = balanceOfShares[msg.sender].add(shares);\n        totalShares = totalShares.add(shares);\n\n        emit Deposit(msg.sender, _amount, shares);\n    }\n\n    function withdraw(uint256 _shares) public nonReentrant {\n        require(_shares > 0, \"Shares must be greater than zero\");\n\n        uint256 userShares = balanceOfShares[msg.sender];\n        require(_shares <= userShares, \"Insufficient shares\");\n\n        // Calculate amount to withdraw based on shares. Perform multiplication before division.\n        uint256 amountToWithdraw = _shares.mul(totalAssets).div(totalShares);\n        require(amountToWithdraw > 0, \"Calculated amount is zero\");\n\n        // Calculate and apply withdrawal fee\n        uint256 feeAmount = amountToWithdraw.mul(withdrawalFeeBPS).div(10000);\n        uint256 netAmountToWithdraw = amountToWithdraw.sub(feeAmount);\n\n        // Update user's shares and total shares\n        balanceOfShares[msg.sender] = userShares.sub(_shares);\n        totalShares = totalShares.sub(_shares);\n\n        // Update total assets in the vault\n        totalAssets = totalAssets.sub(amountToWithdraw);\n\n        // Transfer tokens to user\n        require(depositToken.transfer(msg.sender, netAmountToWithdraw), \"Token transfer failed\");\n\n        emit Withdraw(msg.sender, netAmountToWithdraw, _shares);\n    }\n\n    function withdrawAll() public nonReentrant {\n        uint256 sharesToWithdraw = balanceOfShares[msg.sender];\n        require(sharesToWithdraw > 0, \"No shares to withdraw\");\n        withdraw(sharesToWithdraw);\n    }\n\n    function harvest() public onlyOwner nonReentrant {\n        // Harvest rewards from the strategy\n        uint256 earnedRewards = strategy.harvest();\n        require(earnedRewards > 0, \"No rewards earned\");\n\n        // Calculate management fee\n        uint256 managementFee = earnedRewards.mul(managementFeeBPS).div(10000);\n        uint256 netRewards = earnedRewards.sub(managementFee);\n\n        // Add net rewards to total assets\n        totalAssets = totalAssets.add(netRewards);\n\n        // Transfer management fee to the owner\n        require(depositToken.transfer(owner(), managementFee), \"Management fee transfer failed\");\n\n        emit StrategyHarvested(earnedRewards);\n    }\n\n    function invest() public onlyOwner nonReentrant {\n        uint256 vaultBalance = depositToken.balanceOf(address(this));\n\n        if (vaultBalance > 0) {\n            strategy.deposit(vaultBalance);\n            totalAssets = totalAssets.add(vaultBalance); // Update totalAssets after depositing to strategy\n        }\n    }\n\n    function rebalanceStrategy() public onlyOwner nonReentrant {\n        // Withdraw all from strategy\n        uint256 balanceInStrategy = strategy.withdrawAll(); // Capture return value\n        totalAssets = totalAssets.sub(balanceInStrategy); // Deduct from totalAssets as it's now in vault\n\n        // Re-deposit into the strategy\n        uint256 vaultBalance = depositToken.balanceOf(address(this));\n        if (vaultBalance > 0) {\n            strategy.deposit(vaultBalance);\n            totalAssets = totalAssets.add(vaultBalance); // Add back to totalAssets as it's in strategy\n        }\n    }\n\n    function getVaultInfo()\n        public\n        view\n        returns (\n            uint256 _totalAssets,\n            uint256 _totalShares,\n            uint256 _depositFeeBPS,\n            uint256 _withdrawalFeeBPS,\n            uint256 _managementFeeBPS,\n            address _depositToken,\n            address _strategy\n        )\n    {\n        return (\n            totalAssets,\n            totalShares,\n            depositFeeBPS,\n            withdrawalFeeBPS,\n            managementFeeBPS,\n            address(depositToken),\n            address(strategy)\n        );\n    }\n\n    function getUserInfo(address _user)\n        public\n        view\n        returns (uint256 _balanceOfShares, uint256 _balanceInDepositToken)\n    {\n        uint256 shares = balanceOfShares[_user];\n        uint256 balance = 0;\n        if (totalShares > 0) {\n            balance = shares.mul(totalAssets).div(totalShares);\n        }\n        return (shares, balance);\n    }\n\n    // Function to allow owner to withdraw any accidental sends to the vault contract\n    function withdrawERC20(address _tokenAddress, uint256 _amount) public onlyOwner {\n        IERC20 token = IERC20(_tokenAddress);\n        require(token.balanceOf(address(this)) >= _amount, \"Insufficient token balance in vault\");\n        require(token.transfer(owner(), _amount), \"Withdraw ERC20 failed\");\n    }\n\n    // Function to withdraw ETH if it was accidentally sent to the contract\n    function withdrawETH(uint256 _amount) public onlyOwner {\n        require(address(this).balance >= _amount, \"Insufficient ETH balance in vault\");\n        payable(owner()).transfer(_amount);\n    }\n\n    // Fallback function to receive ETH\n    receive() external payable {\n        // This function is necessary to receive ETH.\n        // The deposit and invest functions would need to be adapted if depositToken is ETH.\n        // For ERC20 tokens, this function allows receiving stray ETH.\n    }\n}",
+    "analysis": {
+      "compiled": true,
+      "findings": [
+        {
+          "check": "divide-before-multiply",
+          "impact": "Medium",
+          "confidence": "Medium",
+          "line": 0,
+          "description": "YieldAggregatorVault.withdraw(uint256) (tmp7ogandzv.sol#113-138) performs a multiplication on the result of a division:\n\t- amountToWithdraw = _shares.mul(totalAssets).div(totalShares) (tmp7ogandzv.sol#120)\n\t- feeAmount = amountToWithdraw.mul(withdrawalFeeBPS).div(10000) (tmp7ogandzv.sol#124)\n",
+          "source": "slither"
+        },
+        {
+          "check": "incorrect-equality",
+          "impact": "Medium",
+          "confidence": "High",
+          "line": 0,
+          "description": "YieldAggregatorVault.deposit(uint256) (tmp7ogandzv.sol#84-111) uses a dangerous strict equality:\n\t- totalShares == 0 (tmp7ogandzv.sol#100)\n",
+          "source": "slither"
+        },
+        {
+          "check": "reentrancy-no-eth",
+          "impact": "Medium",
+          "confidence": "Medium",
+          "line": 0,
+          "description": "Reentrancy in YieldAggregatorVault.setStrategy(address) (tmp7ogandzv.sol#63-75):\n\tExternal calls:\n\t- strategy.withdrawAll() (tmp7ogandzv.sol#69)\n\tState variables written after the call(s):\n\t- strategy = IStrategy(_newStrategyAddress) (tmp7ogandzv.sol#73)\n\tYieldAggregatorVault.strategy (tmp7ogandzv.s",
+          "source": "slither"
+        },
+        {
+          "check": "reentrancy-no-eth",
+          "impact": "Medium",
+          "confidence": "Medium",
+          "line": 0,
+          "description": "Reentrancy in YieldAggregatorVault.rebalanceStrategy() (tmp7ogandzv.sol#173-184):\n\tExternal calls:\n\t- balanceInStrategy = strategy.withdrawAll() (tmp7ogandzv.sol#175)\n\t- strategy.deposit(vaultBalance) (tmp7ogandzv.sol#181)\n\tState variables written after the call(s):\n\t- totalAssets = totalAssets.add(",
+          "source": "slither"
+        },
+        {
+          "check": "unused-return",
+          "impact": "Medium",
+          "confidence": "Medium",
+          "line": 0,
+          "description": "YieldAggregatorVault.setStrategy(address) (tmp7ogandzv.sol#63-75) ignores return value by strategy.withdrawAll() (tmp7ogandzv.sol#69)\n",
+          "source": "slither"
+        }
+      ],
+      "error": ""
+    },
+    "iterations": 3,
+    "usage": {
+      "input_tokens": 9543,
+      "output_tokens": 7362,
+      "llm_calls": 3
+    },
+    "wall_time_s": 27.008477449417114,
+    "loc": 171,
+    "trace": [
+      {
+        "iter": 1,
+        "compiled": true,
+        "total": 7,
+        "high": 0,
+        "medium": 7,
+        "low": 0,
+        "error": ""
+      },
+      {
+        "iter": 2,
+        "compiled": true,
+        "total": 5,
+        "high": 0,
+        "medium": 5,
+        "low": 0,
+        "error": ""
+      },
+      {
+        "iter": 3,
+        "compiled": true,
+        "total": 5,
+        "high": 0,
+        "medium": 5,
+        "low": 0,
+        "error": ""
+      }
+    ],
+    "error": "",
+    "compiled": true,
+    "total_vulns": 5,
+    "high": 0,
+    "density_per_100loc": 2.9239766081871346
+  },
+  {
+    "prompt_id": 123,
+    "category": "Governance/DAO",
+    "complexity": "variation1",
+    "strategy": "s2_repair_loop",
+    "backend": "gemini",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"@openzeppelin/contracts/token/ERC20/IERC20.sol\";\nimport \"@openzeppelin/contracts/access/Ownable.sol\";\n\ncontract QuadraticVotingDAO is Ownable {\n    IERC20 public immutable votingToken;\n\n    struct Proposal {\n        uint256 id;\n        string description;\n        uint256 deadline;\n        uint256 yesVotes;\n        uint256 noVotes;\n        bool executed;\n    }\n\n    mapping(uint256 => Proposal) public proposals;\n    mapping(uint256 => mapping(address => bool)) private _proposalVotedStatus; // Renamed to avoid conflict\n    uint256 public nextProposalId;\n\n    event ProposalCreated(uint256 indexed proposalId, string description, uint256 deadline);\n    event Voted(uint256 indexed proposalId, address voter, uint256 votingPower, bool support);\n    event ProposalExecuted(uint256 indexed proposalId);\n\n    constructor(address _votingTokenAddress) {\n        votingToken = IERC20(_votingTokenAddress);\n        nextProposalId = 1;\n    }\n\n    function _getVotingPower(address _voter) internal view returns (uint256) {\n        uint256 tokenBalance = votingToken.balanceOf(_voter);\n        return uint256(sqrt(tokenBalance));\n    }\n\n    function sqrt(uint256 _n) internal pure returns (uint256) {\n        if (_n == 0) return 0;\n        uint256 x = _n / 2 + 1;\n        uint256 y = (_n / x + x) / 2;\n        while (y < x) {\n            x = y;\n            y = (_n / x + x) / 2;\n        }\n        return x;\n    }\n\n    function createProposal(string memory _description, uint256 _duration) public onlyOwner {\n        uint256 deadline = block.timestamp + _duration;\n        proposals[nextProposalId] = Proposal({\n            id: nextProposalId,\n            description: _description,\n            deadline: deadline,\n            yesVotes: 0,\n            noVotes: 0,\n            executed: false\n        });\n        emit ProposalCreated(nextProposalId, _description, deadline);\n        nextProposalId++;\n    }\n\n    function vote(uint256 _proposalId, bool _support) public {\n        Proposal storage p = proposals[_proposalId];\n        require(block.timestamp <= p.deadline, \"Proposal has expired\");\n        require(!_proposalVotedStatus[_proposalId][msg.sender], \"You have already voted on this proposal\");\n\n        uint256 votingPower = _getVotingPower(msg.sender);\n        require(votingPower > 0, \"You have no voting power\");\n\n        _proposalVotedStatus[_proposalId][msg.sender] = true;\n\n        if (_support) {\n            p.yesVotes += votingPower;\n        } else {\n            p.noVotes += votingPower;\n        }\n\n        emit Voted(_proposalId, msg.sender, votingPower, _support);\n    }\n\n    function executeProposal(uint256 _proposalId) public onlyOwner {\n        Proposal storage p = proposals[_proposalId];\n        require(block.timestamp > p.deadline, \"Proposal has not yet expired\");\n        require(!p.executed, \"Proposal has already been executed\");\n\n        // Define a simple majority threshold, e.g., 50% + 1 vote of total voting power\n        // For simplicity here, we'll just check if yesVotes > noVotes.\n        // A more robust implementation would involve calculating total voting power.\n        require(p.yesVotes > p.noVotes, \"Proposal did not pass\");\n\n        // In a real DAO, this function would trigger other actions based on the proposal.\n        // For this example, we just mark it as executed.\n        p.executed = true;\n        emit ProposalExecuted(_proposalId);\n    }\n\n    function getProposal(uint256 _proposalId) public view returns (\n        uint256 id,\n        string memory description,\n        uint256 deadline,\n        uint256 yesVotes,\n        uint256 noVotes,\n        bool executed\n    ) {\n        Proposal storage p = proposals[_proposalId];\n        return (\n            p.id,\n            p.description,\n            p.deadline,\n            p.yesVotes,\n            p.noVotes,\n            p.executed\n        );\n    }\n\n    // Renamed this function to avoid conflict with the mapping name\n    function hasVoted(uint256 _proposalId, address _voter) public view returns (bool) {\n        return _proposalVotedStatus[_proposalId][_voter];\n    }\n}",
+    "analysis": {
+      "compiled": true,
+      "findings": [
+        {
+          "check": "incorrect-equality",
+          "impact": "Medium",
+          "confidence": "High",
+          "line": 0,
+          "description": "QuadraticVotingDAO.sqrt(uint256) (tmpg45mwcgc.sol#37-46) uses a dangerous strict equality:\n\t- _n == 0 (tmpg45mwcgc.sol#38)\n",
+          "source": "slither"
+        }
+      ],
+      "error": ""
+    },
+    "iterations": 3,
+    "usage": {
+      "input_tokens": 3904,
+      "output_tokens": 3320,
+      "llm_calls": 3
+    },
+    "wall_time_s": 22.80471682548523,
+    "loc": 94,
+    "trace": [
+      {
+        "iter": 1,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmp1jbqu312.sol:\nError: Types in storage containing (nested) mappings cannot be assigned to.\n--> tmp1jbqu312.sol:50:9:\nError: Struct containing a (nested) mapping cannot be constructed.\n--> tmp1jbqu312.sol:50:37:\n--> tmp1jbqu312.sol:50:9:\nError: Struct containing a (nested) mapping cannot be constructed.\n--> tmp1jbqu312.sol:50:37:"
+      },
+      {
+        "iter": 2,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmp60vvrxjq.sol:\nError: Identifier already declared.\n--> tmp60vvrxjq.sol:116:5:\n--> tmp60vvrxjq.sol:20:5:\n--> tmp60vvrxjq.sol:116:5:\n--> tmp60vvrxjq.sol:20:5:"
+      },
+      {
+        "iter": 3,
+        "compiled": true,
+        "total": 1,
+        "high": 0,
+        "medium": 1,
+        "low": 0,
+        "error": ""
+      }
+    ],
+    "error": "",
+    "compiled": true,
+    "total_vulns": 1,
+    "high": 0,
+    "density_per_100loc": 1.0638297872340425
+  },
+  {
+    "prompt_id": 139,
+    "category": "Multisig Wallet",
+    "complexity": "variation2",
+    "strategy": "s2_repair_loop",
+    "backend": "gemini",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract SocialRecoveryWallet {\n    address public owner;\n    mapping(address => bool) public guardians;\n    uint256 public recoveryThreshold;\n    uint256 public recoverySessionTimeout = 7 days; // Example timeout for recovery sessions\n\n    struct RecoverySession {\n        uint256 initiationTimestamp;\n        uint256 votesCount;\n        mapping(address => bool) hasVoted; // Tracks if a guardian has voted in this session\n    }\n    mapping(address => RecoverySession) public recoverySessions;\n\n    event GuardianAdded(address indexed guardian);\n    event GuardianRemoved(address indexed guardian);\n    event RecoveryThresholdChanged(uint256 newThreshold);\n    event RecoverySessionInitiated(address indexed proposedOwner, address indexed initiatingGuardian);\n    event RecoveryVoteCast(address indexed proposedOwner, address indexed guardian);\n    event RecoveryCompleted(address indexed oldOwner, address indexed newOwner);\n    event FundsWithdrawn(address indexed to, uint256 amount);\n    event RecoverySessionExpired(address indexed proposedOwner);\n\n\n    modifier onlyOwner() {\n        require(msg.sender == owner, \"SocialRecoveryWallet: Caller is not the owner\");\n        _;\n    }\n\n    modifier onlyGuardian() {\n        require(guardians[msg.sender], \"SocialRecoveryWallet: Caller is not a guardian\");\n        _;\n    }\n\n    constructor(address[] memory _initialGuardians, uint256 _recoveryThreshold) {\n        owner = msg.sender;\n        recoveryThreshold = _recoveryThreshold;\n\n        for (uint i = 0; i < _initialGuardians.length; i++) {\n            require(_initialGuardians[i] != address(0), \"SocialRecoveryWallet: Invalid guardian address\");\n            require(_initialGuardians[i] != owner, \"SocialRecoveryWallet: Guardian cannot be the owner\");\n            guardians[_initialGuardians[i]] = true;\n        }\n        require(_recoveryThreshold > 0, \"SocialRecoveryWallet: Recovery threshold must be greater than 0\");\n        require(_recoveryThreshold <= _initialGuardians.length, \"SocialRecoveryWallet: Recovery threshold cannot exceed the number of initial guardians\");\n    }\n\n    function addGuardian(address _guardian) public onlyOwner {\n        require(_guardian != address(0), \"SocialRecoveryWallet: Invalid guardian address\");\n        require(_guardian != owner, \"SocialRecoveryWallet: Guardian cannot be the owner\");\n        require(!guardians[_guardian], \"SocialRecoveryWallet: Guardian already exists\");\n        guardians[_guardian] = true;\n        emit GuardianAdded(_guardian);\n    }\n\n    function removeGuardian(address _guardian) public onlyOwner {\n        require(guardians[_guardian], \"SocialRecoveryWallet: Guardian does not exist\");\n        require(_guardian != owner, \"SocialRecoveryWallet: Cannot remove the owner as a guardian\");\n        guardians[_guardian] = false;\n        emit GuardianRemoved(_guardian);\n    }\n\n    function changeRecoveryThreshold(uint256 _newThreshold) public onlyOwner {\n        require(_newThreshold > 0, \"SocialRecoveryWallet: Threshold must be greater than 0\");\n        // Optionally, add a check that the new threshold does not exceed the current number of guardians.\n        // This requires knowing the current number of guardians, which is not directly tracked here.\n        // A more robust implementation might maintain a list of active guardians.\n        recoveryThreshold = _newThreshold;\n        emit RecoveryThresholdChanged(_newThreshold);\n    }\n\n    function changeRecoverySessionTimeout(uint256 _newTimeout) public onlyOwner {\n        require(_newTimeout > 0, \"SocialRecoveryWallet: Timeout must be greater than 0\");\n        recoverySessionTimeout = _newTimeout;\n    }\n\n    function initiateRecovery(address _proposedOwner) public onlyGuardian {\n        require(_proposedOwner != address(0), \"SocialRecoveryWallet: Invalid proposed owner address\");\n        require(_proposedOwner != owner, \"SocialRecoveryWallet: Cannot recover to the current owner\");\n        require(recoverySessions[_proposedOwner].initiationTimestamp == 0, \"SocialRecoveryWallet: Recovery session already active for this proposed owner\");\n        // Guardian cannot initiate recovery for themselves. This implies the guardian is not the proposed owner.\n        require(msg.sender != _proposedOwner, \"SocialRecoveryWallet: Guardian cannot initiate recovery for themselves\");\n\n\n        // Start a new recovery session\n        RecoverySession storage session = recoverySessions[_proposedOwner];\n        session.initiationTimestamp = block.timestamp;\n        session.votesCount = 1; // The initiating guardian's vote\n        session.hasVoted[msg.sender] = true;\n\n        emit RecoverySessionInitiated(_proposedOwner, msg.sender);\n    }\n\n    function castRecoveryVote(address _proposedOwner) public onlyGuardian {\n        require(_proposedOwner != address(0), \"SocialRecoveryWallet: Invalid proposed owner address\");\n        require(recoverySessions[_proposedOwner].initiationTimestamp > 0, \"SocialRecoveryWallet: No active recovery session for this proposed owner\");\n        require(block.timestamp < recoverySessions[_proposedOwner].initiationTimestamp + recoverySessionTimeout, \"SocialRecoveryWallet: Recovery session has expired\");\n        require(!recoverySessions[_proposedOwner].hasVoted[msg.sender], \"SocialRecoveryWallet: Guardian has already voted in this session\");\n\n        // Cast the vote\n        RecoverySession storage session = recoverySessions[_proposedOwner];\n        session.votesCount++;\n        session.hasVoted[msg.sender] = true;\n\n        emit RecoveryVoteCast(_proposedOwner, msg.sender);\n    }\n\n    function completeRecovery(address _proposedOwner) public {\n        require(_proposedOwner != address(0), \"SocialRecoveryWallet: Invalid proposed owner address\");\n        require(recoverySessions[_proposedOwner].initiationTimestamp > 0, \"SocialRecoveryWallet: No active recovery session for this proposed owner\");\n        require(block.timestamp < recoverySessions[_proposedOwner].initiationTimestamp + recoverySessionTimeout, \"SocialRecoveryWallet: Recovery session has expired\");\n\n        RecoverySession storage session = recoverySessions[_proposedOwner];\n\n        // Check if the threshold is met.\n        // The `recoveryThreshold` is an absolute number of votes required.\n        // This logic assumes that the owner sets `recoveryThreshold` appropriately\n        // relative to the expected number of active guardians.\n        if (session.votesCount >= recoveryThreshold) {\n            address oldOwner = owner;\n            owner = _proposedOwner;\n            // Clean up the recovery session state\n            delete recoverySessions[_proposedOwner];\n            emit RecoveryCompleted(oldOwner, _proposedOwner);\n        }\n    }\n\n    // Function to cancel an expired recovery session (optional)\n    function cancelExpiredRecovery(address _proposedOwner) public {\n        require(recoverySessions[_proposedOwner].initiationTimestamp > 0, \"SocialRecoveryWallet: No active recovery session for this proposed owner\");\n        require(block.timestamp >= recoverySessions[_proposedOwner].initiationTimestamp + recoverySessionTimeout, \"SocialRecoveryWallet: Recovery session has not expired\");\n\n        delete recoverySessions[_proposedOwner];\n        emit RecoverySessionExpired(_proposedOwner);\n    }\n\n\n    // Fallback function to receive Ether\n    receive() external payable {\n        emit FundsWithdrawn(msg.sender, msg.value);\n    }\n\n    // Function to withdraw Ether\n    function withdraw(address payable _to, uint256 _amount) public onlyOwner {\n        require(_to != address(0), \"SocialRecoveryWallet: Invalid withdrawal address\");\n        require(_amount > 0, \"SocialRecoveryWallet: Withdrawal amount must be greater than 0\");\n        require(address(this).balance >= _amount, \"SocialRecoveryWallet: Insufficient balance\");\n\n        (bool success, ) = _to.call{value: _amount}(\"\");\n        require(success, \"SocialRecoveryWallet: Ether withdrawal failed\");\n\n        emit FundsWithdrawn(_to, _amount);\n    }\n}",
+    "analysis": {
+      "compiled": true,
+      "findings": [
+        {
+          "check": "mapping-deletion",
+          "impact": "Medium",
+          "confidence": "High",
+          "line": 0,
+          "description": "SocialRecoveryWallet.completeRecovery(address) (tmpmrcpvlko.sol#110-128) deletes SocialRecoveryWallet.RecoverySession (tmpmrcpvlko.sol#10-14) which contains a mapping:\n\t-delete recoverySessions[_proposedOwner] (tmpmrcpvlko.sol#125)\n",
+          "source": "slither"
+        },
+        {
+          "check": "mapping-deletion",
+          "impact": "Medium",
+          "confidence": "High",
+          "line": 0,
+          "description": "SocialRecoveryWallet.cancelExpiredRecovery(address) (tmpmrcpvlko.sol#131-137) deletes SocialRecoveryWallet.RecoverySession (tmpmrcpvlko.sol#10-14) which contains a mapping:\n\t-delete recoverySessions[_proposedOwner] (tmpmrcpvlko.sol#135)\n",
+          "source": "slither"
+        },
+        {
+          "check": "events-maths",
+          "impact": "Low",
+          "confidence": "Medium",
+          "line": 0,
+          "description": "SocialRecoveryWallet.changeRecoverySessionTimeout(uint256) (tmpmrcpvlko.sol#74-77) should emit an event for: \n\t- recoverySessionTimeout = _newTimeout (tmpmrcpvlko.sol#76) \n",
+          "source": "slither"
+        }
+      ],
+      "error": ""
+    },
+    "iterations": 3,
+    "usage": {
+      "input_tokens": 11467,
+      "output_tokens": 8764,
+      "llm_calls": 3
+    },
+    "wall_time_s": 47.36662530899048,
+    "loc": 112,
+    "trace": [
+      {
+        "iter": 1,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmpins9ucdt.sol:\nError: Expected pragma, import directive or contract/interface/library/struct/enum/constant/function/error definition.\n--> tmpins9ucdt.sol:1:1:\n--> tmpins9ucdt.sol:1:1:"
+      },
+      {
+        "iter": 2,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmpvpicj9_f.sol:\nError: Undeclared identifier.\n--> tmpvpicj9_f.sol:151:44:\n--> tmpvpicj9_f.sol:151:44:"
+      },
+      {
+        "iter": 3,
+        "compiled": true,
+        "total": 3,
+        "high": 0,
+        "medium": 2,
+        "low": 1,
+        "error": ""
+      }
+    ],
+    "error": "",
+    "compiled": true,
+    "total_vulns": 3,
+    "high": 0,
+    "density_per_100loc": 2.6785714285714284
+  }
+]

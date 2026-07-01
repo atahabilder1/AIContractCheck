@@ -1,0 +1,451 @@
+[
+  {
+    "prompt_id": 0,
+    "category": "ERC20 Token",
+    "complexity": "simple",
+    "strategy": "s2b_repair_from_seed",
+    "backend": "gemini",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"@openzeppelin/contracts/token/ERC20/ERC20.sol\";\n\ncontract MyToken is ERC20 {\n    address public owner;\n\n    constructor(string memory name_, string memory symbol_, uint256 initialSupply) ERC20(name_, symbol_) {\n        owner = msg.sender;\n        _mint(msg.sender, initialSupply);\n    }\n\n    modifier onlyOwner() {\n        require(msg.sender == owner, \"Not the owner\");\n        _;\n    }\n\n    function mint(address to, uint256 amount) public onlyOwner {\n        _mint(to, amount);\n    }\n\n    function burn(uint256 amount) public {\n        _burn(msg.sender, amount);\n    }\n\n    function burnFrom(address account, uint256 amount) public {\n        _burn(account, amount);\n    }\n}",
+    "analysis": {
+      "compiled": true,
+      "findings": [],
+      "error": ""
+    },
+    "iterations": 2,
+    "usage": {
+      "input_tokens": 536,
+      "output_tokens": 223,
+      "llm_calls": 1
+    },
+    "wall_time_s": 76.4407753944397,
+    "loc": 22,
+    "trace": [
+      {
+        "iter": 1,
+        "kind": "seed",
+        "compiled": true,
+        "total": 2,
+        "high": 0,
+        "medium": 0,
+        "low": 2,
+        "error": ""
+      },
+      {
+        "iter": 2,
+        "kind": "repair",
+        "compiled": true,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": ""
+      }
+    ],
+    "error": "",
+    "compiled": true,
+    "total_vulns": 0,
+    "high": 0,
+    "density_per_100loc": 0.0
+  },
+  {
+    "prompt_id": 16,
+    "category": "ERC721 NFT",
+    "complexity": "medium",
+    "strategy": "s2b_repair_from_seed",
+    "backend": "gemini",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.20;\n\nimport \"@openzeppelin/contracts/token/ERC721/ERC721.sol\";\nimport \"@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol\";\nimport \"@openzeppelin/contracts/access/Ownable.sol\";\nimport \"@openzeppelin/contracts/utils/Base64.sol\";\nimport \"@openzeppelin/contracts/utils/Strings.sol\";\nimport \"@openzeppelin/contracts/metadatacomponents/ERC2981.sol\";\n\ncontract WhitelistRevealNFT is ERC721, ERC721URIStorage, Ownable, ERC2981 {\n    using Strings for uint256;\n    using Base64 for bytes;\n\n    // --- State Variables ---\n\n    // Whitelist\n    mapping(address => bool) public isWhitelisted;\n    uint256 public whitelistMintLimit; // Max NFTs per whitelisted address\n\n    // Minting\n    uint256 public maxSupply;\n    uint256 public pricePerNFT;\n    uint256 public mintStartTime;\n    uint256 public mintEndTime;\n    uint256 public mintCount; // Total NFTs minted\n\n    // Reveal Mechanism\n    string public baseURI; // Base URI for revealed NFTs\n    string public hiddenMetadataURI; // URI for hidden metadata before reveal\n    bool public revealed = false;\n    uint256 public revealStartTime;\n\n    // Royalties (EIP-2981)\n    address public royaltyRecipient;\n    uint96 public royaltyPercentageBasisPoints; // 10000 = 100%\n\n    // --- Events ---\n    event WhitelistAddressAdded(address indexed addr);\n    event WhitelistAddressRemoved(address indexed addr);\n    event WhitelistMintLimitChanged(uint256 newLimit);\n    event MintConfigChanged(uint256 maxSupply, uint256 pricePerNFT, uint256 mintStartTime, uint256 mintEndTime);\n    event RevealConfigChanged(string baseURI, string hiddenMetadataURI, uint256 revealStartTime);\n    event RoyaltiesChanged(address indexed recipient, uint96 percentage);\n    event Minted(address indexed owner, uint256 indexed tokenId);\n    event Revealed();\n\n    // --- Constructor ---\n    constructor(\n        string memory _name,\n        string memory _symbol,\n        uint256 _maxSupply,\n        uint256 _pricePerNFT,\n        uint256 _mintStartTime,\n        uint256 _mintEndTime,\n        uint256 _revealStartTime,\n        string memory _hiddenMetadataURI,\n        address _royaltyRecipient,\n        uint96 _royaltyPercentageBasisPoints\n    ) ERC721(_name, _symbol) Ownable(msg.sender) {\n        require(_maxSupply > 0, \"Max supply must be greater than 0\");\n        require(_pricePerNFT > 0, \"Price per NFT must be greater than 0\");\n        require(_mintStartTime < _mintEndTime, \"Mint start time must be before end time\");\n        require(_revealStartTime > _mintEndTime, \"Reveal start time must be after mint end time\");\n        require(_hiddenMetadataURI != \"\", \"Hidden metadata URI cannot be empty\");\n        require(_royaltyRecipient != address(0), \"Royalty recipient cannot be the zero address\");\n        require(_royaltyPercentageBasisPoints <= 10000, \"Royalty percentage cannot exceed 100%\");\n\n        maxSupply = _maxSupply;\n        pricePerNFT = _pricePerNFT;\n        mintStartTime = _mintStartTime;\n        mintEndTime = _mintEndTime;\n        revealStartTime = _revealStartTime;\n        hiddenMetadataURI = _hiddenMetadataURI;\n        royaltyRecipient = _royaltyRecipient;\n        royaltyPercentageBasisPoints = _royaltyPercentageBasisPoints;\n\n        // Default whitelist mint limit\n        whitelistMintLimit = 1;\n    }\n\n    // --- Whitelist Management ---\n\n    function addWhitelistedAddress(address _addr) public onlyOwner {\n        require(_addr != address(0), \"Invalid address\");\n        isWhitelisted[_addr] = true;\n        emit WhitelistAddressAdded(_addr);\n    }\n\n    function removeWhitelistedAddress(address _addr) public onlyOwner {\n        require(_addr != address(0), \"Invalid address\");\n        isWhitelisted[_addr] = false;\n        emit WhitelistAddressRemoved(_addr);\n    }\n\n    function setWhitelistMintLimit(uint256 _limit) public onlyOwner {\n        whitelistMintLimit = _limit;\n        emit WhitelistMintLimitChanged(_limit);\n    }\n\n    // --- Minting ---\n\n    function mint(uint256 _quantity) public payable {\n        require(block.timestamp >= mintStartTime, \"Minting has not started yet\");\n        require(block.timestamp < mintEndTime, \"Minting has ended\");\n        require(_quantity > 0, \"Quantity must be greater than 0\");\n        require(mintCount + _quantity <= maxSupply, \"Exceeds max supply\");\n\n        // Whitelist check\n        require(isWhitelisted[msg.sender], \"Not whitelisted\");\n        // You might want to track how many NFTs a whitelisted address has already minted\n        // For simplicity, this example doesn't track individual whitelist mint counts per address\n        // but relies on the global whitelistMintLimit for a single mint action.\n        // A more robust implementation would involve a mapping: mapping(address => uint256) public whitelistMintedCount;\n\n        require(msg.value >= pricePerNFT * _quantity, \"Insufficient payment\");\n\n        for (uint256 i = 0; i < _quantity; i++) {\n            uint256 tokenId = mintCount + 1;\n            _safeMint(msg.sender, tokenId);\n            mintCount++;\n            emit Minted(msg.sender, tokenId);\n        }\n\n        // If the contract receives more Ether than required, it's kept by the contract owner.\n        // You might want to implement a withdrawal function for the owner.\n    }\n\n    // --- Reveal Mechanism ---\n\n    function setRevealConfig(string memory _baseURI, uint256 _revealStartTime) public onlyOwner {\n        require(_baseURI != \"\", \"Base URI cannot be empty\");\n        require(_revealStartTime > mintEndTime, \"Reveal start time must be after mint end time\");\n        baseURI = _baseURI;\n        revealStartTime = _revealStartTime;\n        emit RevealConfigChanged(baseURI, hiddenMetadataURI, revealStartTime);\n    }\n\n    function reveal() public {\n        require(block.timestamp >= revealStartTime, \"Reveal has not started yet\");\n        require(!revealed, \"Already revealed\");\n        revealed = true;\n        emit Revealed();\n    }\n\n    // --- Royalties (EIP-2981) ---\n\n    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721, ERC2981) returns (bool) {\n        return super.supportsInterface(interfaceId);\n    }\n\n    function royaltyInfo(uint256 tokenId, uint256 salePrice)\n        public\n        view\n        virtual\n        override(ERC2981)\n        returns (address receiver, uint256 royaltyAmount)\n    {\n        // Only apply royalties if the token has been revealed\n        if (revealed) {\n            return (royaltyRecipient, (salePrice * royaltyPercentageBasisPoints) / 10000);\n        } else {\n            return (address(0), 0); // No royalties before reveal\n        }\n    }\n\n    function setRoyalties(address _recipient, uint96 _percentage) public onlyOwner {\n        require(_recipient != address(0), \"Royalty recipient cannot be the zero address\");\n        require(_percentage <= 10000, \"Royalty percentage cannot exceed 100%\");\n        royaltyRecipient = _recipient;\n        royaltyPercentageBasisPoints = _percentage;\n        emit RoyaltiesChanged(_recipient, _percentage);\n    }\n\n    // --- Metadata ---\n\n    function _baseURI() internal view override returns (string memory) {\n        return baseURI;\n    }\n\n    function tokenURI(uint256 tokenId) public view override(ERC721, ERC721URIStorage) returns (string memory) {\n        _requireMinted(tokenId);\n\n        if (revealed) {\n            // If revealed, construct the URI using the baseURI and token ID\n            return string(abi.encodePacked(baseURI, tokenId.toString()));\n        } else {\n            // If not revealed, return the hidden metadata URI\n            return hiddenMetadataURI;\n        }\n    }\n\n    // --- Owner Functions ---\n\n    function withdraw() public onlyOwner {\n        (bool success, ) = payable(owner()).call{value: address(this).balance}(\"\");\n        require(success, \"Withdrawal failed\");\n    }\n\n    function setMintConfig(\n        uint256 _maxSupply,\n        uint256 _pricePerNFT,\n        uint256 _mintStartTime,\n        uint256 _mintEndTime\n    ) public onlyOwner {\n        require(_maxSupply > 0, \"Max supply must be greater than 0\");\n        require(_pricePerNFT > 0, \"Price per NFT must be greater than 0\");\n        require(_mintStartTime < _mintEndTime, \"Mint start time must be before end time\");\n        maxSupply = _maxSupply;\n        pricePerNFT = _pricePerNFT;\n        mintStartTime = _mintStartTime;\n        mintEndTime = _mintEndTime;\n        emit MintConfigChanged(_maxSupply, _pricePerNFT, _mintStartTime, _mintEndTime);\n    }\n\n    // --- Fallback and Receive ---\n    receive() external payable {}\n    fallback() external payable {}\n}",
+    "analysis": {
+      "compiled": false,
+      "findings": [],
+      "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmphj8g2fh3.sol:\nError: Source \"node_modules/@openzeppelin/contracts/metadatacomponents/ERC2981.sol\" not found: File not found. Searched the following locations: \"\".\n--> tmphj8g2fh3.sol:9:1:\n--> tmphj8g2fh3.sol:9:1:"
+    },
+    "iterations": 3,
+    "usage": {
+      "input_tokens": 7267,
+      "output_tokens": 4556,
+      "llm_calls": 2
+    },
+    "wall_time_s": 101.42129516601562,
+    "loc": 157,
+    "trace": [
+      {
+        "iter": 1,
+        "kind": "seed",
+        "compiled": false,
+        "total": null,
+        "high": null,
+        "medium": null,
+        "low": null,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmpjkvk82rs.sol:\nError: Source \"node_modules/@openzeppelin/contracts/metadatacomponents/ERC2981.sol\" not found: File not found. Searched "
+      },
+      {
+        "iter": 2,
+        "kind": "repair",
+        "compiled": false,
+        "total": null,
+        "high": null,
+        "medium": null,
+        "low": null,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmp3e_pz57j.sol:\n--> tmp3e_pz57j.sol:132:30:\n--> tmp3e_pz57j.sol:178:5:\nError: Function needs to specify overridden contract \"ERC721URISt"
+      },
+      {
+        "iter": 3,
+        "kind": "repair",
+        "compiled": false,
+        "total": null,
+        "high": null,
+        "medium": null,
+        "low": null,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmpdhuneknp.sol:\n--> tmpdhuneknp.sol:132:30:\n--> tmpdhuneknp.sol:178:5:\nError: Function needs to specify overridden contract \"ERC721URISt"
+      }
+    ],
+    "error": "",
+    "compiled": false,
+    "total_vulns": null,
+    "high": null,
+    "density_per_100loc": null
+  },
+  {
+    "prompt_id": 32,
+    "category": "ERC1155 Multi-Token",
+    "complexity": "complex",
+    "strategy": "s2b_repair_from_seed",
+    "backend": "gemini",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.20;\n\nimport \"@openzeppelin/contracts/token/ERC1155/ERC1155.sol\";\nimport \"@openzeppelin/contracts/access/Ownable.sol\";\nimport \"@openzeppelin/contracts/utils/Strings.sol\";\nimport \"@openzeppelin/contracts/utils/Base64.sol\";\n\ncontract ProductionERC1155 is ERC1155, Ownable {\n    using Strings for uint256;\n\n    // --- State Variables ---\n\n    // Mapping from token ID to its crafting recipe\n    struct CraftingRecipe {\n        uint256 outputTokenId;\n        uint256 outputAmount;\n        mapping(uint256 => uint256) inputTokens; // tokenId => amount\n    }\n\n    // Stores all defined crafting recipes\n    CraftingRecipe[] public recipes;\n    // Maps a recipe index to its details\n    mapping(uint256 => CraftingRecipe) public recipeDetails;\n    // Tracks the next available recipe ID\n    uint256 public nextRecipeId;\n\n    // Base URI for metadata. Can be dynamic based on token ID.\n    string public baseURI;\n\n    // --- Events ---\n\n    event TokenCrafted(\n        address indexed crafter,\n        uint256 outputTokenId,\n        uint256 outputAmount,\n        uint256 recipeId\n    );\n\n    event RecipeAdded(uint256 indexed recipeId, uint256 outputTokenId, uint256 outputAmount);\n    event RecipeInputAdded(uint256 indexed recipeId, uint256 inputTokenId, uint256 inputAmount);\n    event RecipeRemoved(uint256 indexed recipeId);\n\n    // --- Constructor ---\n\n    constructor(string memory _baseURI) ERC1155(_baseURI) Ownable(msg.sender) {\n        baseURI = _baseURI;\n        nextRecipeId = 0;\n    }\n\n    // --- Modifier ---\n\n    modifier onlyRecipeOwner(uint256 _recipeId) {\n        // In a more complex scenario, you might want to assign recipe ownership.\n        // For simplicity here, we assume only the contract owner can manage recipes.\n        require(msg.sender == owner(), \"Not the owner\");\n        _;\n    }\n\n    // --- Core ERC1155 Functions (Overridden for custom logic) ---\n\n    function uri(uint256 _tokenId) public view override returns (string memory) {\n        // Basic URI generation. Can be extended for dynamic metadata.\n        // Example: if baseURI is \"ipfs://Qm...\", and _tokenId is 1, it returns \"ipfs://Qm.../1.json\"\n        return string(abi.encodePacked(super.uri(_tokenId), _tokenId.toString(), \".json\"));\n    }\n\n    // --- Token Crafting Functions ---\n\n    /**\n     * @notice Adds a new crafting recipe.\n     * @param _outputTokenId The ID of the token to be minted.\n     * @param _outputAmount The amount of the output token to be minted.\n     */\n    function addRecipe(uint256 _outputTokenId, uint256 _outputAmount)\n        public\n        onlyOwner\n        returns (uint256)\n    {\n        uint256 recipeId = nextRecipeId;\n        recipes.push(); // Add a new slot for the recipe\n        recipeDetails[recipeId].outputTokenId = _outputTokenId;\n        recipeDetails[recipeId].outputAmount = _outputAmount;\n        nextRecipeId++;\n        emit RecipeAdded(recipeId, _outputTokenId, _outputAmount);\n        return recipeId;\n    }\n\n    /**\n     * @notice Adds an input token requirement to an existing recipe.\n     * @param _recipeId The ID of the recipe to modify.\n     * @param _inputTokenId The ID of the required input token.\n     * @param _inputAmount The amount of the input token required.\n     */\n    function addRecipeInput(\n        uint256 _recipeId,\n        uint256 _inputTokenId,\n        uint256 _inputAmount\n    ) public onlyRecipeOwner(_recipeId) {\n        require(_recipeId < nextRecipeId, \"Recipe does not exist\");\n        require(_inputAmount > 0, \"Input amount must be greater than 0\");\n        recipeDetails[_recipeId].inputTokens[_inputTokenId] = _inputAmount;\n        emit RecipeInputAdded(_recipeId, _inputTokenId, _inputAmount);\n    }\n\n    /**\n     * @notice Crafts a new token by burning required input tokens.\n     * @param _recipeId The ID of the recipe to use.\n     */\n    function craftToken(uint256 _recipeId) public {\n        require(_recipeId < nextRecipeId, \"Recipe does not exist\");\n\n        CraftingRecipe storage recipe = recipeDetails[_recipeId];\n        uint256 outputTokenId = recipe.outputTokenId;\n        uint256 outputAmount = recipe.outputAmount;\n\n        // Check if the caller has enough input tokens\n        for (uint256 i = 0; i < recipes.length; i++) { // Iterate through the dynamic array of inputs for this recipe\n            if (recipe.inputTokens[i] > 0) { // Check if there's an input for this token ID\n                require(\n                    balanceOf(msg.sender, i) >= recipe.inputTokens[i],\n                    \"Insufficient input tokens\"\n                );\n            }\n        }\n\n        // Burn input tokens\n        for (uint256 i = 0; i < recipes.length; i++) {\n            if (recipe.inputTokens[i] > 0) {\n                _burn(msg.sender, i, recipe.inputTokens[i]);\n            }\n        }\n\n        // Mint output token\n        _mint(msg.sender, outputTokenId, outputAmount, \"\");\n\n        emit TokenCrafted(msg.sender, outputTokenId, outputAmount, _recipeId);\n    }\n\n    /**\n     * @notice Allows the owner to remove a crafting recipe.\n     * @param _recipeId The ID of the recipe to remove.\n     */\n    function removeRecipe(uint256 _recipeId) public onlyRecipeOwner(_recipeId) {\n        require(_recipeId < nextRecipeId, \"Recipe does not exist\");\n        // Mark recipe as inactive or set output to 0 to effectively remove it.\n        // A more robust solution might involve shifting recipes or using a boolean flag.\n        // For simplicity, we'll zero out the output and input amounts.\n        recipeDetails[_recipeId].outputTokenId = 0;\n        recipeDetails[_recipeId].outputAmount = 0;\n        // Clearing mappings in Solidity is not straightforward.\n        // We'll rely on checking outputAmount > 0 to consider a recipe valid.\n        emit RecipeRemoved(_recipeId);\n    }\n\n\n    // --- Dynamic Metadata Functions ---\n\n    /**\n     * @notice Sets the base URI for all tokens.\n     * @param _newBaseURI The new base URI.\n     */\n    function setBaseURI(string memory _newBaseURI) public onlyOwner {\n        baseURI = _newBaseURI;\n        // Note: Changing baseURI might require re-minting tokens or using a more complex metadata system\n        // if existing tokens need to reflect the new base URI immediately.\n        // For ERC1155, token URIs are typically resolved by appending the token ID to the base URI.\n        // If the _newBaseURI is a contract address, you might need to implement a function to fetch metadata from that contract.\n    }\n\n    /**\n     * @notice Generates SVG metadata for a given token ID.\n     * @dev This is a simplified example. Real-world dynamic metadata can be much more complex.\n     * @param _tokenId The ID of the token.\n     * @return JSON string representing the metadata.\n     */\n    function generateSVGBasedMetadata(uint256 _tokenId) public view returns (string memory) {\n        // Example: Token 1 might be 'Wood', Token 2 'Stone', Token 3 'Iron Ore'\n        // Token 4 might be 'Wooden Sword' (crafted from wood)\n\n        string memory name;\n        string memory description;\n        string memory imageURI; // This will be an SVG\n\n        if (_tokenId == 1) {\n            name = \"Wood\";\n            description = \"A simple piece of wood.\";\n            imageURI = '<svg width=\"100\" height=\"100\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"100\" height=\"100\" fill=\"saddlebrown\"/></svg>';\n        } else if (_tokenId == 2) {\n            name = \"Stone\";\n            description = \"A rough stone.\";\n            imageURI = '<svg width=\"100\" height=\"100\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"100\" height=\"100\" fill=\"dimgray\"/></svg>';\n        } else if (_tokenId == 3) {\n            name = \"Iron Ore\";\n            description = \"A chunk of iron ore.\";\n            imageURI = '<svg width=\"100\" height=\"100\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"100\" height=\"100\" fill=\"gray\"/></svg>';\n        } else if (_tokenId == 4) {\n            name = \"Wooden Sword\";\n            description = \"A basic sword made of wood.\";\n            imageURI = '<svg width=\"100\" height=\"100\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M20 10 L80 10 L70 90 L30 90 Z\" fill=\"saddlebrown\" stroke=\"black\" stroke-width=\"2\"/></svg>';\n        } else {\n            name = string(abi.encodePacked(\"Unknown Item \", _tokenId.toString()));\n            description = \"An item with unknown properties.\";\n            imageURI = '<svg width=\"100\" height=\"100\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"100\" height=\"100\" fill=\"black\"/></svg>';\n        }\n\n        // Construct the JSON metadata\n        // The 'image' field will contain the SVG data encoded in base64\n        string memory jsonMetadata = string(abi.encodePacked(\n            '{\"name\": \"', name,\n            '\", \"description\": \"', description,\n            '\", \"image\": \"data:image/svg+xml;base64,', Base64.encode(bytes(imageURI)), '\"}'\n        ));\n\n        return jsonMetadata;\n    }\n\n    /**\n     * @notice Returns the metadata URI for a given token ID, potentially pointing to dynamic metadata.\n     * @param _tokenId The ID of the token.\n     * @return The metadata URI.\n     */\n    function getTokenMetadataURI(uint256 _tokenId) public view returns (string memory) {\n        // This function can be used to dynamically generate metadata.\n        // The `uri` function is called by marketplaces to fetch metadata.\n        // If you want to serve dynamic metadata directly from the contract,\n        // you would return a data URI here.\n        // For example: \"data:application/json;base64,...\"\n\n        // In this example, we'll return a data URI that points to dynamically generated SVG metadata.\n        // This requires a marketplace or client that can interpret data URIs.\n        // Alternatively, you could have a separate off-chain service that generates metadata based on the token ID and contract address.\n\n        string memory jsonMetadata = generateSVGBasedMetadata(_tokenId);\n        return string(abi.encodePacked(\"data:application/json;base64,\", Base64.encode(bytes(jsonMetadata))));\n\n        // If you are using a decentralized storage like IPFS, you would return the IPFS URI.\n        // return string(abi.encodePacked(baseURI, _tokenId.toString(), \".json\"));\n    }\n\n    // --- Marketplace Integration ---\n    // ERC1155 already provides the necessary interfaces for marketplaces (like OpenSea).\n    // Marketplaces typically interact with the contract by:\n    // 1. Calling `balanceOf(owner, tokenId)` to check ownership.\n    // 2. Calling `uri(tokenId)` or `getTokenMetadataURI(tokenId)` to fetch metadata.\n    // 3. Transferring tokens using `safeTransferFrom` or `transferBatch`.\n\n    // --- Utility Functions ---\n\n    /**\n     * @notice A helper function to check if a recipe exists and is valid.\n     * @param _recipeId The ID of the recipe.\n     * @return True if the recipe is valid, false otherwise.\n     */\n    function isRecipeValid(uint256 _recipeId) public view returns (bool) {\n        return _recipeId < nextRecipeId && recipeDetails[_recipeId].outputAmount > 0;\n    }\n\n    // --- Internal Functions (for potential future extensions) ---\n    // _beforeTokenTransfer, _afterTokenTransfer, etc.\n}",
+    "analysis": {
+      "compiled": false,
+      "findings": [],
+      "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmpv96o6bsj.sol:\nError: Wrong argument count for modifier invocation: 1 arguments given but expected 0.\n--> tmpv96o6bsj.sol:46:59:\n--> tmpv96o6bsj.sol:46:59:"
+    },
+    "iterations": 3,
+    "usage": {
+      "input_tokens": 9908,
+      "output_tokens": 7062,
+      "llm_calls": 2
+    },
+    "wall_time_s": 62.066986083984375,
+    "loc": 168,
+    "trace": [
+      {
+        "iter": 1,
+        "kind": "seed",
+        "compiled": false,
+        "total": null,
+        "high": null,
+        "medium": null,
+        "low": null,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmp6gb8t3hy.sol:\nError: Wrong argument count for modifier invocation: 1 arguments given but expected 0.\n--> tmp6gb8t3hy.sol:46:59:\n--> tm"
+      },
+      {
+        "iter": 2,
+        "kind": "repair",
+        "compiled": false,
+        "total": null,
+        "high": null,
+        "medium": null,
+        "low": null,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmp_q3jnyxk.sol:\nError: Wrong argument count for modifier invocation: 1 arguments given but expected 0.\n--> tmp_q3jnyxk.sol:46:59:\nError:"
+      },
+      {
+        "iter": 3,
+        "kind": "repair",
+        "compiled": false,
+        "total": null,
+        "high": null,
+        "medium": null,
+        "low": null,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmp8yfmgcgv.sol:\nError: Wrong argument count for modifier invocation: 1 arguments given but expected 0.\n--> tmp8yfmgcgv.sol:46:59:\nError:"
+      }
+    ],
+    "error": "",
+    "compiled": false,
+    "total_vulns": null,
+    "high": null,
+    "density_per_100loc": null
+  },
+  {
+    "prompt_id": 48,
+    "category": "DeFi Staking",
+    "complexity": "variation1",
+    "strategy": "s2b_repair_from_seed",
+    "backend": "gemini",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"@openzeppelin/contracts/token/ERC20/IERC20.sol\";\nimport \"@openzeppelin/contracts/token/ERC20/ERC20.sol\";\nimport \"@openzeppelin/contracts/access/Ownable.sol\";\nimport \"@openzeppelin/contracts/utils/math/SafeMath.sol\";\n\ncontract LiquidStaking is ERC20, Ownable {\n    using SafeMath for uint256;\n\n    // The underlying asset to be staked (e.g., ETH, DAI, etc.)\n    IERC20 public immutable stakingToken;\n\n    // The receipt token representing the staked position\n    string public constant NAME = \"Staked Token\";\n    string public constant SYMBOL = \"stToken\";\n\n    // Mapping from stToken holder to their staked amount\n    mapping(address => uint256) public stakedAmount;\n\n    // Total amount of staking tokens currently staked\n    uint256 public totalStakedAmount;\n\n    // Minimum staking amount\n    uint256 public minStakeAmount;\n\n    // Maximum staking amount\n    uint256 public maxStakeAmount;\n\n    // Staking fee in basis points (e.g., 100 for 1%)\n    uint16 public stakingFeeBasisPoints;\n\n    // Event for successful staking\n    event Staked(address indexed user, uint256 amount);\n\n    // Event for successful unstaking\n    event Unstaked(address indexed user, uint256 amount);\n\n    // Event for updating staking fee\n    event StakingFeeUpdated(uint16 newFee);\n\n    // Event for updating min/max stake amounts\n    event StakeLimitsUpdated(uint256 minAmount, uint256 maxAmount);\n\n    constructor(address _stakingTokenAddress, uint256 _minStakeAmount, uint256 _maxStakeAmount, uint16 _stakingFeeBasisPoints) ERC20(NAME, SYMBOL) {\n        require(_stakingTokenAddress != address(0), \"Staking token cannot be zero address\");\n        stakingToken = IERC20(_stakingTokenAddress);\n        minStakeAmount = _minStakeAmount;\n        maxStakeAmount = _maxStakeAmount;\n        stakingFeeBasisPoints = _stakingFeeBasisPoints;\n    }\n\n    /**\n     * @notice Stake the underlying token. Mints stTokens to the user.\n     * @param _amount The amount of staking tokens to stake.\n     */\n    function stake(uint256 _amount) external {\n        require(_amount >= minStakeAmount, \"Amount below minimum stake\");\n        require(_amount <= maxStakeAmount, \"Amount above maximum stake\");\n\n        // Transfer staking tokens from user to this contract\n        require(stakingToken.transferFrom(msg.sender, address(this), _amount), \"Transfer failed\");\n\n        // Mint stTokens to the user\n        uint256 stTokensToMint = _calculateStTokensToMint(_amount);\n        _mint(msg.sender, stTokensToMint);\n\n        // Update internal tracking\n        stakedAmount[msg.sender] = stakedAmount[msg.sender].add(_amount);\n        totalStakedAmount = totalStakedAmount.add(_amount);\n\n        emit Staked(msg.sender, _amount);\n    }\n\n    /**\n     * @notice Unstake the underlying token. Burns stTokens from the user.\n     * @param _amount The amount of stTokens to burn.\n     */\n    function unstake(uint256 _amount) external {\n        require(_amount > 0, \"Amount must be greater than zero\");\n        require(balanceOf(msg.sender) >= _amount, \"Insufficient stToken balance\");\n\n        // Calculate unstake amount, considering potential fee\n        uint256 unstakeAmount = _calculateUnstakeAmount(_amount);\n        uint256 feeAmount = _amount.sub(unstakeAmount);\n\n        // Burn stTokens from the user\n        _burn(msg.sender, _amount);\n\n        // Transfer staking tokens back to the user\n        require(stakingToken.transfer(msg.sender, unstakeAmount), \"Transfer failed\");\n\n        // Update internal tracking\n        stakedAmount[msg.sender] = stakedAmount[msg.sender].sub(unstakeAmount);\n        totalStakedAmount = totalStakedAmount.sub(unstakeAmount);\n\n        // If there was a fee, send it to the contract owner\n        if (feeAmount > 0) {\n            // Assuming the fee is taken in staking tokens\n            // This logic might need adjustment based on fee collection mechanism\n            // For simplicity, we assume the fee is directly deducted from the unstake amount\n            // A more sophisticated approach might involve a separate fee pool\n            // For now, we'll just log it and assume it's handled by the fee calculation itself.\n            // If you want to send the fee to the owner, you'd need to ensure the contract holds enough staking tokens.\n            // This current implementation implies the fee is effectively a loss for the staker on unstake.\n        }\n\n        emit Unstaked(msg.sender, unstakeAmount);\n    }\n\n    /**\n     * @notice Calculate the amount of stTokens to mint for a given staking amount.\n     * @param _stakingAmount The amount of staking tokens.\n     * @return The amount of stTokens to mint.\n     */\n    function _calculateStTokensToMint(uint256 _stakingAmount) internal view returns (uint256) {\n        // In a simple model, 1 stToken represents 1 staking token.\n        // More complex models could involve changing exchange rates based on accrued rewards.\n        // For this basic version, the exchange rate is 1:1.\n        return _stakingAmount;\n    }\n\n    /**\n     * @notice Calculate the amount of staking tokens to unstake for a given stToken amount.\n     * @param _stTokenAmount The amount of stTokens to burn.\n     * @return The amount of staking tokens to return to the user.\n     */\n    function _calculateUnstakeAmount(uint256 _stTokenAmount) internal view returns (uint256) {\n        // Calculate the fee to be deducted\n        uint256 feeAmountBasisPoints = _stTokenAmount.mul(stakingFeeBasisPoints).div(10000);\n        return _stTokenAmount.sub(feeAmountBasisPoints);\n    }\n\n    /**\n     * @notice Update the minimum staking amount.\n     * @param _minAmount The new minimum staking amount.\n     */\n    function updateMinStakeAmount(uint256 _minAmount) external onlyOwner {\n        require(_minAmount > 0, \"Minimum stake must be positive\");\n        minStakeAmount = _minAmount;\n        emit StakeLimitsUpdated(minStakeAmount, maxStakeAmount);\n    }\n\n    /**\n     * @notice Update the maximum staking amount.\n     * @param _maxAmount The new maximum staking amount.\n     */\n    function updateMaxStakeAmount(uint256 _maxAmount) external onlyOwner {\n        require(_maxAmount >= minStakeAmount, \"Maximum stake must be greater than or equal to minimum stake\");\n        maxStakeAmount = _maxAmount;\n        emit StakeLimitsUpdated(minStakeAmount, maxStakeAmount);\n    }\n\n    /**\n     * @notice Update the staking fee in basis points.\n     * @param _feeBasisPoints The new staking fee in basis points (e.g., 100 for 1%).\n     */\n    function updateStakingFee(uint16 _feeBasisPoints) external onlyOwner {\n        require(_feeBasisPoints <= 10000, \"Fee cannot exceed 100%\"); // Max 100% fee\n        stakingFeeBasisPoints = _feeBasisPoints;\n        emit StakingFeeUpdated(_feeBasisPoints);\n    }\n\n    /**\n     * @notice Allows the owner to withdraw any staking tokens accidentally sent to the contract.\n     */\n    function withdrawStakingTokens() external onlyOwner {\n        uint256 balance = stakingToken.balanceOf(address(this));\n        require(balance > 0, \"No staking tokens to withdraw\");\n        // Check the return value of the transfer function\n        require(stakingToken.transfer(owner(), balance), \"Withdrawal failed\");\n    }\n\n    /**\n     * @notice Get the user's current staked amount.\n     * @param _user The address of the user.\n     * @return The staked amount.\n     */\n    function getUserStakedAmount(address _user) external view returns (uint256) {\n        return stakedAmount[_user];\n    }\n\n    /**\n     * @notice Get the total staked amount in the protocol.\n     * @return The total staked amount.\n     */\n    function getTotalStakedAmount() external view returns (uint256) {\n        return totalStakedAmount;\n    }\n}",
+    "analysis": {
+      "compiled": true,
+      "findings": [],
+      "error": ""
+    },
+    "iterations": 2,
+    "usage": {
+      "input_tokens": 2137,
+      "output_tokens": 2002,
+      "llm_calls": 1
+    },
+    "wall_time_s": 23.460493564605713,
+    "loc": 125,
+    "trace": [
+      {
+        "iter": 1,
+        "kind": "seed",
+        "compiled": true,
+        "total": 1,
+        "high": 1,
+        "medium": 0,
+        "low": 0,
+        "error": ""
+      },
+      {
+        "iter": 2,
+        "kind": "repair",
+        "compiled": true,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": ""
+      }
+    ],
+    "error": "",
+    "compiled": true,
+    "total_vulns": 0,
+    "high": 0,
+    "density_per_100loc": 0.0
+  },
+  {
+    "prompt_id": 75,
+    "category": "DeFi DEX/AMM",
+    "complexity": "simple",
+    "strategy": "s2b_repair_from_seed",
+    "backend": "gemini",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract ConstantProductAMM {\n    address public token0;\n    address public token1;\n    uint256 public reserve0;\n    uint256 public reserve1;\n    uint256 public k; // constant product: reserve0 * reserve1\n\n    event Swap(address indexed sender, uint256 amount0In, uint256 amount1In, uint256 amount0Out, uint256 amount1Out);\n    event AddLiquidity(address indexed sender, uint256 amount0, uint256 amount1);\n    event RemoveLiquidity(address indexed sender, uint256 amount0, uint256 amount1);\n\n    constructor(address _token0, address _token1) {\n        require(_token0 != address(0), \"Token0 cannot be the zero address\");\n        require(_token1 != address(0), \"Token1 cannot be the zero address\");\n        require(_token0 != _token1, \"Tokens cannot be the same\");\n        token0 = _token0;\n        token1 = _token1;\n    }\n\n    // Helper to get reserves, ensuring correct order\n    function _getReserves() internal view returns (uint256 _reserve0, uint256 _reserve1) {\n        _reserve0 = reserve0;\n        _reserve1 = reserve1;\n    }\n\n    // Function to add liquidity to the pool\n    function addLiquidity(uint256 _amount0, uint256 _amount1) external {\n        // Transfer tokens from user to the contract\n        // Assume ERC20 tokens for simplicity, actual implementation would require ERC20 interface and transfers\n        // For this example, we'll just update reserves directly.\n        // In a real scenario, you'd need to implement token transfers.\n\n        (uint256 _reserve0, uint256 _reserve1) = _getReserves();\n\n        if (_reserve0 == 0 && _reserve1 == 0) {\n            reserve0 = _amount0;\n            reserve1 = _amount1;\n            k = _amount0 * _amount1;\n        } else {\n            // Calculate the proportional amount of the other token to add\n            // This ensures that the ratio of tokens added matches the current pool ratio\n            uint256 amount0Optimal = (_amount1 * _reserve0) / _reserve1;\n            uint256 amount1Optimal = (_amount0 * _reserve1) / _reserve0;\n\n            uint256 amount0ToAdd = _amount0;\n            uint256 amount1ToAdd = _amount1;\n\n            if (amount0Optimal < _amount0) {\n                amount0ToAdd = amount0Optimal;\n            }\n            if (amount1Optimal < _amount1) {\n                amount1ToAdd = amount1Optimal;\n            }\n\n            require(amount0ToAdd > 0 && amount1ToAdd > 0, \"Must add both tokens\");\n\n            reserve0 = _reserve0 + amount0ToAdd;\n            reserve1 = _reserve1 + amount1ToAdd;\n            k = reserve0 * reserve1;\n        }\n\n        emit AddLiquidity(msg.sender, _amount0, _amount1);\n    }\n\n    // Function to remove liquidity from the pool\n    function removeLiquidity(uint256 _amount0, uint256 _amount1) external {\n        (uint256 _reserve0, uint256 _reserve1) = _getReserves();\n\n        require(_amount0 <= _reserve0, \"Amount0 exceeds reserve0\");\n        require(_amount1 <= _reserve1, \"Amount1 exceeds reserve1\");\n\n        // In a real scenario, you'd need to implement token transfers to the user.\n\n        reserve0 = _reserve0 - _amount0;\n        reserve1 = _reserve1 - _amount1;\n        k = reserve0 * reserve1;\n\n        emit RemoveLiquidity(msg.sender, _amount0, _amount1);\n    }\n\n    // Function to swap token0 for token1\n    function swap0For1(uint256 _amount0In) external returns (uint256 amount1Out) {\n        (uint256 _reserve0, uint256 _reserve1) = _getReserves();\n\n        require(_amount0In > 0, \"Amount in must be positive\");\n        require(_amount0In <= _reserve0, \"Amount0In exceeds reserve0\");\n\n        // Calculate the new reserves and the amount of token1 to output\n        uint256 newReserve0 = _reserve0 + _amount0In;\n        uint256 newReserve1 = k / newReserve0;\n        amount1Out = _reserve1 - newReserve1;\n\n        require(amount1Out > 0, \"Amount out must be positive\");\n\n        // Update reserves\n        reserve0 = newReserve0;\n        reserve1 = newReserve1;\n\n        // In a real scenario, you'd need to implement token transfers.\n        // Transfer _amount0In from msg.sender to this contract.\n        // Transfer amount1Out from this contract to msg.sender.\n\n        emit Swap(msg.sender, _amount0In, 0, 0, amount1Out);\n        return amount1Out;\n    }\n\n    // Function to swap token1 for token0\n    function swap1For0(uint256 _amount1In) external returns (uint256 amount0Out) {\n        (uint256 _reserve0, uint256 _reserve1) = _getReserves();\n\n        require(_amount1In > 0, \"Amount in must be positive\");\n        require(_amount1In <= _reserve1, \"Amount1In exceeds reserve1\");\n\n        // Calculate the new reserves and the amount of token0 to output\n        uint256 newReserve1 = _reserve1 + _amount1In;\n        uint256 newReserve0 = k / newReserve1;\n        amount0Out = _reserve0 - newReserve0;\n\n        require(amount0Out > 0, \"Amount out must be positive\");\n\n        // Update reserves\n        reserve0 = newReserve0;\n        reserve1 = newReserve1;\n\n        // In a real scenario, you'd need to implement token transfers.\n        // Transfer _amount1In from msg.sender to this contract.\n        // Transfer amount0Out from this contract to msg.sender.\n\n        emit Swap(msg.sender, 0, _amount1In, amount0Out, 0);\n        return amount0Out;\n    }\n}",
+    "analysis": {
+      "compiled": true,
+      "findings": [],
+      "error": ""
+    },
+    "iterations": 2,
+    "usage": {
+      "input_tokens": 1697,
+      "output_tokens": 1500,
+      "llm_calls": 1
+    },
+    "wall_time_s": 28.120213508605957,
+    "loc": 81,
+    "trace": [
+      {
+        "iter": 1,
+        "kind": "seed",
+        "compiled": true,
+        "total": 2,
+        "high": 0,
+        "medium": 1,
+        "low": 1,
+        "error": ""
+      },
+      {
+        "iter": 2,
+        "kind": "repair",
+        "compiled": true,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": ""
+      }
+    ],
+    "error": "",
+    "compiled": true,
+    "total_vulns": 0,
+    "high": 0,
+    "density_per_100loc": 0.0
+  },
+  {
+    "prompt_id": 91,
+    "category": "Yield Aggregator",
+    "complexity": "medium",
+    "strategy": "s2b_repair_from_seed",
+    "backend": "gemini",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"@openzeppelin/contracts/token/ERC20/IERC20.sol\";\nimport \"@openzeppelin/contracts/access/Ownable.sol\";\nimport \"@openzeppelin/contracts/utils/math/SafeMath.sol\";\n\ninterface IStrategy {\n    function deposit(uint256 _amount) external;\n    function withdraw(uint256 _amount) external;\n    function harvest() external returns (uint256 _earned);\n    function withdrawAll() external returns (uint256 _balance);\n    function balanceOf() external view returns (uint256);\n    function getRewardToken() external view returns (IERC20);\n    function getUnderlyingToken() external view returns (IERC20);\n}\n\ncontract YieldAggregatorVault is Ownable {\n    using SafeMath for uint256;\n\n    IERC20 public underlyingToken;\n    IStrategy public strategy;\n\n    mapping(address => uint256) public balanceOf;\n    uint256 public totalShares;\n\n    uint256 public depositFeeBP; // Basis points for deposit fee (e.g., 100 for 1%)\n    uint256 public withdrawalFeeBP; // Basis points for withdrawal fee (e.g., 50 for 0.5%)\n    uint256 public managementFeeBP; // Basis points for management fee (e.g., 200 for 2%)\n\n    address public performanceFeeRecipient;\n\n    event Deposit(address indexed user, uint256 amount, uint256 shares);\n    event Withdraw(address indexed user, uint256 amount, uint256 shares);\n    event StrategyHarvested(uint256 harvestedAmount);\n    event FeesCollected(uint256 depositFees, uint256 withdrawalFees, uint256 managementFees);\n    event DepositFeeSet(uint256 newDepositFeeBP);\n    event WithdrawalFeeSet(uint256 newWithdrawalFeeBP);\n    event ManagementFeeSet(uint256 newManagementFeeBP);\n    event PerformanceFeeRecipientSet(address indexed newRecipient);\n    event StrategySet(address indexed newStrategy);\n\n    constructor(\n        address _underlyingToken,\n        address _strategy,\n        uint256 _depositFeeBP,\n        uint256 _withdrawalFeeBP,\n        uint256 _managementFeeBP,\n        address _performanceFeeRecipient\n    ) {\n        underlyingToken = IERC20(_underlyingToken);\n        strategy = IStrategy(_strategy);\n        depositFeeBP = _depositFeeBP;\n        withdrawalFeeBP = _withdrawalFeeBP;\n        managementFeeBP = _managementFeeBP;\n        performanceFeeRecipient = _performanceFeeRecipient;\n\n        require(address(underlyingToken) != address(0), \"Vault: Invalid underlying token address\");\n        require(address(strategy) != address(0), \"Vault: Invalid strategy address\");\n        require(_performanceFeeRecipient != address(0), \"Vault: Invalid performance fee recipient\");\n        require(_depositFeeBP <= 10000, \"Vault: Deposit fee too high\"); // Max 100%\n        require(_withdrawalFeeBP <= 10000, \"Vault: Withdrawal fee too high\"); // Max 100%\n        require(_managementFeeBP <= 10000, \"Vault: Management fee too high\"); // Max 100%\n    }\n\n    function deposit(uint256 _amount) external {\n        require(_amount > 0, \"Vault: Deposit amount must be greater than 0\");\n\n        // Calculate deposit fee\n        uint256 depositFee = _amount.mul(depositFeeBP).div(10000);\n        uint256 amountAfterFee = _amount.sub(depositFee);\n\n        // Transfer underlying tokens to the vault\n        require(underlyingToken.transferFrom(msg.sender, address(this), _amount), \"Vault: Token transfer failed\");\n\n        // Transfer deposit fee to performance fee recipient (or treasury)\n        if (depositFee > 0) {\n            require(underlyingToken.transfer(performanceFeeRecipient, depositFee), \"Vault: Deposit fee transfer failed\");\n            emit FeesCollected(depositFee, 0, 0);\n        }\n\n        // Calculate shares based on current vault value\n        uint256 shares = 0;\n        if (totalShares == 0) {\n            shares = amountAfterFee; // First deposit, 1:1 ratio\n        } else {\n            uint256 vaultValue = getVaultValue();\n            // Ensure vaultValue is not zero before division to avoid division by zero\n            if (vaultValue > 0) {\n                shares = amountAfterFee.mul(totalShares).div(vaultValue);\n            } else {\n                // If vault value is zero, assign shares based on amount deposited.\n                // This scenario should ideally not happen if strategy is funded.\n                shares = amountAfterFee;\n            }\n        }\n\n        balanceOf[msg.sender] = balanceOf[msg.sender].add(shares);\n        totalShares = totalShares.add(shares);\n\n        // Deposit to strategy\n        strategy.deposit(amountAfterFee);\n\n        emit Deposit(msg.sender, _amount, shares);\n    }\n\n    function withdraw(uint256 _shares) external {\n        require(_shares > 0, \"Vault: Withdraw shares must be greater than 0\");\n        require(balanceOf[msg.sender] >= _shares, \"Vault: Insufficient shares\");\n\n        // Calculate amount to withdraw from strategy\n        uint256 vaultValue = getVaultValue();\n        uint256 amountToWithdraw = _shares.mul(vaultValue).div(totalShares);\n\n        // Update user's shares and total shares\n        balanceOf[msg.sender] = balanceOf[msg.sender].sub(_shares);\n        totalShares = totalShares.sub(_shares);\n\n        // Withdraw from strategy\n        strategy.withdraw(amountToWithdraw);\n        uint256 withdrawnAmount = underlyingToken.balanceOf(address(this)); // Amount received from strategy\n\n        // Calculate withdrawal fee\n        uint256 withdrawalFee = withdrawnAmount.mul(withdrawalFeeBP).div(10000);\n        uint256 amountAfterFee = withdrawnAmount.sub(withdrawalFee);\n\n        // Transfer withdrawal fee to performance fee recipient (or treasury)\n        if (withdrawalFee > 0) {\n            require(underlyingToken.transfer(performanceFeeRecipient, withdrawalFee), \"Vault: Withdrawal fee transfer failed\");\n            emit FeesCollected(0, withdrawalFee, 0);\n        }\n\n        // Transfer remaining amount to user\n        require(underlyingToken.transfer(msg.sender, amountAfterFee), \"Vault: Token transfer failed\");\n\n        emit Withdraw(msg.sender, amountAfterFee, _shares);\n    }\n\n    function harvest() external onlyOwner {\n        // Harvest rewards from the strategy\n        uint256 harvestedAmount = strategy.harvest();\n        emit StrategyHarvested(harvestedAmount);\n\n        // Calculate management fee\n        uint256 managementFee = harvestedAmount.mul(managementFeeBP).div(10000);\n        uint256 amountAfterManagementFee = harvestedAmount.sub(managementFee);\n\n        // Transfer management fee to performance fee recipient (or treasury)\n        if (managementFee > 0) {\n            require(underlyingToken.transfer(performanceFeeRecipient, managementFee), \"Vault: Management fee transfer failed\");\n            emit FeesCollected(0, 0, managementFee);\n        }\n\n        // Deposit remaining harvested amount back into the strategy for auto-compounding\n        if (amountAfterManagementFee > 0) {\n            strategy.deposit(amountAfterManagementFee);\n        }\n    }\n\n    function getVaultValue() public view returns (uint256) {\n        // The vault value is the amount of underlying tokens currently held by the strategy + vault itself\n        // For simplicity, we assume the strategy holds all deposited assets and returns its balance.\n        // In a more complex scenario, you might need to track vault's own balance too.\n        return underlyingToken.balanceOf(address(strategy)).add(underlyingToken.balanceOf(address(this)));\n    }\n\n    function getUserShares(address _user) external view returns (uint256) {\n        return balanceOf[_user];\n    }\n\n    function getUserAmount(address _user) external view returns (uint256) {\n        uint256 userShares = balanceOf[_user];\n        // Check if userShares is zero to avoid division by zero if totalShares is also zero\n        if (userShares == 0 || totalShares == 0) return 0;\n        uint256 vaultValue = getVaultValue();\n        return userShares.mul(vaultValue).div(totalShares);\n    }\n\n    function setDepositFee(uint256 _depositFeeBP) external onlyOwner {\n        require(_depositFeeBP <= 10000, \"Vault: Deposit fee too high\");\n        depositFeeBP = _depositFeeBP;\n        emit DepositFeeSet(_depositFeeBP);\n    }\n\n    function setWithdrawalFee(uint256 _withdrawalFeeBP) external onlyOwner {\n        require(_withdrawalFeeBP <= 10000, \"Vault: Withdrawal fee too high\");\n        withdrawalFeeBP = _withdrawalFeeBP;\n        emit WithdrawalFeeSet(_withdrawalFeeBP);\n    }\n\n    function setManagementFee(uint256 _managementFeeBP) external onlyOwner {\n        require(_managementFeeBP <= 10000, \"Vault: Management fee too high\");\n        managementFeeBP = _managementFeeBP;\n        emit ManagementFeeSet(_managementFeeBP);\n    }\n\n    function setPerformanceFeeRecipient(address _performanceFeeRecipient) external onlyOwner {\n        require(_performanceFeeRecipient != address(0), \"Vault: Invalid performance fee recipient\");\n        performanceFeeRecipient = _performanceFeeRecipient;\n        emit PerformanceFeeRecipientSet(_performanceFeeRecipient);\n    }\n\n    function setStrategy(address _newStrategy) external onlyOwner {\n        require(_newStrategy != address(0), \"Vault: Invalid strategy address\");\n        // Optionally, you might want to withdraw all assets from the old strategy before setting a new one.\n        strategy = IStrategy(_newStrategy);\n        emit StrategySet(_newStrategy);\n    }\n\n    function withdrawAllFromStrategy() external onlyOwner {\n        // This is a safety function to withdraw all assets from the strategy if needed.\n        // It should be used with caution.\n        strategy.withdrawAll(); // Removed the void cast, as it's not valid Solidity syntax. The function call itself is sufficient.\n    }\n\n    function emergencyWithdraw(address _token, address _to) external onlyOwner {\n        // Emergency withdrawal function for the vault's own balance of a specific token.\n        // This bypasses the strategy and fees. Use with extreme caution.\n        uint256 balance = IERC20(_token).balanceOf(address(this));\n        require(balance > 0, \"Vault: No balance to withdraw\");\n        require(IERC20(_token).transfer(_to, balance), \"Vault: Emergency transfer failed\");\n    }\n}",
+    "analysis": {
+      "compiled": true,
+      "findings": [
+        {
+          "check": "unused-return",
+          "impact": "Medium",
+          "confidence": "Medium",
+          "line": 0,
+          "description": "YieldAggregatorVault.withdrawAllFromStrategy() (tmp7nevj2j8.sol#210-214) ignores return value by strategy.withdrawAll() (tmp7nevj2j8.sol#213)\n",
+          "source": "slither"
+        },
+        {
+          "check": "missing-zero-check",
+          "impact": "Low",
+          "confidence": "Medium",
+          "line": 0,
+          "description": "YieldAggregatorVault.constructor(address,address,uint256,uint256,uint256,address)._performanceFeeRecipient (tmp7nevj2j8.sol#49) lacks a zero-check on :\n\t\t- performanceFeeRecipient = _performanceFeeRecipient (tmp7nevj2j8.sol#56)\n",
+          "source": "slither"
+        }
+      ],
+      "error": ""
+    },
+    "iterations": 3,
+    "usage": {
+      "input_tokens": 8535,
+      "output_tokens": 5048,
+      "llm_calls": 2
+    },
+    "wall_time_s": 32.77792763710022,
+    "loc": 155,
+    "trace": [
+      {
+        "iter": 1,
+        "kind": "seed",
+        "compiled": true,
+        "total": 9,
+        "high": 3,
+        "medium": 3,
+        "low": 3,
+        "error": ""
+      },
+      {
+        "iter": 2,
+        "kind": "repair",
+        "compiled": false,
+        "total": null,
+        "high": null,
+        "medium": null,
+        "low": null,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmp7wspzyay.sol:\nError: Expected ',' but got '.'\n--> tmp7wspzyay.sol:213:23:\n--> tmp7wspzyay.sol:213:23:"
+      },
+      {
+        "iter": 3,
+        "kind": "repair",
+        "compiled": true,
+        "total": 2,
+        "high": 0,
+        "medium": 1,
+        "low": 1,
+        "error": ""
+      }
+    ],
+    "error": "",
+    "compiled": true,
+    "total_vulns": 2,
+    "high": 0,
+    "density_per_100loc": 1.2903225806451613
+  },
+  {
+    "prompt_id": 123,
+    "category": "Governance/DAO",
+    "complexity": "variation1",
+    "strategy": "s2b_repair_from_seed",
+    "backend": "gemini",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"@openzeppelin/contracts/token/ERC20/IERC20.sol\";\nimport \"@openzeppelin/contracts/access/Ownable.sol\";\nimport \"@openzeppelin/contracts/utils/math/SafeMath.sol\";\n\ncontract QuadraticVotingDAO is Ownable {\n    using SafeMath for uint256;\n\n    IERC20 public immutable votingToken;\n    uint256 public proposalThreshold; // Minimum tokens required to create a proposal\n    uint256 public votingDelay; // Blocks to wait before voting starts\n    uint256 public votingPeriod; // Blocks a proposal is active for voting\n\n    struct Proposal {\n        uint256 id;\n        address proposer;\n        string description;\n        uint256 creationBlock;\n        uint256 startBlock;\n        uint256 endBlock;\n        uint256 forVotes;\n        uint256 againstVotes;\n        bool executed;\n    }\n\n    // Mappings cannot be part of a struct that is stored in an array directly.\n    // We store the 'hasVoted' status in a separate mapping where the key is the proposal ID.\n    mapping(uint256 => mapping(address => bool)) public proposalHasVoted;\n\n    Proposal[] public proposals;\n    uint256 public nextProposalId;\n\n    event ProposalCreated(\n        uint256 id,\n        address proposer,\n        string description,\n        uint256 creationBlock,\n        uint256 startBlock,\n        uint256 endBlock\n    );\n    event Voted(uint256 proposalId, address voter, bool support, uint256 votingPower);\n    event ProposalExecuted(uint256 proposalId);\n\n    constructor(\n        address _votingTokenAddress,\n        uint256 _proposalThreshold,\n        uint256 _votingDelay,\n        uint256 _votingPeriod\n    ) {\n        votingToken = IERC20(_votingTokenAddress);\n        proposalThreshold = _proposalThreshold;\n        votingDelay = _votingDelay;\n        votingPeriod = _votingPeriod;\n        nextProposalId = 0;\n    }\n\n    function getVotingPower(address _voter) public view returns (uint256) {\n        uint256 balance = votingToken.balanceOf(_voter);\n        // Quadratic voting: voting power is sqrt(balance)\n        // We can approximate sqrt by iterating or using a more complex algorithm if high precision is needed.\n        // For simplicity, a basic integer square root is used here.\n        // Note: This is a simplified integer square root, consider a more robust implementation for production.\n        uint256 power = 0;\n        uint256 guess = balance / 2;\n        if (guess == 0) guess = 1;\n        uint256 guessSquared = guess.mul(guess);\n\n        while (guessSquared > balance) {\n            guess = guess / 2;\n            guessSquared = guess.mul(guess);\n        }\n        while (guessSquared < balance) {\n            guess = guess.add(1);\n            guessSquared = guess.mul(guess);\n        }\n        power = guess.sub(1); // Adjust if guessSquared is exactly balance or slightly over\n\n        if (power.mul(power) > balance) {\n            power = power.sub(1);\n        }\n\n        return power;\n    }\n\n\n    function createProposal(string memory _description) public {\n        require(votingToken.balanceOf(msg.sender) >= proposalThreshold, \"Not enough tokens to create proposal\");\n\n        uint256 currentBlock = block.number;\n        uint256 proposalId = nextProposalId++;\n\n        proposals.push(Proposal({\n            id: proposalId,\n            proposer: msg.sender,\n            description: _description,\n            creationBlock: currentBlock,\n            startBlock: currentBlock.add(votingDelay),\n            endBlock: currentBlock.add(votingDelay).add(votingPeriod),\n            forVotes: 0,\n            againstVotes: 0,\n            executed: false\n        }));\n\n        emit ProposalCreated(proposalId, msg.sender, _description, currentBlock, currentBlock.add(votingDelay), currentBlock.add(votingDelay).add(votingPeriod));\n    }\n\n    function vote(uint256 _proposalId, bool _support) public {\n        require(_proposalId < nextProposalId, \"Proposal does not exist\");\n        Proposal storage proposal = proposals[_proposalId];\n\n        require(block.number >= proposal.startBlock, \"Voting has not started yet\");\n        require(block.number <= proposal.endBlock, \"Voting period has ended\");\n        require(!proposalHasVoted[_proposalId][msg.sender], \"Already voted\"); // Use the external mapping\n\n        uint256 votingPower = getVotingPower(msg.sender);\n        require(votingPower > 0, \"No voting power\");\n\n        proposalHasVoted[_proposalId][msg.sender] = true; // Use the external mapping\n\n        if (_support) {\n            proposal.forVotes = proposal.forVotes.add(votingPower);\n        } else {\n            proposal.againstVotes = proposal.againstVotes.add(votingPower);\n        }\n\n        emit Voted(_proposalId, msg.sender, _support, votingPower);\n    }\n\n    function executeProposal(uint256 _proposalId) public onlyOwner {\n        require(_proposalId < nextProposalId, \"Proposal does not exist\");\n        Proposal storage proposal = proposals[_proposalId];\n\n        require(block.number > proposal.endBlock, \"Voting period has not ended yet\");\n        require(!proposal.executed, \"Proposal already executed\");\n\n        // Simple majority check (can be customized, e.g., quorum)\n        if (proposal.forVotes > proposal.againstVotes) {\n            proposal.executed = true;\n            // In a real DAO, you would implement the actual logic here based on the proposal description.\n            // For example, calling a function on another contract, transferring funds, etc.\n            // This is a placeholder.\n            emit ProposalExecuted(_proposalId);\n        } else {\n            // Optionally, you could have a way to cancel or mark as failed\n            // For now, just don't mark as executed if it doesn't pass.\n        }\n    }\n\n    function getProposal(uint256 _proposalId) public view returns (\n        uint256 id,\n        address proposer,\n        string memory description,\n        uint256 creationBlock,\n        uint256 startBlock,\n        uint256 endBlock,\n        uint256 forVotes,\n        uint256 againstVotes,\n        bool executed\n    ) {\n        require(_proposalId < nextProposalId, \"Proposal does not exist\");\n        Proposal storage p = proposals[_proposalId];\n        return (\n            p.id,\n            p.proposer,\n            p.description,\n            p.creationBlock,\n            p.startBlock,\n            p.endBlock,\n            p.forVotes,\n            p.againstVotes,\n            p.executed\n        );\n    }\n\n    // Helper to get the number of proposals\n    function getNumberOfProposals() public view returns (uint256) {\n        return nextProposalId;\n    }\n}",
+    "analysis": {
+      "compiled": true,
+      "findings": [
+        {
+          "check": "divide-before-multiply",
+          "impact": "Medium",
+          "confidence": "Medium",
+          "line": 0,
+          "description": "QuadraticVotingDAO.getVotingPower(address) (tmpgq66leno.sol#59-85) performs a multiplication on the result of a division:\n\t- guess = balance / 2 (tmpgq66leno.sol#66)\n\t- guessSquared = guess.mul(guess) (tmpgq66leno.sol#68)\n",
+          "source": "slither"
+        },
+        {
+          "check": "divide-before-multiply",
+          "impact": "Medium",
+          "confidence": "Medium",
+          "line": 0,
+          "description": "QuadraticVotingDAO.getVotingPower(address) (tmpgq66leno.sol#59-85) performs a multiplication on the result of a division:\n\t- guess = balance / 2 (tmpgq66leno.sol#66)\n\t- guessSquared = guess.mul(guess) (tmpgq66leno.sol#76)\n",
+          "source": "slither"
+        },
+        {
+          "check": "divide-before-multiply",
+          "impact": "Medium",
+          "confidence": "Medium",
+          "line": 0,
+          "description": "QuadraticVotingDAO.getVotingPower(address) (tmpgq66leno.sol#59-85) performs a multiplication on the result of a division:\n\t- guess = guess / 2 (tmpgq66leno.sol#71)\n\t- guessSquared = guess.mul(guess) (tmpgq66leno.sol#72)\n",
+          "source": "slither"
+        },
+        {
+          "check": "incorrect-equality",
+          "impact": "Medium",
+          "confidence": "High",
+          "line": 0,
+          "description": "QuadraticVotingDAO.getVotingPower(address) (tmpgq66leno.sol#59-85) uses a dangerous strict equality:\n\t- guess == 0 (tmpgq66leno.sol#67)\n",
+          "source": "slither"
+        }
+      ],
+      "error": ""
+    },
+    "iterations": 3,
+    "usage": {
+      "input_tokens": 5383,
+      "output_tokens": 3417,
+      "llm_calls": 2
+    },
+    "wall_time_s": 53.35205101966858,
+    "loc": 139,
+    "trace": [
+      {
+        "iter": 1,
+        "kind": "seed",
+        "compiled": false,
+        "total": null,
+        "high": null,
+        "medium": null,
+        "low": null,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmpyi97me_i.sol:\nError: Struct containing a (nested) mapping cannot be constructed.\n--> tmpyi97me_i.sol:91:24:\n--> tmpyi97me_i.sol:91:24:"
+      },
+      {
+        "iter": 2,
+        "kind": "repair",
+        "compiled": false,
+        "total": null,
+        "high": null,
+        "medium": null,
+        "low": null,
+        "error": "Compilation warnings/errors on /home/anik/code/AIContractCheck/tmpax4z35da.sol:\nError: Struct containing a (nested) mapping cannot be constructed.\n--> tmpax4z35da.sol:97:24:\n--> tmpax4z35da.sol:97:24:"
+      },
+      {
+        "iter": 3,
+        "kind": "repair",
+        "compiled": true,
+        "total": 4,
+        "high": 0,
+        "medium": 4,
+        "low": 0,
+        "error": ""
+      }
+    ],
+    "error": "",
+    "compiled": true,
+    "total_vulns": 4,
+    "high": 0,
+    "density_per_100loc": 2.8776978417266186
+  },
+  {
+    "prompt_id": 139,
+    "category": "Multisig Wallet",
+    "complexity": "variation2",
+    "strategy": "s2b_repair_from_seed",
+    "backend": "gemini",
+    "code": "",
+    "analysis": null,
+    "iterations": 1,
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "llm_calls": 0
+    },
+    "wall_time_s": 129.74671483039856,
+    "loc": 0,
+    "trace": [],
+    "error": "503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}",
+    "compiled": false,
+    "total_vulns": null,
+    "high": null,
+    "density_per_100loc": null
+  }
+]

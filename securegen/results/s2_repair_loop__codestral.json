@@ -1,0 +1,460 @@
+[
+  {
+    "prompt_id": 0,
+    "category": "ERC20 Token",
+    "complexity": "simple",
+    "strategy": "s2_repair_loop",
+    "backend": "codestral",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"@openzeppelin/contracts/token/ERC20/ERC20.sol\";\n\ncontract BasicToken is ERC20 {\n    constructor() ERC20(\"BasicToken\", \"BST\") {}\n\n    function mint(address account, uint256 amount) public onlyOwner {\n        _mint(account, amount);\n    }\n\n    function burn(uint256 amount) public {\n        _burn(_msgSender(), amount);\n    }\n}",
+    "analysis": {
+      "compiled": false,
+      "findings": [],
+      "error": "no output"
+    },
+    "iterations": 3,
+    "usage": {
+      "input_tokens": 748,
+      "output_tokens": 485,
+      "llm_calls": 3
+    },
+    "wall_time_s": 10.136647462844849,
+    "loc": 11,
+    "trace": [
+      {
+        "iter": 1,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "no output"
+      },
+      {
+        "iter": 2,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "no output"
+      },
+      {
+        "iter": 3,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "no output"
+      }
+    ],
+    "error": "",
+    "compiled": false,
+    "total_vulns": null,
+    "high": null,
+    "density_per_100loc": null
+  },
+  {
+    "prompt_id": 16,
+    "category": "ERC721 NFT",
+    "complexity": "medium",
+    "strategy": "s2_repair_loop",
+    "backend": "codestral",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"@openzeppelin/contracts/token/ERC721/ERC721.sol\";\nimport \"@openzeppelin/contracts/access/Ownable.sol\";\nimport \"@openzeppelin/contracts/utils/Strings.sol\";\n\ncontract WhitelistNFT is ERC721, Ownable {\n    using Strings for uint256;\n\n    mapping(address => bool) public whitelisted;\n    uint256 public constant baseURILength = 40; // length of \"ipfs://Qm...\"\n    bytes32[] private hashedAddresses;\n    uint256 private _tokenIds;\n\n    constructor() ERC721(\"WhitelistNFT\", \"WLNFT\") {}\n\n    modifier onlyOwner() {\n        _;\n    }\n\n    function addToWhitelist(address[] memory _addresses) public onlyOwner {\n        for (uint256 i = 0; i < _addresses.length; i++) {\n            whitelisted[_addresses[i]] = true;\n            hashedAddresses.push(keccak256(abi.encodePacked(_addresses[i])));\n        }\n    }\n\n    function removeFromWhitelist(address[] memory _addresses) public onlyOwner {\n        for (uint256 i = 0; i < _addresses.length; i++) {\n            whitelisted[_addresses[i]] = false;\n            uint256 index = findHashedAddressIndex(keccak256(abi.encodePacked(_addresses[i])));\n            hashedAddresses[index] = hashedAddresses[hashedAddresses.length - 1];\n            hashedAddresses.pop();\n        }\n    }\n\n    function mint() public payable {\n        require(whitelisted[msg.sender], \"Not whitelisted\");\n        _safeMint(msg.sender, baseURI());\n        whitelisted[msg.sender] = false;\n    }\n\n    function royaltyInfo(uint256 _tokenId, uint256 _salePrice) external view override returns (address receiver, uint256 royaltyAmount) {\n        receiver = owner();\n        royaltyAmount = _salePrice.div(10); // 10% royalties\n    }\n\n    function baseURI() internal view virtual override returns (string memory) {\n        return \"ipfs://Qm...\";\n    }\n\n    function tokenURI(uint256 _tokenId) public view override returns (string memory) {\n        require(_exists(_tokenId), \"ERC721Metadata: URI query for nonexistent token\");\n        uint256 index = findHashedAddressIndex(keccak256(abi.encodePacked(ownerOf(_tokenId))));\n        return string(abi.encodePacked(baseURI(), Strings.toString(index + baseURILength), \".json\"));\n    }\n\n    function findHashedAddressIndex(bytes32 hashedAddress) private view returns (uint256) {\n        for (uint256 i = 0; i < hashedAddresses.length; i++) {\n            if (hashedAddresses[i] == hashedAddress) {\n                return i;\n            }\n        }\n        revert(\"Address not found\");\n    }\n}",
+    "analysis": {
+      "compiled": false,
+      "findings": [],
+      "error": "no output"
+    },
+    "iterations": 3,
+    "usage": {
+      "input_tokens": 2504,
+      "output_tokens": 2011,
+      "llm_calls": 3
+    },
+    "wall_time_s": 39.82331848144531,
+    "loc": 54,
+    "trace": [
+      {
+        "iter": 1,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "no output"
+      },
+      {
+        "iter": 2,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "no output"
+      },
+      {
+        "iter": 3,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "no output"
+      }
+    ],
+    "error": "",
+    "compiled": false,
+    "total_vulns": null,
+    "high": null,
+    "density_per_100loc": null
+  },
+  {
+    "prompt_id": 32,
+    "category": "ERC1155 Multi-Token",
+    "complexity": "complex",
+    "strategy": "s2_repair_loop",
+    "backend": "codestral",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"@openzeppelin/contracts@4.9.3/token/ERC1155/ERC1155.sol\";\nimport \"@openzeppelin/contracts@4.9.3/utils/Strings.sol\";\nimport \"@openzeppelin/contracts@4.9.3/access/Ownable.sol\";\nimport \"@openzeppelin/contracts@4.9.3/token/ERC721/IERC721Receiver.sol\";\n\ncontract TokenCraft is ERC1155, Ownable {\n    string private baseTokenURI;\n    mapping(uint => string) private tokenURIs;\n\n    constructor() ERC1155(\"\", \"\") {}\n\n    function setBaseTokenURI(string memory _baseTokenURI) external onlyOwner {\n        baseTokenURI = _baseTokenURI;\n    }\n\n    function mint(address account, uint256 id, uint256 amount, string memory uri)\n        external\n        onlyOwner\n    {\n        _mint(account, id, amount, \"\");\n        tokenURIs[id] = uri;\n    }\n\n    function batchMint(address to, uint256[] memory ids, uint256[] memory amounts, string memory uri) external onlyOwner {\n        require(ids.length == amounts.length, \"Ids and amounts length mismatch\");\n        _mintBatch(to, ids, amounts, \"\");\n        for (uint i = 0; i < ids.length; i++) {\n            tokenURIs[ids[i]] = uri;\n        }\n    }\n\n    function craftToken(uint256[] memory burnIds, uint256[] memory burnAmounts, uint256 newId, string memory uri) external {\n        require(burnIds.length == burnAmounts.length, \"Ids and amounts length mismatch\");\n        for (uint i = 0; i < burnIds.length; i++) {\n            _burn(msg.sender, burnIds[i], burnAmounts[i]);\n        }\n        _mint(msg.sender, newId, 1, \"\");\n        tokenURIs[newId] = uri;\n    }\n\n    function _beforeTokenTransfer(address operator, address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes calldata data)\n        internal\n        override\n    {\n        super._beforeTokenTransfer(operator, from, to, ids, amounts, data);\n    }\n\n    function uri(uint256 tokenId) public view virtual override returns (string memory) {\n        string memory _uri = baseTokenURI;\n        if (tokenURIs[tokenId].length > 0) {\n            return string(abi.encodePacked(_uri, Strings.toString(tokenId), \"/\", tokenURIs[tokenId]));\n        } else {\n            return super.uri(tokenId);\n        }\n    }\n}\n\ncontract Marketplace is Ownable {\n    TokenCraft tokenContract;\n    mapping(uint => uint) private tokenPrices;\n    mapping(uint => address) private tokenOwners;\n\n    constructor(address _tokenContract) {\n        tokenContract = TokenCraft(_tokenContract);\n    }\n\n    function setTokenPrice(uint tokenId, uint price) external onlyOwner {\n        tokenPrices[tokenId] = price;\n    }\n\n    function buyToken(uint tokenId) external payable {\n        require(address(this).balance >= tokenPrices[tokenId], \"Insufficient funds\");\n        require(tokenOwners[tokenId] == address(0), \"Token already sold\");\n        tokenContract.transferFrom(msg.sender, address(this), tokenId, 1);\n        payable(tokenOwners[tokenId]).transfer(tokenPrices[tokenId]);\n        tokenOwners[tokenId] = msg.sender;\n    }\n}",
+    "analysis": {
+      "compiled": false,
+      "findings": [],
+      "error": "no output"
+    },
+    "iterations": 3,
+    "usage": {
+      "input_tokens": 3112,
+      "output_tokens": 2795,
+      "llm_calls": 3
+    },
+    "wall_time_s": 59.3956663608551,
+    "loc": 67,
+    "trace": [
+      {
+        "iter": 1,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "no output"
+      },
+      {
+        "iter": 2,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "no output"
+      },
+      {
+        "iter": 3,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "no output"
+      }
+    ],
+    "error": "",
+    "compiled": false,
+    "total_vulns": null,
+    "high": null,
+    "density_per_100loc": null
+  },
+  {
+    "prompt_id": 48,
+    "category": "DeFi Staking",
+    "complexity": "variation1",
+    "strategy": "s2_repair_loop",
+    "backend": "codestral",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"@openzeppelin/contracts/token/ERC20/IERC20.sol\";\nimport \"@openzeppelin/contracts/access/Ownable.sol\";\nimport \"@openzeppelin/contracts/security/ReentrancyGuard.sol\";\nimport \"@openzeppelin/contracts/token/ERC20/ERC20.sol\";\nimport \"@openzeppelin/contracts/utils/math/SafeMath.sol\";\n\ncontract LiquidStaking is Ownable, ReentrancyGuard {\n    using SafeMath for uint256;\n\n    IERC20 public stakedToken;\n    ERC20 public stToken;\n\n    constructor(address _stakedTokenAddress) {\n        stakedToken = IERC20(_stakedTokenAddress);\n        stToken = new ERC20(\"Staked Token\", \"STK\");\n    }\n\n    function stake(uint256 amount) public nonReentrant {\n        require(amount > 0, \"Amount must be greater than zero.\");\n        require(stakedToken.transferFrom(msg.sender, address(this), amount), \"Transfer failed.\");\n\n        uint256 stTokensToMint = calculateStTokens(amount);\n        stToken.mint(msg.sender, stTokensToMint);\n    }\n\n    function unstake(uint256 stAmount) public nonReentrant {\n        require(stAmount > 0, \"Amount must be greater than zero.\");\n        require(stToken.balanceOf(msg.sender) >= stAmount, \"Insufficient balance.\");\n\n        uint256 underlyingTokens = calculateUnderlyingTokens(stAmount);\n        stToken.burn(msg.sender, stAmount);\n        stakedToken.transfer(msg.sender, underlyingTokens);\n    }\n\n    function calculateStTokens(uint256 amount) private view returns (uint256) {\n        // Add your logic to calculate the number of stTokens to mint based on the amount of staked tokens.\n        return amount; // Placeholder logic, replace with actual calculation.\n    }\n\n    function calculateUnderlyingTokens(uint256 stAmount) private view returns (uint256) {\n        // Add your logic to calculate the number of underlying tokens to release based on the amount of stTokens burned.\n        return stAmount; // Placeholder logic, replace with actual calculation.\n    }\n}",
+    "analysis": {
+      "compiled": false,
+      "findings": [],
+      "error": "no output"
+    },
+    "iterations": 3,
+    "usage": {
+      "input_tokens": 2043,
+      "output_tokens": 1749,
+      "llm_calls": 3
+    },
+    "wall_time_s": 37.219314098358154,
+    "loc": 34,
+    "trace": [
+      {
+        "iter": 1,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "no output"
+      },
+      {
+        "iter": 2,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "no output"
+      },
+      {
+        "iter": 3,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "no output"
+      }
+    ],
+    "error": "",
+    "compiled": false,
+    "total_vulns": null,
+    "high": null,
+    "density_per_100loc": null
+  },
+  {
+    "prompt_id": 75,
+    "category": "DeFi DEX/AMM",
+    "complexity": "simple",
+    "strategy": "s2_repair_loop",
+    "backend": "codestral",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.13;\n\ncontract BasicAMM {\n    uint256 public tokenBalance;\n    uint256 public ethBalance;\n    uint256 public constant k = 10**18 * 10**18; // Initial product of ETH and Token (1 ETH = 1 Token)\n\n    function addLiquidity(uint256 _ethAmount, uint256 _tokenAmount) external payable {\n        require(_ethAmount > 0 && _tokenAmount > 0, \"Invalid input\");\n        tokenBalance += _tokenAmount;\n        ethBalance += msg.value;\n    }\n\n    function swap(uint256 _inputAmount, bool _isEth) external payable {\n        if (_isEth) {\n            require(_inputAmount <= ethBalance && _inputAmount > 0, \"Insufficient ETH balance\");\n            uint256 output = tokenBalance - k / (_inputAmount + ethBalance);\n            require(output < tokenBalance && output > 0, \"Swap calculation error\");\n            payable(msg.sender).transfer(tokenBalance - output);\n            tokenBalance -= output;\n        } else {\n            require(_inputAmount <= tokenBalance && _inputAmount > 0, \"Insufficient Token balance\");\n            uint256 output = ethBalance - k / (_inputAmount + tokenBalance);\n            require(output < ethBalance && output > 0, \"Swap calculation error\");\n            msg.sender.transfer(ethBalance - output);\n            ethBalance -= output;\n        }\n    }\n}",
+    "analysis": {
+      "compiled": false,
+      "findings": [],
+      "error": "no output"
+    },
+    "iterations": 3,
+    "usage": {
+      "input_tokens": 1617,
+      "output_tokens": 1373,
+      "llm_calls": 3
+    },
+    "wall_time_s": 29.92071843147278,
+    "loc": 26,
+    "trace": [
+      {
+        "iter": 1,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "no output"
+      },
+      {
+        "iter": 2,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "no output"
+      },
+      {
+        "iter": 3,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "no output"
+      }
+    ],
+    "error": "",
+    "compiled": false,
+    "total_vulns": null,
+    "high": null,
+    "density_per_100loc": null
+  },
+  {
+    "prompt_id": 91,
+    "category": "Yield Aggregator",
+    "complexity": "medium",
+    "strategy": "s2_repair_loop",
+    "backend": "codestral",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface IYieldStrategy {\n    function deposit(uint256 amount) external returns (uint256);\n    function withdraw(uint256 amount) external returns (uint256);\n    function compound() external;\n}\n\ncontract YieldAggregatorVault {\n    address public owner;\n    IYieldStrategy public strategy;\n    uint256 public depositFeeBps = 10; // 0.1% deposit fee\n    uint256 public withdrawalFeeBps = 10; // 0.1% withdrawal fee\n\n    constructor(address _strategy) {\n        owner = msg.sender;\n        strategy = IYieldStrategy(_strategy);\n    }\n\n    function deposit(uint256 amount) public returns (uint256) {\n        require(amount > 0, \"Amount must be greater than zero\");\n        uint256 fee = (amount * depositFeeBps) / 10000;\n        strategy.deposit(amount - fee);\n        return amount - fee;\n    }\n\n    function withdraw(uint256 amount) public returns (uint256) {\n        uint256 fee = (amount * withdrawalFeeBps) / 10000;\n        uint256 withdrawnAmount = strategy.withdraw(amount - fee);\n        return withdrawnAmount;\n    }\n\n    function compound() public onlyOwner {\n        strategy.compound();\n    }\n\n    modifier onlyOwner() {\n        require(msg.sender == owner, \"Only the contract owner can call this function\");\n        _;\n    }\n}",
+    "analysis": {
+      "compiled": true,
+      "findings": [
+        {
+          "check": "unused-return",
+          "impact": "Medium",
+          "confidence": "Medium",
+          "line": 0,
+          "description": "YieldAggregatorVault.deposit(uint256) (tmp3mfeq8vb.sol#21-26) ignores return value by strategy.deposit(amount - fee) (tmp3mfeq8vb.sol#24)\n",
+          "source": "slither"
+        }
+      ],
+      "error": ""
+    },
+    "iterations": 3,
+    "usage": {
+      "input_tokens": 1759,
+      "output_tokens": 1241,
+      "llm_calls": 3
+    },
+    "wall_time_s": 27.740140914916992,
+    "loc": 34,
+    "trace": [
+      {
+        "iter": 1,
+        "compiled": true,
+        "total": 1,
+        "high": 0,
+        "medium": 1,
+        "low": 0,
+        "error": ""
+      },
+      {
+        "iter": 2,
+        "compiled": true,
+        "total": 1,
+        "high": 0,
+        "medium": 1,
+        "low": 0,
+        "error": ""
+      },
+      {
+        "iter": 3,
+        "compiled": true,
+        "total": 1,
+        "high": 0,
+        "medium": 1,
+        "low": 0,
+        "error": ""
+      }
+    ],
+    "error": "",
+    "compiled": true,
+    "total_vulns": 1,
+    "high": 0,
+    "density_per_100loc": 2.9411764705882355
+  },
+  {
+    "prompt_id": 123,
+    "category": "Governance/DAO",
+    "complexity": "variation1",
+    "strategy": "s2_repair_loop",
+    "backend": "codestral",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"@openzeppelin/contracts/token/ERC20/IERC20.sol\";\nimport \"@openzeppelin/contracts/access/Ownable.sol\";\n\ncontract QuadraticVotingDAO is Ownable {\n    IERC20 public token;\n    mapping(address => uint) private _memberBalances;\n\n    constructor(IERC20 _token) {\n        token = _token;\n    }\n\n    function join() external {\n        require(!_memberBalances[msg.sender], \"Already a member\");\n        uint balance = token.balanceOf(msg.sender);\n        require(balance > 0, \"No tokens to contribute\");\n        _memberBalances[msg.sender] = balance;\n    }\n\n    function vote(uint proposalId) external {\n        uint votingPower = calculateVotingPower(msg.sender);\n        // Implement your voting logic here using the calculated voting power\n    }\n\n    function calculateVotingPower(address account) internal view returns (uint) {\n        return _memberBalances[account] > 0 ? uint(sqrt(_memberBalances[account])) : 0;\n    }\n}",
+    "analysis": {
+      "compiled": false,
+      "findings": [],
+      "error": "no output"
+    },
+    "iterations": 3,
+    "usage": {
+      "input_tokens": 1237,
+      "output_tokens": 965,
+      "llm_calls": 3
+    },
+    "wall_time_s": 21.458274841308594,
+    "loc": 22,
+    "trace": [
+      {
+        "iter": 1,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "no output"
+      },
+      {
+        "iter": 2,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "no output"
+      },
+      {
+        "iter": 3,
+        "compiled": false,
+        "total": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "error": "no output"
+      }
+    ],
+    "error": "",
+    "compiled": false,
+    "total_vulns": null,
+    "high": null,
+    "density_per_100loc": null
+  },
+  {
+    "prompt_id": 139,
+    "category": "Multisig Wallet",
+    "complexity": "variation2",
+    "strategy": "s2_repair_loop",
+    "backend": "codestral",
+    "code": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract SocialRecoveryWallet {\n    address payable public owner;\n    mapping(address => bool) public guardians;\n    uint public requiredGuardians;\n    uint public recoveredGuardians;\n\n    constructor(address[] memory _guardians, uint _requiredGuardians) {\n        require(_requiredGuardians <= _guardians.length, \"Required guardians should not exceed total guardians\");\n        owner = payable(msg.sender);\n        requiredGuardians = _requiredGuardians;\n\n        for (uint i = 0; i < _guardians.length; i++) {\n            addGuardian(_guardians[i]);\n        }\n    }\n\n    function addGuardian(address _guardian) public onlyOwner {\n        require(!guardians[_guardian], \"Guardian already exists\");\n        guardians[_guardian] = true;\n    }\n\n    function removeGuardian(address _guardian) public onlyOwner {\n        require(guardians[_guardian], \"Guardian does not exist\");\n        delete guardians[_guardian];\n    }\n\n    function recoverFunds() public {\n        require(recoveredGuardians >= requiredGuardians, \"Not enough guardians have approved the recovery\");\n        owner.transfer(address(this).balance);\n    }\n\n    function approveRecovery() public {\n        require(guardians[msg.sender], \"Sender is not a guardian\");\n        require(recoveredGuardians < requiredGuardians, \"All required guardians have already approved the recovery\");\n        recoveredGuardians++;\n    }\n\n    modifier onlyOwner() {\n        require(msg.sender == owner, \"Only the owner can perform this action\");\n        _;\n    }\n}",
+    "analysis": {
+      "compiled": true,
+      "findings": [
+        {
+          "check": "arbitrary-send-eth",
+          "impact": "High",
+          "confidence": "Medium",
+          "line": 0,
+          "description": "SocialRecoveryWallet.recoverFunds() (tmpvts8z3od.sol#30-33) sends eth to arbitrary user\n\tDangerous calls:\n\t- owner.transfer(address(this).balance) (tmpvts8z3od.sol#32)\n",
+          "source": "slither"
+        }
+      ],
+      "error": ""
+    },
+    "iterations": 3,
+    "usage": {
+      "input_tokens": 1863,
+      "output_tokens": 1369,
+      "llm_calls": 3
+    },
+    "wall_time_s": 30.271087408065796,
+    "loc": 36,
+    "trace": [
+      {
+        "iter": 1,
+        "compiled": true,
+        "total": 1,
+        "high": 1,
+        "medium": 0,
+        "low": 0,
+        "error": ""
+      },
+      {
+        "iter": 2,
+        "compiled": true,
+        "total": 1,
+        "high": 1,
+        "medium": 0,
+        "low": 0,
+        "error": ""
+      },
+      {
+        "iter": 3,
+        "compiled": true,
+        "total": 1,
+        "high": 1,
+        "medium": 0,
+        "low": 0,
+        "error": ""
+      }
+    ],
+    "error": "",
+    "compiled": true,
+    "total_vulns": 1,
+    "high": 1,
+    "density_per_100loc": 2.7777777777777777
+  }
+]

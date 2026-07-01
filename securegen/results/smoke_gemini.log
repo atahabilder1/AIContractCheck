@@ -1,0 +1,50 @@
+=== Smoke: 8 prompts, backend=gemini ===
+
+>>> S0 baseline
+[1/8] id=0 ERC20 Token | s0_baseline
+   compiled=True vulns=2 iters=1 tok=223 1.8s
+[2/8] id=16 ERC721 NFT | s0_baseline
+   compiled=False vulns=None iters=1 tok=2226 8.6s
+[3/8] id=32 ERC1155 Multi-Token | s0_baseline
+   compiled=False vulns=None iters=1 tok=3008 11.5s
+[4/8] id=48 DeFi Staking | s0_baseline
+   compiled=True vulns=1 iters=1 tok=1984 11.4s
+[5/8] id=75 DeFi DEX/AMM | s0_baseline
+   compiled=True vulns=2 iters=1 tok=1460 5.8s
+[6/8] id=91 Yield Aggregator | s0_baseline
+   compiled=True vulns=9 iters=1 tok=2252 9.8s
+[7/8] id=123 Governance/DAO | s0_baseline
+   compiled=False vulns=None iters=1 tok=1610 11.1s
+[8/8] id=139 Multisig Wallet | s0_baseline
+   compiled=False vulns=None iters=1 tok=1414 20.2s
+
+Saved -> securegen/results/s0_baseline__gemini.json
+
+>>> S2 repair loop
+[1/8] id=0 ERC20 Token | s2_repair_loop
+   compiled=True vulns=0 iters=2 tok=504 13.7s
+[2/8] id=16 ERC721 NFT | s2_repair_loop
+   compiled=False vulns=None iters=3 tok=5823 25.8s
+[3/8] id=32 ERC1155 Multi-Token | s2_repair_loop
+   compiled=False vulns=None iters=3 tok=7047 32.2s
+[4/8] id=48 DeFi Staking | s2_repair_loop
+   compiled=True vulns=0 iters=2 tok=1613 25.3s
+[5/8] id=75 DeFi DEX/AMM | s2_repair_loop
+   compiled=True vulns=5 iters=3 tok=5940 56.8s
+[6/8] id=91 Yield Aggregator | s2_repair_loop
+   compiled=True vulns=5 iters=3 tok=7362 27.0s
+[7/8] id=123 Governance/DAO | s2_repair_loop
+   compiled=True vulns=1 iters=3 tok=3320 22.8s
+[8/8] id=139 Multisig Wallet | s2_repair_loop
+   compiled=True vulns=3 iters=3 tok=8764 47.4s
+
+Saved -> securegen/results/s2_repair_loop__gemini.json
+
+============================================================
+
+Baseline: s0_baseline__gemini
+strategy                            comp%  vulns  high   dens     tok iters    sec
+----------------------------------------------------------------------------------
+s0_baseline__gemini                 50.0%   3.50     1   4.70    1772   1.0   10.0
+s2_repair_loop__gemini              75.0%   2.33     0   1.75    5047   2.8   31.4
+    vs baseline: Δvulns=-1 p=nan δ=-0.25 (n=4)

@@ -1,0 +1,217 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{fancyvrb}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+
+\titleformat{\section}{\large\bfseries\color{blue!50!black}}{\thesection}{1em}{}
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+\title{\textbf{SecureGen / S4:\\ Generation-Time Defenses for LLM-Written Smart Contracts}\\[4pt]
+\large A plain-language walkthrough of the pipeline}
+\author{AIContractCheck project}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent This note explains, in accessible terms, what the SecureGen ``S4''
+system does and why. The measurement study behind this project found that
+vulnerabilities in LLM-generated Solidity are \emph{intrinsic}: you cannot remove
+them by rewording the prompt. S4's answer is to put a lightweight security
+``verifier'' \emph{inside} the model's generation loop --- a tiny probe that reads
+the model's own internal state token-by-token and steers it away from vulnerable
+code as it writes. This document walks through the idea, the training pipeline,
+the inference pipeline, and the current experimental results.
+\end{abstract}
+
+\section{The problem, in one paragraph}
+Developers increasingly paste LLM-generated Solidity straight into production,
+where it guards real money. Our 2{,}400-contract, 8-LLM study showed that a large
+fraction of that code is vulnerable, and --- crucially --- that ``adversarial''
+prompts do \emph{not} meaningfully change the vulnerability rate ($p\approx0.997$).
+The danger is not a clever attacker's prompt; it is the ordinary developer who
+skips the security pipeline. Asking the model nicely (``write it securely'')
+does not fix this. So the fix has to live \emph{in the generation process itself}.
+
+\section{The five strategies}
+SecureGen is a modular harness where each defense is a pluggable
+\emph{Strategy}, and every strategy is scored by the \emph{same} analyzer
+(Slither) so comparisons are fair.
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Strategy} & \textbf{Idea} & \textbf{Cost} \\
+\midrule
+S0 baseline & plain generation (control) & 1 call \\
+S1 prompt prefix & prepend a security instruction & 1 call \\
+S2 / S2b repair loop & generate $\rightarrow$ Slither $\rightarrow$ repair & several calls \\
+S3 checkpoint & write a skeleton first, then fill & several calls \\
+\textbf{S4 inline probe} & \textbf{steer decoding with a probe} & 1 call, white-box \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent S2b already gives a clean, \emph{large} improvement (repairing a
+contract against Slither feedback). But S2b needs a full compile-and-Slither pass
+per fix --- seconds each, and impossible \emph{while the model is still typing}.
+\textbf{S4 is the novel contribution}: it replaces the slow analyzer-in-the-loop
+with a fast probe that works mid-generation.
+
+\section{The core insight behind S4}
+An ``open'' model (one whose weights we run ourselves --- here
+\code{Qwen2.5-Coder-7B}) exposes its internal \emph{activations}: the vectors
+flowing through each layer as it generates. We ask a simple question: is
+vulnerability already visible in those activations \emph{before} the code is even
+finished? If yes, a tiny classifier can read that signal cheaply and warn us in
+real time.
+
+\begin{center}
+\fbox{\parbox{0.9\textwidth}{\centering
+\textbf{TEACHER} (Slither, slow, offline) $\;\rightarrow\;$ labels\\
+\textbf{STUDENT} (tiny probe on activations) $\;\rightarrow\;$ fast inline signal\\
+\textbf{VERIFIER} (Slither again, on the final code) $\;\rightarrow\;$ fair evaluation}}
+\end{center}
+
+\noindent The probe is a cheap, differentiable stand-in for a slow static
+analyzer --- and it can ride \emph{inside} decoding, where Slither physically
+cannot. That is the whole trick.
+
+\section{Pipeline 1 --- Training the probe (one-time)}
+\begin{Verbatim}[frame=single,fontsize=\small]
+ Qwen corpus contracts          Slither/Semgrep labels
+ dataset/qwen/*.sol (237)       (line numbers parsed from dedup_key #L88-L94)
+        |                              |
+        v                              v
+   +-------------------------------------------------+
+   |  extract_activations.py                         |
+   |  re-feed each contract through Qwen (on the GPU) |
+   |  grab the layer-12 residual stream               |
+   |  one vector per LINE (the line's final token)    |
+   |  label = 1 if any tool flagged that line         |
+   +-----------------------+-------------------------+
+                           v
+             activations.pt   { X:[N,3584]  y:[N]  groups:[N] }
+                           v
+   +-------------------------------------------------+
+   |  train_probe.py -- tiny LINEAR classifier        |
+   |  CONTRACT-LEVEL 80/20 split (no line leakage)    |
+   +-----------------------+-------------------------+
+                           v
+              probe_l12.pt   +   AUROC  <-- the paper result
+\end{Verbatim}
+
+\section{Pipeline 2 --- Steered decoding (inference)}
+\begin{Verbatim}[frame=single,fontsize=\small]
+ prompt --> Qwen decodes token by token (with a KV cache for speed)
+                |
+                v   every ~16 tokens, at a ';' or '}' boundary:
+        read layer-12 hidden state --> probe --> risk in [0,1]
+                |
+        risk > threshold?
+           | no                     | yes
+           v                        v
+        keep going            BACKTRACK to the last safe point,
+                              inject "// checks-effects-interactions..."
+                              and re-decode the risky span
+                |
+                v
+        final contract --> Slither (the harness verifies it, fairly)
+\end{Verbatim}
+
+\noindent Two engineering details make this runnable and correct:
+\begin{itemize}[nosep]
+  \item \textbf{KV cache}: without it, every new token re-reads the whole
+  sequence ($O(n^2)$); with it, cost is $O(n)$. Verified: cache-on produces
+  byte-identical output to cache-off.
+  \item \textbf{Backtrack sync}: when we rewind the text, we crop the cache to
+  the same point, so the model never ``remembers'' code we erased.
+\end{itemize}
+
+\section{How we test ``does it work?''}
+For each prompt we run the \emph{same} white-box model twice with the \emph{same}
+random seed:
+\begin{itemize}[nosep]
+  \item \textbf{OFF} --- probe disabled: plain Qwen (the control).
+  \item \textbf{ON} --- probe active: steering + backtracking.
+\end{itemize}
+Because the seed matches, the two runs are identical until the probe first
+intervenes, so any difference in Slither's verdict is caused by \emph{steering
+alone}. We then report the \textbf{paired $\Delta$vulns}: the per-prompt change
+$(\text{vulns}_{\text{ON}} - \text{vulns}_{\text{OFF}})$, averaged over prompts
+where both versions compiled. \textbf{Negative = steering removed
+vulnerabilities.} Pairing (each contract vs.\ itself) cancels the noise from
+contracts having different inherent difficulty.
+
+\section{Results so far}
+\subsection*{Probe (the signal exists)}
+On the RTX~3090, re-feeding 237 compiled Qwen contracts gave 10{,}287 line
+samples (13\% flagged). A \emph{linear} probe recovers Slither's judgment with:
+\begin{center}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+ & \textbf{AUROC} & \textbf{note} \\
+\midrule
+Layer 12 (chosen) & 0.887 & lowest variance; mid-network \\
+Best over sweep (L28) & 0.887 & signal is flat across depth \\
+Range across all layers & 0.86--0.89 & robust: decodable everywhere \\
+\bottomrule
+\end{tabular}
+\end{center}
+\noindent \textbf{Conclusion: vulnerability is \emph{linearly} decodable from
+Qwen's own layer-12 representations.} This is the green light for steering ---
+the signal the decoder needs is really there.
+
+\subsection*{Steered decoding (does steering help?)}
+A paired A/B over 15 diverse prompts (one per contract category), threshold
+0.5, gives a \textbf{mixed} result:
+\begin{center}
+\begin{tabular}{@{}lc@{}}
+\toprule
+\textbf{Metric (OFF $\rightarrow$ ON)} & \textbf{Value} \\
+\midrule
+Compile rate & \textbf{40\% $\rightarrow$ 60\%} \quad(rescued 3 contracts) \\
+Mean vulns (compiled only) & 0.83 $\rightarrow$ 1.89 \\
+Density /100 LOC & 1.25 $\rightarrow$ 3.25 \\
+High-severity total & 0 $\rightarrow$ 3 \\
+Paired $\Delta$vulns ($n=6$ both compiled) & \textbf{+0.33} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\noindent \textbf{Honest reading:} the probe signal is strong, and steering
+\emph{improves compilability} (the nudge helps the model finish valid code). But
+it does \emph{not} reduce vulnerability density: on contracts that compiled both
+ways vulns were flat except one regression, and the rescued contracts compile
+\emph{with} vulnerabilities. \textbf{Conclusion: the signal works; naive
+comment-injection steering does not yet reduce vulns.} This motivates the next
+steps below (calibration via self-generation, a stronger steering intervention,
+and a threshold sweep) --- and it is a genuine, publishable negative on the
+naive approach, not a dead end.
+
+\section{Status and what remains}
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Done} & \textbf{Next} \\
+\midrule
+Probe de-risk (AUROC 0.89) & Self-generation rewrite (clean number) \\
+Layer sweep $\rightarrow$ layer 12 & Scale A/B to all 300 prompts \\
+KV-cache decoder (verified) & Threshold sweep for best trade-off \\
+Paired A/B harness & Bigger open models (needs the A6000) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent \textbf{One-line summary:} training time turns Slither's slow verdicts
+into a fast probe; inference time lets that probe steer the model away from
+vulnerable code as it writes --- and the probe is accurate enough (AUROC
+$\approx 0.89$) for that steering to be well-founded.
+
+\end{document}
